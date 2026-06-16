@@ -1,0 +1,12 @@
+steambridge.gui.open_steam=Відкрити для Steam
+steambridge.gui.select_friend=Виберіть друга зі Steam
+steambridge.gui.kick=Вигнати
+steambridge.gui.ban=Заблокувати
+steambridge.gui.unban=Розблокувати
+steambridge.gui.banned=Список заблокованих
+steambridge.gui.management=Керування сервером Steam
+steambridge.gui.manage_session=Керування Steam сесією
+steambridge.gui.not_running=Steam сервер не запущено
+steambridge.gui.no_players=Поки що немає гравців, які приєдналися цим способом...
+steambridge.error.steam_shutdown=Зв'язок зі Steam втрачено. Будь ласка, перевірте клієнт Steam.
+steambridge.error.host_steam_shutdown=Локальний Steam міст вимкнено через помилку клієнта Steam! Багатокористувацька гра більше недоступна.

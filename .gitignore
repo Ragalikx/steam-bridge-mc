@@ -1,0 +1,27 @@
+# Gradle
+.gradle/
+build/
+tmp/
+
+# IDE
+.idea/
+*.iml
+out/
+bin/
+
+# Forge decompiled workspace
+src/generated/
+run/
+
+# Logs and debug artifacts
+*.log
+log.txt
+build_output.txt
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Internal dev notes - not for public release
+roadmap.txt
+

@@ -1,0 +1,12 @@
+steambridge.gui.open_steam=Открыть для Steam
+steambridge.gui.select_friend=Выберите друга из Steam
+steambridge.gui.kick=Кик
+steambridge.gui.ban=Бан
+steambridge.gui.unban=Рaзбан
+steambridge.gui.banned=Список забаненных
+steambridge.gui.management=Управление Steam сервером
+steambridge.gui.manage_session=Управление Steam Сессией
+steambridge.gui.not_running=Сервер Steam не запущен
+steambridge.gui.no_players=Пока что нет людей, присоединённых данным способом...
+steambridge.error.steam_shutdown=Связь со Steam разорвана. Пожалуйста, проверьте клиент Steam.
+steambridge.error.host_steam_shutdown=Локальный Steam мост отключен из-за ошибки клиента Steam! Мультиплеер больше не доступен.
