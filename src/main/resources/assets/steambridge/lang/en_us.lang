@@ -1,0 +1,12 @@
+steambridge.gui.open_steam=Open in Steam
+steambridge.gui.select_friend=Select a Steam Friend
+steambridge.gui.kick=Kick
+steambridge.gui.ban=Ban
+steambridge.gui.unban=Unban
+steambridge.gui.banned=Ban List
+steambridge.gui.management=Steam Server Management
+steambridge.gui.manage_session=Manage Steam Session
+steambridge.gui.not_running=Steam server is not running
+steambridge.gui.no_players=No players have joined this way yet...
+steambridge.error.steam_shutdown=Connection with Steam was lost. Please check your Steam client.
+steambridge.error.host_steam_shutdown=Local Steam bridge disconnected due to a Steam client error! Multiplayer is no longer accessible.

@@ -1,0 +1,169 @@
+buildscript {
+    repositories {
+        maven { url = 'https://maven.minecraftforge.net' }
+        mavenCentral()
+    }
+    dependencies {
+        classpath group: 'net.minecraftforge.gradle', name: 'ForgeGradle', version: '3.+', changing: true
+    }
+}
+
+apply plugin: 'net.minecraftforge.gradle'
+apply plugin: 'java'
+
+def buildDate   = new Date()
+version         = "1.${buildDate.format('yyMMdd')}"
+group           = 'steambridge'
+archivesBaseName = 'steambridge'
+
+sourceCompatibility = JavaVersion.VERSION_1_8
+targetCompatibility = JavaVersion.VERSION_1_8
+
+def generatedSrcDir = "$buildDir/generated/java"
+
+sourceSets {
+    main { java { srcDir generatedSrcDir } }
+}
+
+task generateBuildInfo {
+    outputs.dir(generatedSrcDir)
+    doFirst {
+        def f = new File("${generatedSrcDir}/steambridge/BuildInfo.java")
+        f.parentFile.mkdirs()
+        f.text = """\
+package steambridge;
+/** Auto-generated at build time. Do not edit or commit. */
+public final class BuildInfo {
+    public static final String VERSION     = "${project.version}";
+    /** Embedded in bytecode - visible in hex/strings dump of the jar. */
+    public static final String AUTHOR      = "Ragalikx";
+    public static final String GITHUB      = "https://github.com/Ragalikx/steam-bridge-mc";
+    public static final String RELEASES    = "https://github.com/Ragalikx/steam-bridge-mc/releases/latest";
+    public static final String VERSION_URL = "https://raw.githubusercontent.com/Ragalikx/steam-bridge-mc/main/version.json";
+    private BuildInfo() {}
+}
+"""
+    }
+}
+
+/** Computes SHA-256 hex string of a file. */
+def sha256Of(File f) {
+    def md = java.security.MessageDigest.getInstance('SHA-256')
+    f.withInputStream { is ->
+        byte[] buf = new byte[8192]
+        int n
+        while ((n = is.read(buf)) > 0) md.update(buf, 0, n)
+    }
+    return md.digest().collect { String.format('%02x', it) }.join('')
+}
+
+/**
+ * Generates version.json next to build.gradle after the jar is reobfuscated.
+ * reobfJar runs after jar and remaps MCP names -> SRG names for production use.
+ * Commit version.json to main branch so the mod can fetch it at runtime.
+ */
+task generateVersionJson(dependsOn: 'reobfJar') {
+    doLast {
+        // reobfJar remaps MCP names -> SRG names in-place at jar.archivePath (production JAR)
+        def jarFile  = jar.archivePath
+        def sha256   = sha256Of(jarFile)
+        def outFile  = new File("${projectDir}/version.json")
+        outFile.text = """\
+{
+  "version": "${project.version}",
+  "sha256": "${sha256}",
+  "download_url": "https://github.com/Ragalikx/steam-bridge-mc/releases/latest"
+}
+"""
+        println "[SteamBridge] version.json written → version=${project.version}  sha256=${sha256}"
+    }
+}
+
+tasks.withType(JavaCompile) {
+    dependsOn generateBuildInfo
+    options.encoding = 'UTF-8'
+}
+
+minecraft {
+    mappings channel: 'stable', version: '39-1.12'
+    accessTransformer = file('src/main/resources/META-INF/accesstransformer.cfg')
+    runs {
+        client {
+            workingDirectory project.file('run')
+            property 'forge.logging.markers', 'SCAN,REGISTRIES,REGISTRYDUMP'
+            property 'forge.logging.console.level', 'debug'
+            mods { steambridge { source sourceSets.main } }
+        }
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+configurations {
+    shade
+    compile.extendsFrom shade
+}
+
+dependencies {
+    minecraft 'net.minecraftforge:forge:1.12.2-14.23.5.2860'
+    shade('com.code-disaster.steamworks4j:steamworks4j:1.10.0') { transitive = false }
+    shade('net.java.dev.jna:jna:5.14.0')                        { transitive = false }
+}
+
+jar {
+    from('third_party_licenses') { into 'META-INF/licenses' }
+    exclude 'module-info.class'
+    exclude 'META-INF/versions/**'
+
+    exclude 'com/sun/jna/darwin*/**'
+    exclude 'com/sun/jna/linux*/**'
+    exclude 'com/sun/jna/sunos*/**'
+    exclude 'com/sun/jna/freebsd*/**'
+    exclude 'com/sun/jna/openbsd*/**'
+    exclude 'com/sun/jna/aix*/**'
+    exclude 'com/sun/jna/win32-x86/**'
+    exclude 'com/sun/jna/win32-aarch64/**'
+
+    exclude 'libsteam_api.dylib'
+    exclude 'libsteamworks4j.dylib'
+    exclude 'libsteam_api.so'
+    exclude 'libsteamworks4j.so'
+    exclude 'steam_api.dll'
+    exclude 'steamworks4j.dll'
+
+    exclude 'com/codedisaster/steamworks/SteamController*'
+    exclude 'com/codedisaster/steamworks/SteamHTTP*'
+    exclude 'com/codedisaster/steamworks/SteamLeaderboard*'
+    exclude 'com/codedisaster/steamworks/SteamMatchmaking*'
+    exclude 'com/codedisaster/steamworks/SteamNetworking*'
+    exclude 'com/codedisaster/steamworks/SteamPublishedFile*'
+    exclude 'com/codedisaster/steamworks/SteamRemoteStorage*'
+    exclude 'com/codedisaster/steamworks/SteamScreenshot*'
+    exclude 'com/codedisaster/steamworks/SteamServer*'
+    exclude 'com/codedisaster/steamworks/SteamUGC*'
+    exclude 'com/codedisaster/steamworks/SteamUserStats*'
+    exclude 'com/codedisaster/steamworks/SteamApps*'
+
+    manifest {
+        attributes([
+            "Specification-Title"   : "steambridge",
+            "Implementation-Title"  : "steambridge",
+            "Implementation-Version": version,
+            "Implementation-Vendor" : "Ragalikx",
+            "Implementation-URL"    : "https://github.com/Ragalikx/steam-bridge-mc",
+            "Built-By"              : "Ragalikx"
+        ])
+    }
+    from { configurations.shade.collect { it.isDirectory() ? it : zipTree(it) } }
+}
+
+processResources {
+    inputs.property 'version', project.version
+    from(sourceSets.main.resources.srcDirs) {
+        include 'mcmod.info'
+        expand 'version': project.version, 'mcversion': '1.12.2'
+    }
+    from(sourceSets.main.resources.srcDirs) { exclude 'mcmod.info' }
+}
