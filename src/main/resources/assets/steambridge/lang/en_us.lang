@@ -8,5 +8,36 @@ steambridge.gui.management=Steam Server Management
 steambridge.gui.manage_session=Manage Steam Session
 steambridge.gui.not_running=Steam server is not running
 steambridge.gui.no_players=No players have joined this way yet...
+steambridge.gui.route_auto=Route: Auto
+steambridge.gui.route_p2p=Route: Direct P2P
+steambridge.gui.route_relay=Route: Valve Relay
+
+# Disconnect reasons
+steambridge.disconnect.kicked=Host has temporarily blocked this connection (1 min)
+steambridge.disconnect.banned=You are banned from this world
+steambridge.disconnect.friends_only=Host allows Steam friends only
+steambridge.disconnect.mod_mismatch_hint=Connection closed during the Forge login handshake. Your mods probably do not match the host's mods. Install the same modpack and versions as the host, then try again.
+
+# Steam errors
 steambridge.error.steam_shutdown=Connection with Steam was lost. Please check your Steam client.
 steambridge.error.host_steam_shutdown=Local Steam bridge disconnected due to a Steam client error! Multiplayer is no longer accessible.
+
+# Connection status messages shown on the connecting screen
+steambridge.status.connecting=Connecting through Steam Relay...
+steambridge.status.waiting_route=Waiting for Steam route to host...
+steambridge.status.path_ready=Steam path ready — activating pipeline...
+steambridge.status.steam_ready=Steam path ready — waiting for Minecraft login...
+steambridge.status.route_relay=Relay route ready — activating channel...
+steambridge.status.route_direct=Direct P2P route ready — activating channel...
+steambridge.status.handshake=Steam ready — Minecraft/Forge handshake in progress...
+steambridge.status.loading_world=Login accepted — loading world...
+steambridge.status.in_world=Connected as 
+steambridge.status.fail_create=Steam refused to create a relay connection
+steambridge.status.fail_timeout=Timeout: Steam route did not become ready within 30 seconds
+steambridge.status.fail_proxy=Failed to start loopback proxy for connection
+steambridge.status.fail_closed=Steam connection closed: 
+
+steambridge.gui.access_everyone=Access: Everyone
+steambridge.gui.access_friends=Access: Friends Only
+steambridge.gui.steam_settings=Steam Settings
+steambridge.gui.no_bans=Nobody has been banned yet.

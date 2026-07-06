@@ -1,23 +1,7 @@
 /*
  * Copyright (c) 2019-2026 Ragalikx
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * MIT License - see the LICENSE file in the repository root.
+ * If you use this code, please credit the author.
  */
 package steambridge;
 
@@ -43,11 +27,6 @@ public class SteamBridgeConfig {
     // (Spacewar) in SteamAppIdHelper. Letting users point it at a real game's App ID —
     // especially one with an anti-cheat (VAC/EAC) — would get their account banned and
     // damage the mod's reputation, so the option is removed entirely.
-
-    @Config.Comment("Check for mod updates on startup. Fetches version.json from GitHub in a background thread; " +
-            "shows a chat notification once when you join a world. Disable to skip all network requests.")
-    @Config.Name("Check For Updates")
-    public static boolean checkForUpdates = true;
 
     @Mod.EventBusSubscriber(modid = SteamBridgeMod.MODID)
     private static class EventHandler {

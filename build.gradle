@@ -38,44 +38,9 @@ public final class BuildInfo {
     /** Embedded in bytecode - visible in hex/strings dump of the jar. */
     public static final String AUTHOR      = "Ragalikx";
     public static final String GITHUB      = "https://github.com/Ragalikx/steam-bridge-mc";
-    public static final String RELEASES    = "https://github.com/Ragalikx/steam-bridge-mc/releases/latest";
-    public static final String VERSION_URL = "https://raw.githubusercontent.com/Ragalikx/steam-bridge-mc/main/version.json";
     private BuildInfo() {}
 }
 """
-    }
-}
-
-/** Computes SHA-256 hex string of a file. */
-def sha256Of(File f) {
-    def md = java.security.MessageDigest.getInstance('SHA-256')
-    f.withInputStream { is ->
-        byte[] buf = new byte[8192]
-        int n
-        while ((n = is.read(buf)) > 0) md.update(buf, 0, n)
-    }
-    return md.digest().collect { String.format('%02x', it) }.join('')
-}
-
-/**
- * Generates version.json next to build.gradle after the jar is reobfuscated.
- * reobfJar runs after jar and remaps MCP names -> SRG names for production use.
- * Commit version.json to main branch so the mod can fetch it at runtime.
- */
-task generateVersionJson(dependsOn: 'reobfJar') {
-    doLast {
-        // reobfJar remaps MCP names -> SRG names in-place at jar.archivePath (production JAR)
-        def jarFile  = jar.archivePath
-        def sha256   = sha256Of(jarFile)
-        def outFile  = new File("${projectDir}/version.json")
-        outFile.text = """\
-{
-  "version": "${project.version}",
-  "sha256": "${sha256}",
-  "download_url": "https://github.com/Ragalikx/steam-bridge-mc/releases/latest"
-}
-"""
-        println "[SteamBridge] version.json written → version=${project.version}  sha256=${sha256}"
     }
 }
 

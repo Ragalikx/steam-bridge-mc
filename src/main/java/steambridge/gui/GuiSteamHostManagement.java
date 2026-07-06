@@ -1,23 +1,7 @@
 /*
  * Copyright (c) 2019-2026 Ragalikx
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * MIT License - see the LICENSE file in the repository root.
+ * If you use this code, please credit the author.
  */
 package steambridge.gui;
 
@@ -35,6 +19,30 @@ public class GuiSteamHostManagement extends GuiScreen {
     private int snapshotCount = -1;
     private static final int BUTTON_BACK = 0;
     private static final int BUTTON_BAN_LIST = 1;
+
+    /** Live status (incl. per-player ping) is a native Steam call; poll it at most this often. */
+    private static final long SNAPSHOT_REFRESH_INTERVAL_MS = 1000L;
+    private List<SteamServer.PlayerSnapshot> cachedSnaps = java.util.Collections.emptyList();
+    private long lastSnapRefreshMs = 0L;
+
+    /**
+     * Returns player snapshots, refreshed at most once per second. drawScreen runs every
+     * frame, so calling the server (and its native ping query) directly there would fire
+     * dozens of native calls per second and make the ping value jitter every frame. All
+     * on-screen consumers share this cache so button indices stay consistent with the roster.
+     */
+    private List<SteamServer.PlayerSnapshot> snapshots() {
+        if (server == null || !server.isRunning()) {
+            cachedSnaps = java.util.Collections.emptyList();
+            return cachedSnaps;
+        }
+        long now = System.currentTimeMillis();
+        if (now - lastSnapRefreshMs >= SNAPSHOT_REFRESH_INTERVAL_MS) {
+            cachedSnaps = server.getPlayerSnapshots();
+            lastSnapRefreshMs = now;
+        }
+        return cachedSnaps;
+    }
 
     public GuiSteamHostManagement(GuiScreen parent) {
         this.parent = parent;
@@ -61,7 +69,7 @@ public class GuiSteamHostManagement extends GuiScreen {
     private void updatePlayerButtons() {
         this.buttonList.removeIf(b -> b.id >= 100);
         if (server != null && server.isRunning()) {
-            List<SteamServer.PlayerSnapshot> snaps = server.getPlayerSnapshots();
+            List<SteamServer.PlayerSnapshot> snaps = snapshots();
             snapshotCount = snaps.size();
             int yStart = 40;
             for (int i = 0; i < snaps.size(); i++) {
@@ -76,7 +84,7 @@ public class GuiSteamHostManagement extends GuiScreen {
     public void updateScreen() {
         super.updateScreen();
         if (server != null && server.isRunning()) {
-            List<SteamServer.PlayerSnapshot> snaps = server.getPlayerSnapshots();
+            List<SteamServer.PlayerSnapshot> snaps = snapshots();
             if (snaps.size() != snapshotCount) {
                 updatePlayerButtons();
             }
@@ -90,16 +98,16 @@ public class GuiSteamHostManagement extends GuiScreen {
         } else if (button.id == BUTTON_BAN_LIST) {
             this.mc.displayGuiScreen(new GuiSteamBanList(this, server));
         } else if (button.id >= 100 && button.id < 200) {
-            // Kick
+            // Kick — resolve against the same cached roster the buttons were built from.
             int idx = button.id - 100;
-            List<SteamServer.PlayerSnapshot> snaps = server.getPlayerSnapshots();
+            List<SteamServer.PlayerSnapshot> snaps = snapshots();
             if (idx < snaps.size()) {
                 server.kickPlayer(snaps.get(idx).getSteamId());
             }
         } else if (button.id >= 200 && button.id < 300) {
-            // Ban
+            // Ban — resolve against the same cached roster the buttons were built from.
             int idx = button.id - 200;
-            List<SteamServer.PlayerSnapshot> snaps = server.getPlayerSnapshots();
+            List<SteamServer.PlayerSnapshot> snaps = snapshots();
             if (idx < snaps.size()) {
                 server.banPlayer(snaps.get(idx).getSteamId());
             }
@@ -112,7 +120,7 @@ public class GuiSteamHostManagement extends GuiScreen {
         this.drawCenteredString(this.fontRenderer, net.minecraft.client.resources.I18n.format("steambridge.gui.management"), this.width / 2, 10, 16777215);
 
         if (server != null && server.isRunning()) {
-            List<SteamServer.PlayerSnapshot> snaps = server.getPlayerSnapshots();
+            List<SteamServer.PlayerSnapshot> snaps = snapshots();
             int yStart = 40;
 
             if (snaps.isEmpty()) {
@@ -130,8 +138,14 @@ public class GuiSteamHostManagement extends GuiScreen {
                     }
                     
                     SteamConnectionStatus status = snap.getConnectionStatus();
-                    String pingStr = (status != null && status.getPingMs() >= 0) ? status.getPingMs() + "ms" : "~";
-                    this.drawString(this.fontRenderer, snap.getSteamName() + " (" + snap.getMinecraftName() + ") Ping: " + pingStr, this.width / 2 - 150, y + 6, 16777215);
+                    String pingStr  = (status != null && status.getPingMs() >= 0) ? status.getPingMs() + "ms" : "~";
+                    String connType = (status != null && status.isConnectionActive())
+                            ? (status.isUsingRelay() ? "relay" : "p2p")
+                            : "?";
+                    this.drawString(this.fontRenderer,
+                            snap.getSteamName() + " (" + snap.getMinecraftName() + ") "
+                            + pingStr + " [" + connType + "]",
+                            this.width / 2 - 150, y + 6, 16777215);
                 }
             }
         } else {

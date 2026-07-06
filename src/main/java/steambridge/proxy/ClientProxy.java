@@ -1,27 +1,12 @@
 /*
  * Copyright (c) 2019-2026 Ragalikx
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * MIT License - see the LICENSE file in the repository root.
+ * If you use this code, please credit the author.
  */
 package steambridge.proxy;
 
 import steambridge.SteamBridgeMod;
+import steambridge.gui.GuiSteamConnecting;
 import steambridge.steam.SteamClient;
 import steambridge.steam.SteamManager;
 import steambridge.steam.SteamServer;
@@ -30,8 +15,10 @@ import net.minecraft.client.gui.GuiDisconnected;
 import net.minecraft.client.gui.GuiDownloadTerrain;
 import net.minecraft.client.gui.GuiMultiplayer;
 import net.minecraft.client.gui.GuiScreen;
+import net.minecraft.client.resources.I18n;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.TextComponentTranslation;
 import net.minecraftforge.client.event.GuiOpenEvent;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.common.event.FMLInitializationEvent;
@@ -49,6 +36,9 @@ import java.net.SocketAddress;
 public class ClientProxy extends CommonProxy {
 
     private static final int TRANSIENT_DISCONNECT_GRACE_TICKS = 160;
+    private static final String MOD_MISMATCH_HINT_KEY = "steambridge.disconnect.mod_mismatch_hint";
+    private static final String MOD_MISMATCH_HINT_FALLBACK =
+        "Connection closed during the Forge login handshake. Your mods probably do not match the host's mods. Install the same modpack and versions as the host, then try again.";
 
     private int deferredClientDisconnectTicks = -1;
     private int deferredServerStopTicks = -1;
@@ -65,6 +55,43 @@ public class ClientProxy extends CommonProxy {
 
     @SubscribeEvent
     public void onGuiOpen(GuiOpenEvent event) {
+        GuiScreen next = event.getGui();
+        Minecraft mc = Minecraft.getMinecraft();
+        
+        if (next != null) {
+            boolean isDisconnect = next instanceof GuiDisconnected;
+            boolean isModReject = next.getClass().getName().endsWith("GuiOldSaveLoadConfirm") || next.getClass().getName().endsWith("GuiModReject");
+            
+            if (isDisconnect || isModReject) {
+                // If we already have an error screen (e.g. detailed FML mod mismatch) and Vanilla tries
+                // to open a generic "Disconnected" due to the loopback socket closing, block the generic one!
+                boolean isCurrentScreenError = mc.currentScreen instanceof GuiDisconnected || 
+                    (mc.currentScreen != null && (mc.currentScreen.getClass().getName().endsWith("GuiOldSaveLoadConfirm") || mc.currentScreen.getClass().getName().endsWith("GuiModReject")));
+                
+                if (isDisconnect && isCurrentScreenError) {
+                    boolean mayReplaceGeneric = isGenericDisconnectScreen(mc.currentScreen)
+                        && !isGenericDisconnectScreen(next);
+                    if (!mayReplaceGeneric) {
+                        SteamBridgeMod.LOG.info("[SteamBridge] Ignoring secondary GuiDisconnected to preserve original error screen.");
+                        event.setCanceled(true);
+                        return;
+                    }
+                }
+                
+                // Force all disconnect/error screens to return to Multiplayer Server List, NOT DirectConnect
+                try {
+                    net.minecraft.client.gui.GuiMultiplayer serverList = new net.minecraft.client.gui.GuiMultiplayer(new net.minecraft.client.gui.GuiMainMenu());
+                    if (isDisconnect) {
+                        net.minecraftforge.fml.relauncher.ReflectionHelper.setPrivateValue(GuiDisconnected.class, (GuiDisconnected) next, serverList, "parentScreen", "field_146307_h");
+                    } else if (isModReject) {
+                        try {
+                            net.minecraftforge.fml.relauncher.ReflectionHelper.setPrivateValue(net.minecraft.client.gui.GuiYesNo.class, (net.minecraft.client.gui.GuiYesNo) next, serverList, "parentScreen", "field_146313_a");
+                        } catch (Exception ignored) {}
+                    }
+                } catch (Exception ignored) {}
+            }
+        }
+        
         handleSteamGuiOpen(event);
     }
 
@@ -93,7 +120,10 @@ public class ClientProxy extends CommonProxy {
         steambridge.steam.SteamClient client =
                 steambridge.steam.SteamManager.getInstance().getActiveClient();
         if (client != null && client.isAlive()) {
-            if (shouldDeferSteamClientDisconnect(mc, client)) {
+            if (shouldShowLoginMismatchHint(mc, client)) {
+                deferredClientDisconnectTicks = -1;
+                showLoginMismatchHint(mc, client);
+            } else if (shouldDeferSteamClientDisconnect(mc, client)) {
                 deferredClientDisconnectTicks = TRANSIENT_DISCONNECT_GRACE_TICKS;
                 SteamBridgeMod.LOG.info(
                     "[SteamBridge] Deferring Steam client disconnect; possible dimension transfer. screen={} world={} player={} channelOpen={}",
@@ -175,12 +205,28 @@ public class ClientProxy extends CommonProxy {
 
         // --- Standard Steam GUI hooks --------------------------------------
         if (client != null && next instanceof GuiDisconnected) {
-            if (client.getState() == SteamClient.State.CONNECTING || client.getState() == SteamClient.State.STEAM_READY) {
+            // Only suppress the spurious UnknownHost screen from the abandoned vanilla
+            // GuiConnecting thread, which races in during the early CONNECTING window
+            // before our loopback is up. Once STEAM_READY (loopback established) or later,
+            // any GuiDisconnected is a real server-side drop and must be shown — otherwise
+            // the player is left in limbo with an unresponsive screen.
+            if (client.getState() == SteamClient.State.CONNECTING) {
                 SteamBridgeMod.LOG.info("[SteamBridge] Ignoring secondary GuiDisconnected from vanilla background thread (e.g. UnknownHost) while Steam connection is negotiating.");
                 event.setCanceled(true);
             } else {
                 deferredClientDisconnectTicks = -1;
                 DisconnectedInfo info = extractDisconnectedInfo((GuiDisconnected) next);
+                if (isGenericDisconnectDuringLogin(client, info)) {
+                    SteamBridgeMod.LOG.warn(
+                        "[SteamBridge] Replacing generic login disconnect with mod mismatch hint. state={} reason='{}' details='{}'",
+                        client.getState(),
+                        SteamBridgeMod.safeLog(compactText(info.reason)),
+                        SteamBridgeMod.safeLog(compactText(info.message))
+                    );
+                    GuiDisconnected replacement = createModMismatchHintScreen();
+                    event.setGui(replacement);
+                    info = extractDisconnectedInfo(replacement);
+                }
                 client.onMinecraftDisconnect(info.reason, info.message);
                 logDisconnectDetails(info);
                 client.disconnect();
@@ -219,6 +265,38 @@ public class ClientProxy extends CommonProxy {
     private boolean shouldDeferSteamServerStop(Minecraft mc) {
         return mc.getIntegratedServer() != null
             && isLikelyTransientSteamDisconnectScreen(mc.currentScreen);
+    }
+
+    private boolean shouldShowLoginMismatchHint(Minecraft mc, SteamClient client) {
+        if (client == null || mc.world != null || mc.player != null) {
+            return false;
+        }
+
+        SteamClient.State state = client.getState();
+        if (state != SteamClient.State.STEAM_READY && state != SteamClient.State.NEGOTIATING) {
+            return false;
+        }
+
+        GuiScreen screen = mc.currentScreen;
+        return screen == null
+            || screen instanceof GuiSteamConnecting
+            || isGenericDisconnectScreen(screen);
+    }
+
+    private void showLoginMismatchHint(Minecraft mc, SteamClient client) {
+        String details = modMismatchHintText();
+        SteamBridgeMod.LOG.warn(
+            "[SteamBridge] Minecraft connection closed during Steam/Forge login before a detailed disconnect screen appeared. screen={} state={}",
+            screenName(mc.currentScreen),
+            client.getState()
+        );
+        client.closeAfterMinecraftFailure("connect.failed", details);
+        mc.addScheduledTask(() -> {
+            GuiScreen current = mc.currentScreen;
+            if (current == null || current instanceof GuiSteamConnecting || isGenericDisconnectScreen(current)) {
+                mc.displayGuiScreen(createModMismatchHintScreen());
+            }
+        });
     }
 
     private boolean isLikelyTransientSteamDisconnectScreen(GuiScreen screen) {
@@ -309,8 +387,67 @@ public class ClientProxy extends CommonProxy {
         String lower = text.toLowerCase(java.util.Locale.ROOT);
         return lower.contains("mod rejection")
             || lower.contains("missing mods")
+            || lower.contains("mod mismatch")
+            || lower.contains("mods do not match")
+            || lower.contains("mods don't match")
+            || lower.contains("your mods")
             || lower.contains("requires version")
             || lower.contains("mod is not found");
+    }
+
+    private boolean isGenericDisconnectDuringLogin(SteamClient client, DisconnectedInfo info) {
+        if (client == null || info == null) {
+            return false;
+        }
+
+        SteamClient.State state = client.getState();
+        if (state != SteamClient.State.STEAM_READY && state != SteamClient.State.NEGOTIATING) {
+            return false;
+        }
+
+        String reason = compactText(info.reason).toLowerCase(java.util.Locale.ROOT);
+        String message = compactText(info.message).toLowerCase(java.util.Locale.ROOT);
+        if (looksLikeModMismatch(reason + " " + message)) {
+            return false;
+        }
+
+        return isGenericDisconnectText(reason) && isGenericDisconnectText(message);
+    }
+
+    private boolean isGenericDisconnectScreen(GuiScreen screen) {
+        if (!(screen instanceof GuiDisconnected)) {
+            return false;
+        }
+        DisconnectedInfo info = extractDisconnectedInfo((GuiDisconnected) screen);
+        return isGenericDisconnectText(compactText(info.reason).toLowerCase(java.util.Locale.ROOT))
+            && isGenericDisconnectText(compactText(info.message).toLowerCase(java.util.Locale.ROOT));
+    }
+
+    private boolean isGenericDisconnectText(String text) {
+        return text == null
+            || text.isEmpty()
+            || text.equals("disconnected")
+            || text.equals("disconnect")
+            || text.equals("disconnect.genericreason")
+            || text.equals("disconnect.endofstream")
+            || text.equals("connect.failed");
+    }
+
+    private GuiDisconnected createModMismatchHintScreen() {
+        return new GuiDisconnected(
+            new GuiMultiplayer(new net.minecraft.client.gui.GuiMainMenu()),
+            "connect.failed",
+            new TextComponentTranslation(MOD_MISMATCH_HINT_KEY)
+        );
+    }
+
+    private String modMismatchHintText() {
+        try {
+            if (I18n.hasKey(MOD_MISMATCH_HINT_KEY)) {
+                return I18n.format(MOD_MISMATCH_HINT_KEY);
+            }
+        } catch (Exception ignored) {}
+        return MOD_MISMATCH_HINT_FALLBACK;
     }
 
     private java.util.List<String> extractMismatchEntries(String text) {

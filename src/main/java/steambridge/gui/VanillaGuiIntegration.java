@@ -1,23 +1,7 @@
 /*
  * Copyright (c) 2019-2026 Ragalikx
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * MIT License - see the LICENSE file in the repository root.
+ * If you use this code, please credit the author.
  */
 package steambridge.gui;
 
@@ -47,8 +31,21 @@ import java.util.List;
 @Mod.EventBusSubscriber(value = Side.CLIENT, modid = SteamBridgeMod.MODID)
 public class VanillaGuiIntegration {
 
-    private static final int BTN_FRIENDS    = 9002;
-    private static final int BTN_STEAM_HOST = 9003;
+    private static final int BTN_FRIENDS        = 9002;
+    private static final int BTN_STEAM_HOST     = 9003;
+    private static final int BTN_TRANSPORT_MODE = 9004;
+    private static final int BTN_ACCESS_POLICY  = 9005;
+
+    /**
+     * Transport route the host will start with, cycled by the button on the Share-to-LAN screen.
+     * Loaded from the world's saved settings when that screen opens; defaults to AUTO.
+     */
+    static SteamServer.TransportMode pendingTransportMode = SteamServer.TransportMode.AUTO;
+    
+    /**
+     * Access policy (Friends/Everyone), toggled by the button on the Share-to-LAN screen.
+     */
+    static SteamServer.AccessPolicy pendingAccessPolicy = SteamServer.AccessPolicy.FRIENDS_ONLY;
 
     /** Pending SteamID to inject when the parent screen re-initializes. */
     static String pendingSteamId = null;
@@ -57,6 +54,12 @@ public class VanillaGuiIntegration {
      * Set alongside {@link #pendingSteamId} so the name field isn't lost.
      */
     static String pendingServerName = null;
+    /**
+     * When true the next Draw frame will force-enable the Connect button (id=1).
+     * Needed because vanilla's updateScreen() resets {@code enabled} every tick
+     * and does not react to programmatic {@code setText()} calls.
+     */
+    private static boolean pendingConnectEnable = false;
 
     // -- Reflected fields ------------------------------------------------------
 
@@ -180,10 +183,65 @@ public class VanillaGuiIntegration {
 
     @SubscribeEvent
     public static void onDrawScreenPre(GuiScreenEvent.DrawScreenEvent.Pre event) {
-        // Final guard right before MC draws each frame -> ensures no ping thread starts
-        if (event.getGui() instanceof GuiMultiplayer) {
-            markAllSteamServers(event.getGui());
+        GuiScreen gui = event.getGui();
+
+        // Suppress Steam-server ping on the multiplayer list.
+        if (gui instanceof GuiMultiplayer) {
+            markAllSteamServers(gui);
         }
+
+        /*
+         * Vanilla updateScreen() resets the button enabled-state every tick.
+         * Re-enable Connect (id=1) every frame when the IP field is non-empty.
+         */
+        if (pendingConnectEnable || isDirectConnectWithAddress(gui)) {
+            try {
+                List<GuiButton> buttons = ReflectionHelper.getPrivateValue(GuiScreen.class, gui, "buttonList", "field_146292_n");
+                if (buttons != null) {
+                    for (GuiButton b : buttons) {
+                        if (b.id == 1) {
+                            b.enabled = true;
+                            break;
+                        }
+                    }
+                }
+            } catch (Exception ignored) {}
+            pendingConnectEnable = false;
+        }
+    }
+
+    @SubscribeEvent
+    public static void onDrawScreenPost(GuiScreenEvent.DrawScreenEvent.Post event) {
+        GuiScreen gui = event.getGui();
+        if (gui instanceof GuiShareToLan) {
+            String title = "Steam settings";
+            if (net.minecraft.client.resources.I18n.hasKey("steambridge.gui.steam_settings")) {
+                title = net.minecraft.client.resources.I18n.format("steambridge.gui.steam_settings");
+            }
+            
+            // Find the Game Mode button (id = 104) to anchor our text
+            int textY = gui.height / 4 + 40; // fallback
+            try {
+                List<GuiButton> buttons = ReflectionHelper.getPrivateValue(GuiScreen.class, gui, "buttonList", "field_146292_n");
+                if (buttons != null) {
+                    for (GuiButton b : buttons) {
+                        if (b.id == 104) {
+                            textY = b.y + 28;
+                            break;
+                        }
+                    }
+                }
+            } catch (Exception ignored) {}
+            
+            gui.drawCenteredString(Minecraft.getMinecraft().fontRenderer, title, gui.width / 2, textY, 0xFFFFFF);
+        }
+    }
+
+    /** Returns true when {@code gui} is a DirectConnect screen whose IP field is non-empty. */
+    private static boolean isDirectConnectWithAddress(GuiScreen gui) {
+        if (!(gui instanceof GuiScreenServerList)) return false;
+        GuiTextField tf = findIpTextField(gui);
+        return tf != null && !tf.getText().isEmpty();
     }
 
     @SubscribeEvent
@@ -271,27 +329,50 @@ public class VanillaGuiIntegration {
                 // GuiScreenDirectConnect or similar -> just fill the IP field
                 GuiTextField tf = findIpTextField(gui);
                 if (tf != null) tf.setText(sid);
-                // Enable the "Connect" button (id=1 in GuiScreenDirectConnect)
+                // Signal the draw hook to keep Connect (id=1) enabled every frame.
+                pendingConnectEnable = true;
                 for (GuiButton b : event.getButtonList()) {
                     if (b.id == 1) { b.enabled = true; break; }
                 }
             }
         }
 
-        // -- Share-to-LAN button rearrangement ---------------------------------
         if (gui instanceof GuiShareToLan) {
-            GuiButton startLan = null, cancel = null;
+            GuiButton startLan = null, cancel = null, gameMode = null;
             for (GuiButton b : event.getButtonList()) {
                 if (b.id == 101) startLan = b;
                 if (b.id == 102) cancel   = b;
+                if (b.id == 104) gameMode = b;
             }
             if (startLan != null && cancel != null) {
-                startLan.width = 98;
+                // Load saved settings for this world
+                net.minecraft.server.integrated.IntegratedServer srv = Minecraft.getMinecraft().getIntegratedServer();
+                if (srv != null) {
+                    steambridge.steam.SteamSocial.Worlds.Settings saved =
+                            steambridge.steam.SteamSocial.Worlds.get().load(srv.getFolderName());
+                    pendingTransportMode = steambridge.steam.SteamSocial.Worlds.parseTransportMode(saved.transportMode);
+                    pendingAccessPolicy  = steambridge.steam.SteamSocial.Worlds.parseAccessPolicy(saved.accessPolicy);
+                }
+
+                // Steam settings row: sit directly below vanilla's Game Mode button
+                int steamRowY = (gameMode != null) ? (gameMode.y + 40) : (gui.height / 4 + 55);
+                event.getButtonList().add(new GuiButton(BTN_ACCESS_POLICY,
+                        gui.width / 2 - 155, steamRowY, 150, 20,
+                        accessPolicyButtonLabel(pendingAccessPolicy)));
+                event.getButtonList().add(new GuiButton(BTN_TRANSPORT_MODE,
+                        gui.width / 2 + 5, steamRowY, 150, 20,
+                        transportButtonLabel(pendingTransportMode)));
+
+                // Move Start LAN + Open for Steam + Cancel to the very bottom (3-button row)
+                startLan.width = 96;
                 startLan.x     = gui.width / 2 - 155;
-                event.getButtonList().add(new GuiButton(BTN_STEAM_HOST, gui.width / 2 - 49, gui.height - 28, 98, 20,
+                startLan.y     = gui.height - 28;
+                event.getButtonList().add(new GuiButton(BTN_STEAM_HOST,
+                        gui.width / 2 - 54, gui.height - 28, 96, 20,
                         net.minecraft.client.resources.I18n.format("steambridge.gui.open_steam")));
-                cancel.width = 98;
-                cancel.x     = gui.width / 2 + 57;
+                cancel.width = 96;
+                cancel.x     = gui.width / 2 + 47;
+                cancel.y     = gui.height - 28;
             }
         }
 
@@ -349,6 +430,24 @@ public class VanillaGuiIntegration {
         GuiScreen gui = event.getGui();
         GuiButton btn = event.getButton();
 
+        // -- Cycle transport route (Share-to-LAN screen) -----------------------
+        if (gui instanceof GuiShareToLan && btn.id == BTN_TRANSPORT_MODE) {
+            pendingTransportMode = nextTransportMode(pendingTransportMode);
+            btn.displayString = transportButtonLabel(pendingTransportMode);
+            saveShareToLanSettings(gui);
+            return;
+        }
+
+        // -- Toggle access policy (Share-to-LAN screen) ------------------------
+        if (gui instanceof GuiShareToLan && btn.id == BTN_ACCESS_POLICY) {
+            pendingAccessPolicy = (pendingAccessPolicy == SteamServer.AccessPolicy.EVERYONE)
+                    ? SteamServer.AccessPolicy.FRIENDS_ONLY
+                    : SteamServer.AccessPolicy.EVERYONE;
+            btn.displayString = accessPolicyButtonLabel(pendingAccessPolicy);
+            saveShareToLanSettings(gui);
+            return;
+        }
+
         // -- Open for Steam (in Share-to-LAN screen) ---------------------------
         if (gui instanceof GuiShareToLan && btn.id == BTN_STEAM_HOST) {
             Minecraft mc = Minecraft.getMinecraft();
@@ -365,11 +464,12 @@ public class VanillaGuiIntegration {
                 String worldKey = mc.getIntegratedServer().getFolderName();
                 steambridge.steam.SteamSocial.Worlds.get().save(
                         worldKey, gameType, ac,
-                        steambridge.steam.SteamServer.AccessPolicy.EVERYONE,
-                        steambridge.steam.SteamServer.TransportMode.AUTO);
+                        pendingAccessPolicy,
+                        pendingTransportMode);
 
                 String port = mc.getIntegratedServer().shareToLAN(gameType, ac);
-                SteamServer server = new SteamServer(SteamServer.AccessPolicy.EVERYONE, worldKey, "World");
+                SteamServer server = new SteamServer(pendingAccessPolicy, worldKey, "World");
+                server.setTransportMode(pendingTransportMode);
                 if (port != null) { try { server.setMcPort(Integer.parseInt(port)); } catch (NumberFormatException ignored) {} }
                 server.start();
 
@@ -400,6 +500,67 @@ public class VanillaGuiIntegration {
                 mc.displayGuiScreen(new GuiSteamResync(gui, steamId -> pendingSteamId = steamId));
             }
         }
+    }
+
+    /** Cycles AUTO -> P2P_ONLY -> RELAY_ONLY -> AUTO. */
+    private static SteamServer.TransportMode nextTransportMode(SteamServer.TransportMode mode) {
+        switch (mode) {
+            case AUTO:      return SteamServer.TransportMode.P2P_ONLY;
+            case P2P_ONLY:  return SteamServer.TransportMode.RELAY_ONLY;
+            case RELAY_ONLY:
+            default:        return SteamServer.TransportMode.AUTO;
+        }
+    }
+
+    private static String transportButtonLabel(SteamServer.TransportMode mode) {
+        String key;
+        switch (mode) {
+            case P2P_ONLY:   key = "steambridge.gui.route_p2p";   break;
+            case RELAY_ONLY: key = "steambridge.gui.route_relay"; break;
+            case AUTO:
+            default:         key = "steambridge.gui.route_auto";  break;
+        }
+        if (net.minecraft.client.resources.I18n.hasKey(key)) {
+            return net.minecraft.client.resources.I18n.format(key);
+        }
+        switch (mode) {                     // fallback if lang file lacks the key
+            case P2P_ONLY:   return "Route: P2P";
+            case RELAY_ONLY: return "Route: Relay";
+            case AUTO:
+            default:         return "Route: Auto";
+        }
+    }
+
+    private static String accessPolicyButtonLabel(SteamServer.AccessPolicy policy) {
+        String key = (policy == SteamServer.AccessPolicy.EVERYONE)
+                ? "steambridge.gui.access_everyone"
+                : "steambridge.gui.access_friends";
+                
+        if (net.minecraft.client.resources.I18n.hasKey(key)) {
+            return net.minecraft.client.resources.I18n.format(key);
+        }
+        return (policy == SteamServer.AccessPolicy.EVERYONE) ? "Access: Everyone" : "Access: Friends Only";
+    }
+
+    private static void saveShareToLanSettings(GuiScreen gui) {
+        Minecraft mc = Minecraft.getMinecraft();
+        if (mc.getIntegratedServer() == null) return;
+
+        boolean ac = false;
+        String gm  = "survival";
+        try {
+            if (fShareToLanGameMode != null)       gm = (String) fShareToLanGameMode.get(gui);
+            if (fShareToLanAllowCommands != null)  ac = (Boolean) fShareToLanAllowCommands.get(gui);
+        } catch (Exception ignored) {}
+
+        net.minecraft.world.GameType gameType =
+                net.minecraft.world.GameType.parseGameTypeWithDefault(gm, net.minecraft.world.GameType.SURVIVAL);
+        String worldKey = mc.getIntegratedServer().getFolderName();
+
+        steambridge.steam.SteamSocial.Worlds.get().save(
+                worldKey, gameType, ac,
+                pendingAccessPolicy,
+                pendingTransportMode);
     }
 }
 

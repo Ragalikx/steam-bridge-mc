@@ -1,23 +1,7 @@
 /*
  * Copyright (c) 2019-2026 Ragalikx
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * MIT License - see the LICENSE file in the repository root.
+ * If you use this code, please credit the author.
  */
 package steambridge.gui;
 
@@ -30,6 +14,8 @@ import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.GuiTextField;
 import net.minecraft.client.gui.Gui;
+import net.minecraft.client.renderer.GlStateManager;
+import net.minecraft.util.ResourceLocation;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -37,47 +23,86 @@ import java.util.List;
 import java.util.function.Consumer;
 
 public class GuiSteamFriends extends GuiScreen {
-    private final GuiScreen parent;
-    private final GuiTextField targetField;
+
+
+
+    /** Height of a single row (avatar + name). */
+    private static final int ROW_HEIGHT = 24;
+
+    /** Width of the avatar icon drawn inside each row. */
+    private static final int AVATAR_SIZE = 16;
+
+    /** Horizontal padding between the panel edge and content. */
+    private static final int PANEL_PADDING = 5;
+
+    /** Extra pixels added on each side of the panel beyond the list width. */
+    private static final int PANEL_HALF_WIDTH = 105;
+
+    /** Width of the clickable / name area (excluding avatar). */
+    private static final int LIST_HALF_WIDTH = 100;
+
+    /** Y coordinate where the friend list panel starts. */
+    private static final int LIST_Y_START = 65;
+
+
+
+    private final GuiScreen        parent;
+    private final GuiTextField     targetField;
     private final Consumer<String> onSelected;
+
     private GuiTextField searchField;
 
-    private static class FriendItem {
-        long steamId;
+    private static final class FriendItem {
+        long   steamId;
         String name;
     }
 
-    private List<FriendItem> cachedFriends = new ArrayList<>();
-    private List<FriendItem> filteredFriends = new ArrayList<>();
-    private int listScrollY = 0;
+    private final List<FriendItem> cachedFriends   = new ArrayList<>();
+    private final List<FriendItem> filteredFriends  = new ArrayList<>();
+
+    /** Index of the first visible row (scroll position). */
+    private int scrollOffset = 0;
+
+
 
     public GuiSteamFriends(GuiScreen parent, GuiTextField targetField, Consumer<String> onSelected) {
-        this.parent = parent;
+        this.parent      = parent;
         this.targetField = targetField;
-        this.onSelected = onSelected;
+        this.onSelected  = onSelected;
     }
+
+
 
     @Override
     public void initGui() {
-        this.buttonList.add(new GuiButton(0, this.width / 2 - 100, this.height - 30, 200, 20, net.minecraft.client.resources.I18n.format("gui.back")));
+        this.buttonList.add(new GuiButton(0,
+                this.width / 2 - 100, this.height - 30,
+                200, 20,
+                net.minecraft.client.resources.I18n.format("gui.back")));
 
-        searchField = new GuiTextField(1, this.fontRenderer, this.width / 2 - 100, 35, 200, 20);
+        searchField = new GuiTextField(1, this.fontRenderer,
+                this.width / 2 - 100, 35, 200, 20);
         searchField.setMaxStringLength(50);
         searchField.setFocused(true);
 
+        loadFriends();
+        updateFilter();
+    }
+
+    /** Populates {@link #cachedFriends} from the Steam friends API. */
+    private void loadFriends() {
         cachedFriends.clear();
         SteamFriends friends = SteamManager.getInstance().getFriends();
-        if (friends != null) {
-            int count = friends.getFriendCount(SteamFriends.FriendFlags.Immediate);
-            for (int i = 0; i < count; i++) {
-                SteamID id = friends.getFriendByIndex(i, SteamFriends.FriendFlags.Immediate);
-                FriendItem item = new FriendItem();
-                item.steamId = com.codedisaster.steamworks.SteamNativeHandle.getNativeHandle(id);
-                item.name = SteamSocial.ProfileCache.get().getDisplayName(item.steamId);
-                cachedFriends.add(item);
-            }
+        if (friends == null) return;
+
+        int count = friends.getFriendCount(SteamFriends.FriendFlags.Immediate);
+        for (int i = 0; i < count; i++) {
+            SteamID id = friends.getFriendByIndex(i, SteamFriends.FriendFlags.Immediate);
+            FriendItem item = new FriendItem();
+            item.steamId = com.codedisaster.steamworks.SteamNativeHandle.getNativeHandle(id);
+            item.name    = SteamSocial.ProfileCache.get().getDisplayName(item.steamId);
+            cachedFriends.add(item);
         }
-        updateFilter();
     }
 
     private void updateFilter() {
@@ -88,12 +113,16 @@ public class GuiSteamFriends extends GuiScreen {
                 filteredFriends.add(f);
             }
         }
+        // Reset scroll when the result set changes.
+        scrollOffset = 0;
     }
 
     @Override
     public void updateScreen() {
         searchField.updateCursorCounter();
     }
+
+
 
     @Override
     protected void keyTyped(char typedChar, int keyCode) throws IOException {
@@ -105,40 +134,16 @@ public class GuiSteamFriends extends GuiScreen {
     }
 
     @Override
-    protected void actionPerformed(GuiButton button) throws IOException {
-        if (button.id == 0) {
-            Minecraft.getMinecraft().displayGuiScreen(parent);
+    public void handleMouseInput() throws IOException {
+        super.handleMouseInput();
+
+        int wheel = org.lwjgl.input.Mouse.getEventDWheel();
+        if (wheel != 0) {
+            int maxVisible = maxVisibleRows();
+            int maxScroll  = Math.max(0, filteredFriends.size() - maxVisible);
+            scrollOffset  += (wheel < 0) ? 1 : -1;
+            scrollOffset   = Math.max(0, Math.min(scrollOffset, maxScroll));
         }
-    }
-
-    @Override
-    public void drawScreen(int mouseX, int mouseY, float partialTicks) {
-        this.drawDefaultBackground();
-        this.drawCenteredString(this.fontRenderer, net.minecraft.client.resources.I18n.format("steambridge.gui.select_friend"), this.width / 2, 15, 16777215);
-
-        searchField.drawTextBox();
-
-        int yStart = 65;
-        int listHeight = this.height - 105;
-        int maxItems = listHeight / 24;
-
-        Gui.drawRect(this.width / 2 - 105, yStart - 5, this.width / 2 + 105, yStart + (maxItems * 24), 0x88000000);
-
-        int index = 0;
-        for (FriendItem friend : filteredFriends) {
-            int y = yStart + (index * 24);
-            if (y > this.height - 40) break;
-
-            boolean hover = mouseX > this.width / 2 - 100 && mouseX < this.width / 2 + 100 && mouseY > y && mouseY < y + 24;
-            if (hover) {
-                drawRect(this.width / 2 - 100, y, this.width / 2 + 100, y + 24, 0x88FFFFFF);
-            }
-
-            this.drawString(this.fontRenderer, friend.name, this.width / 2 - 98, y + 8, 16777215);
-            index++;
-        }
-
-        super.drawScreen(mouseX, mouseY, partialTicks);
     }
 
     @Override
@@ -146,27 +151,122 @@ public class GuiSteamFriends extends GuiScreen {
         super.mouseClicked(mouseX, mouseY, mouseButton);
         searchField.mouseClicked(mouseX, mouseY, mouseButton);
 
-        if (mouseButton == 0) {
-            int yStart = 65;
-            int index = 0;
-            for (FriendItem friend : filteredFriends) {
-                int y = yStart + (index * 24);
-                if (y > this.height - 40) break;
+        if (mouseButton != 0) return;
 
-                if (mouseX > this.width / 2 - 100 && mouseX < this.width / 2 + 100 && mouseY > y && mouseY < y + 24) {
-                    String steamIdStr = String.valueOf(friend.steamId);
-                    if (onSelected != null) {
-                        onSelected.accept(steamIdStr);
-                    }
-                    if (targetField != null) {
-                        targetField.setText(steamIdStr);
-                    }
-                    Minecraft.getMinecraft().displayGuiScreen(parent);
-                    return;
-                }
-                index++;
+        int maxVisible = maxVisibleRows();
+        for (int i = 0; i < maxVisible; i++) {
+            int friendIdx = scrollOffset + i;
+            if (friendIdx >= filteredFriends.size()) break;
+
+            int y = LIST_Y_START + i * ROW_HEIGHT;
+            if (y + ROW_HEIGHT > listPanelBottom()) break;
+
+            boolean inRow = mouseX > this.width / 2 - LIST_HALF_WIDTH
+                         && mouseX < this.width / 2 + LIST_HALF_WIDTH
+                         && mouseY > y
+                         && mouseY < y + ROW_HEIGHT;
+
+            if (inRow) {
+                selectFriend(filteredFriends.get(friendIdx));
+                return;
             }
         }
     }
-}
 
+    @Override
+    protected void actionPerformed(GuiButton button) throws IOException {
+        if (button.id == 0) {
+            Minecraft.getMinecraft().displayGuiScreen(parent);
+        }
+    }
+
+
+
+    @Override
+    public void drawScreen(int mouseX, int mouseY, float partialTicks) {
+        this.drawDefaultBackground();
+        this.drawCenteredString(this.fontRenderer,
+                net.minecraft.client.resources.I18n.format("steambridge.gui.select_friend"),
+                this.width / 2, 15, 0xFFFFFF);
+
+        searchField.drawTextBox();
+
+        drawFriendPanel(mouseX, mouseY);
+
+        super.drawScreen(mouseX, mouseY, partialTicks);
+    }
+
+    private void drawFriendPanel(int mouseX, int mouseY) {
+        int panelLeft   = this.width / 2 - PANEL_HALF_WIDTH;
+        int panelRight  = this.width / 2 + PANEL_HALF_WIDTH;
+        int panelBottom = listPanelBottom();
+        int maxVisible  = maxVisibleRows();
+
+        // Dark background
+        Gui.drawRect(panelLeft, LIST_Y_START - PANEL_PADDING,
+                     panelRight, panelBottom, 0x88000000);
+
+        for (int i = 0; i < maxVisible; i++) {
+            int friendIdx = scrollOffset + i;
+            if (friendIdx >= filteredFriends.size()) break;
+
+            FriendItem friend = filteredFriends.get(friendIdx);
+            int y = LIST_Y_START + i * ROW_HEIGHT;
+            if (y + ROW_HEIGHT > panelBottom) break;
+
+            // Hover highlight
+            boolean hover = mouseX > this.width / 2 - LIST_HALF_WIDTH
+                         && mouseX < this.width / 2 + LIST_HALF_WIDTH
+                         && mouseY > y
+                         && mouseY < y + ROW_HEIGHT;
+            if (hover) {
+                drawRect(this.width / 2 - LIST_HALF_WIDTH, y,
+                         this.width / 2 + LIST_HALF_WIDTH, y + ROW_HEIGHT,
+                         0x55FFFFFF);
+            }
+
+            // Avatar (only fetched when this row is visible → lazy load)
+            drawAvatar(friend.steamId, this.width / 2 - LIST_HALF_WIDTH + 1, y + 4);
+
+            // Name (offset by avatar width + 2px gap)
+            int nameX = this.width / 2 - LIST_HALF_WIDTH + AVATAR_SIZE + 4;
+            this.drawString(this.fontRenderer, friend.name, nameX, y + 8, 0xFFFFFF);
+        }
+    }
+
+    /**
+     * Draws the Steam avatar at (x, y) as a 16×16 square.
+     * Does nothing if the texture is not yet available.
+     */
+    private void drawAvatar(long steamId, int x, int y) {
+        String texturePath = SteamSocial.ProfileCache.get().getAvatarTexture(steamId);
+        if (texturePath == null || texturePath.isEmpty()) return;
+
+        try {
+            ResourceLocation loc = new ResourceLocation(texturePath);
+            this.mc.getTextureManager().bindTexture(loc);
+            GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+            Gui.drawModalRectWithCustomSizedTexture(
+                    x, y, 0, 0, AVATAR_SIZE, AVATAR_SIZE, AVATAR_SIZE, AVATAR_SIZE);
+        } catch (Exception ignored) {}
+    }
+
+
+
+    /** Bottom Y of the friend-list panel (leaves room for the Back button). */
+    private int listPanelBottom() {
+        return this.height - 40;
+    }
+
+    /** Number of rows that fit inside the panel. */
+    private int maxVisibleRows() {
+        return (listPanelBottom() - LIST_Y_START) / ROW_HEIGHT;
+    }
+
+    private void selectFriend(FriendItem friend) {
+        String steamIdStr = String.valueOf(friend.steamId);
+        if (onSelected != null)  onSelected.accept(steamIdStr);
+        if (targetField != null) targetField.setText(steamIdStr);
+        Minecraft.getMinecraft().displayGuiScreen(parent);
+    }
+}

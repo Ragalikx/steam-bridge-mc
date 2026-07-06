@@ -1,23 +1,7 @@
 /*
  * Copyright (c) 2019-2026 Ragalikx
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * MIT License - see the LICENSE file in the repository root.
+ * If you use this code, please credit the author.
  */
 package steambridge.steam;
 
@@ -50,6 +34,37 @@ public final class SteamOffsets {
     public static final int MSG_OFF_CONN    = 12; // uint32 / HSteamNetConnection
     public static final int MSG_OFF_FLAGS   = 196; // int32
     public static final int MSG_OFF_LANE    = 208; // uint16
+
+    /**
+     * Verifies the raw offset constants above agree with the layout JNA computes for the full
+     * {@link SteamNetworkingMessage} struct. If Valve reshuffles the struct (or a constant has a
+     * typo) this throws, so the caller can abort cleanly instead of silently corrupting native
+     * memory at runtime.
+     * <p>
+     * Must be called explicitly (see {@code SteamManager.init()}): the {@code MSG_OFF_*} fields are
+     * compile-time constants that get inlined at their use sites, so nothing here would ever trigger
+     * class initialisation on its own — a {@code static} block would be dead code.
+     *
+     * @throws IllegalStateException if any offset disagrees with JNA's computed layout
+     */
+    public static void validateLayout() {
+        SteamNetworkingMessage probe = new SteamNetworkingMessage();
+        checkOffset(probe, "m_pData",   MSG_OFF_PDATA);
+        checkOffset(probe, "m_cbSize",  MSG_OFF_CBSIZE);
+        checkOffset(probe, "m_conn",    MSG_OFF_CONN);
+        checkOffset(probe, "m_nFlags",  MSG_OFF_FLAGS);
+        checkOffset(probe, "m_idxLane", MSG_OFF_LANE);
+    }
+
+    private static void checkOffset(SteamNetworkingMessage probe, String field, int expected) {
+        int actual = probe.offsetOf(field);
+        if (actual != expected) {
+            throw new IllegalStateException(
+                "SteamNetworkingMessage_t layout mismatch: field '" + field + "' expected at offset "
+                + expected + " but JNA computed " + actual
+                + ". The bundled Steam SDK structs have changed — update SteamOffsets before use.");
+        }
+    }
 
     /**
      * Structure representing an IP Address in SteamNetworkingSockets.
@@ -194,8 +209,15 @@ public final class SteamOffsets {
         public short m_idxLane;
         public short m__pad1__;
 
+        public SteamNetworkingMessage() {}
+
         public SteamNetworkingMessage(Pointer p) {
             super(p);
+        }
+
+        /** Exposes the protected {@link Structure#fieldOffset} for the offset self-check above. */
+        int offsetOf(String field) {
+            return fieldOffset(field);
         }
 
         protected List<String> getFieldOrder() {
