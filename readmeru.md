@@ -2,14 +2,14 @@
 [![Author](https://img.shields.io/badge/author-Ragalikx-blue)](https://github.com/Ragalikx)
 [![MC](https://img.shields.io/badge/Minecraft-1.12.2-green)](https://www.minecraft.net)
 [![Forge](https://img.shields.io/badge/Forge-14.23.5.2861-orange)](https://files.minecraftforge.net)
-[![Discord](https://img.shields.io/badge/Discord-Присоединиться-5865F2?logo=discord&logoColor=white)](https://discord.gg/PLACEHOLDER)
+[![Discord](https://img.shields.io/badge/Discord-Присоединиться-5865F2?logo=discord&logoColor=white)](https://discord.gg/96yVz8MZ5q)
 
 🇬🇧 [Read in English](readme.md)
 
 **Steam Bridge** - модификация для игры с друзьями по сети без проброса портов, белого IP и всяких VPN.
 Мод встраивается в сетевой слой Minecraft и пускает трафик через **Steam Datagram Relay (SDR)**. Пинг остаётся минимальным, а NAT почти любой сложности пробивается без проблем.
 
-> **Discord - основной канал по проекту.** Отдельного сайта нет, поэтому там можно найти ответы на вопросы, новости и планы по моду, анонсы релизов, а также сообщить о багах: **[discord.gg/PLACEHOLDER](https://discord.gg/PLACEHOLDER)**
+> **Discord - основной канал по проекту.** Отдельного сайта нет, поэтому там можно найти ответы на вопросы, новости и планы по моду, анонсы релизов, а также сообщить о багах: **[discord.gg/96yVz8MZ5q](https://discord.gg/96yVz8MZ5q)**
 
 ## Почему Spacewar (AppID 480)?
 Мод передаёт данные через собственный API Steam (ISteamNetworkingSockets), а для этого Steam требует, чтобы оба игрока находились в одной "игре".
@@ -24,7 +24,7 @@
 
 ## Среда разработки
 Версии, использованные при сборке и тестировании:
-- **Java:** 8u401 (Oracle Corporation, 25.401-b10)
+- **Java:** 8u492 (Eclipse Adoptium / Temurin, build 25.492-b09)
 - **Minecraft Forge:** 1.12.2 - 14.23.5.2860
 - **Gradle:** 4.10.3
 - **ОС:** Windows 11 (amd64), на десятке тоже должно собираться без проблем
@@ -50,7 +50,7 @@
 
 **Bitcoin (BTC)**
 ```
-PLACEHOLDER_BTC_ADDRESS
+bc1q2e7hxvv90qm5menfc9m9nd8q43g4w6hmdfuhk3
 ```
 
 **Litecoin (LTC)**
@@ -60,5 +60,5 @@ ltc1q075u480ug7c7wne9tv34yf8suskvtr68rd4q9y
 
 **USDT (сеть TRC-20, Tron)**
 ```
-PLACEHOLDER_USDT_TRC20_ADDRESS
+TVzTdidAdYnQyTth1RoY8duyHQnxcuHDrC
 ```

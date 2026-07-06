@@ -10,12 +10,12 @@ steambridge.gui.not_running=Steam сервер не запущено
 steambridge.gui.no_players=Поки що немає гравців, які приєдналися цим способом...
 steambridge.gui.route_auto=Маршрут: Авто
 steambridge.gui.route_p2p=Маршрут: Прямий P2P
-steambridge.gui.route_relay=Маршрут: Релей Valve
+steambridge.gui.route_relay=Маршрут: Релей-сервер Valve
 steambridge.gui.access_everyone=Доступ: Усі
 steambridge.gui.access_friends=Доступ: Тільки друзі
 
 # Причини відключення
-steambridge.disconnect.kicked=Хост тимчасово заблокував це з'єднання (1 хв)
+steambridge.disconnect.kicked=Хост вигнав вас із сервера (тимчасове блокування 1 хв)
 steambridge.disconnect.banned=Вас заблоковано на цьому сервері
 steambridge.disconnect.friends_only=Хост дозволяє підключення лише друзям Steam
 steambridge.disconnect.mod_mismatch_hint=З'єднання закрито під час входу Forge. Найімовірніше, ваші моди не збігаються з модами хоста. Встановіть такий самий набір модів і версії, потім спробуйте ще раз.

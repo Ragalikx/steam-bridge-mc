@@ -2,14 +2,14 @@
 [![Author](https://img.shields.io/badge/author-Ragalikx-blue)](https://github.com/Ragalikx)
 [![MC](https://img.shields.io/badge/Minecraft-1.12.2-green)](https://www.minecraft.net)
 [![Forge](https://img.shields.io/badge/Forge-14.23.5.2861-orange)](https://files.minecraftforge.net)
-[![Discord](https://img.shields.io/badge/Discord-Join%20the%20server-5865F2?logo=discord&logoColor=white)](https://discord.gg/PLACEHOLDER)
+[![Discord](https://img.shields.io/badge/Discord-Join%20the%20server-5865F2?logo=discord&logoColor=white)](https://discord.gg/96yVz8MZ5q)
 
 🇷🇺 [Читать на русском](readmeru.md)
 
 **Steam Bridge** lets you play with friends over the network without forwarding ports, buying a white IP, or setting up a VPN.
 The mod hooks into Minecraft's networking and routes it through **Steam Datagram Relay (SDR)**. Ping stays low and it gets through pretty much any NAT you throw at it.
 
-> **Discord is the main hub for this project.** There's no separate website, so that's the place to get answers, news and roadmap updates, release announcements, and to report bugs: **[discord.gg/PLACEHOLDER](https://discord.gg/PLACEHOLDER)**
+> **Discord is the main hub for this project.** There's no separate website, so that's the place to get answers, news and roadmap updates, release announcements, and to report bugs: **[discord.gg/96yVz8MZ5q](https://discord.gg/96yVz8MZ5q)**
 
 ## Why Spacewar (AppID 480)?
 The mod moves data through Steam's own API (ISteamNetworkingSockets), and Steam requires everyone involved to be sitting in the same "game" for that to work.
@@ -24,7 +24,7 @@ That's why **AppID 480 (Spacewar)** is used by default. It's Valve's old interna
 
 ## Development Environment
 Versions used while building and testing the mod:
-- **Java:** 8u401 (Oracle Corporation, 25.401-b10)
+- **Java:** 8u492 (Eclipse Adoptium / Temurin, build 25.492-b09)
 - **Minecraft Forge:** 1.12.2 - 14.23.5.2860
 - **Gradle:** 4.10.3
 - **OS:** Windows 11 (amd64), builds should work fine on 10 as well
@@ -50,7 +50,7 @@ If the mod saved you a headache or two, a tip is always appreciated - never expe
 
 **Bitcoin (BTC)**
 ```
-PLACEHOLDER_BTC_ADDRESS
+bc1q2e7hxvv90qm5menfc9m9nd8q43g4w6hmdfuhk3
 ```
 
 **Litecoin (LTC)**
@@ -60,5 +60,5 @@ ltc1q075u480ug7c7wne9tv34yf8suskvtr68rd4q9y
 
 **USDT (TRC-20, Tron network)**
 ```
-PLACEHOLDER_USDT_TRC20_ADDRESS
+TVzTdidAdYnQyTth1RoY8duyHQnxcuHDrC
 ```
