@@ -2,15 +2,24 @@
 [![Author](https://img.shields.io/badge/author-Ragalikx-blue)](https://github.com/Ragalikx)
 [![MC](https://img.shields.io/badge/Minecraft-1.12.2-green)](https://www.minecraft.net)
 [![Forge](https://img.shields.io/badge/Forge-14.23.5.2861-orange)](https://files.minecraftforge.net)
-[![Discord](https://img.shields.io/badge/Discord-Join%20the%20server-5865F2?logo=discord&logoColor=white)](https://discord.gg/96yVz8MZ5q)
+[![Discord](https://img.shields.io/badge/Discord-Join%20the%20server-5865F2?logo=discord&logoColor=white)](https://discord.gg/2xBnJ7awRC)
 
 🇷🇺 [Читать на русском](readmeru.md)
 
 **Steam Bridge** lets you play with friends over the network without forwarding ports, buying a white IP, or setting up a VPN.
 The mod hooks into Minecraft's networking and routes it through **Steam Datagram Relay (SDR)**. Ping stays low and it gets through pretty much any NAT you throw at it.
 
-> **Discord is the main hub for this project.** There's no separate website, so that's the place to get answers, news and roadmap updates, release announcements, and to report bugs: **[discord.gg/96yVz8MZ5q](https://discord.gg/96yVz8MZ5q)**
+> **Discord is the main hub for this project.** There's no separate website, so that's the place to get answers, news and roadmap updates, release announcements, and to report bugs: **[discord.gg/2xBnJ7awRC](https://discord.gg/2xBnJ7awRC)**
 
+
+> ⚠️ **DEVELOPER INFORMATION**
+>
+> Official releases are planned for the following versions: **1.7.10, 1.8, 1.16.5, and 1.20.1**.
+>
+> * **Current Status:** All focus is currently on polishing **1.12.2** (under active testing). Porting to the other listed versions will begin only after gathering bug reports in Discord and fixing major issues, ensuring a stable codebase is transferred. Therefore, there is no need to make standalone ports for these versions - they are already in development.
+>
+> Porting the mod to **any other versions** (not included in the list above) is highly encouraged, provided the MIT license is followed.
+> 
 ## Why Spacewar (AppID 480)?
 The mod moves data through Steam's own API (ISteamNetworkingSockets), and Steam requires everyone involved to be sitting in the same "game" for that to work.
 

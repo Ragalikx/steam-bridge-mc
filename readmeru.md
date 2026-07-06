@@ -2,15 +2,23 @@
 [![Author](https://img.shields.io/badge/author-Ragalikx-blue)](https://github.com/Ragalikx)
 [![MC](https://img.shields.io/badge/Minecraft-1.12.2-green)](https://www.minecraft.net)
 [![Forge](https://img.shields.io/badge/Forge-14.23.5.2861-orange)](https://files.minecraftforge.net)
-[![Discord](https://img.shields.io/badge/Discord-Присоединиться-5865F2?logo=discord&logoColor=white)](https://discord.gg/96yVz8MZ5q)
+[![Discord](https://img.shields.io/badge/Discord-Присоединиться-5865F2?logo=discord&logoColor=white)](https://discord.gg/2xBnJ7awRC)
 
 🇬🇧 [Read in English](readme.md)
 
 **Steam Bridge** - модификация для игры с друзьями по сети без проброса портов, белого IP и всяких VPN.
 Мод встраивается в сетевой слой Minecraft и пускает трафик через **Steam Datagram Relay (SDR)**. Пинг остаётся минимальным, а NAT почти любой сложности пробивается без проблем.
 
-> **Discord - основной канал по проекту.** Отдельного сайта нет, поэтому там можно найти ответы на вопросы, новости и планы по моду, анонсы релизов, а также сообщить о багах: **[discord.gg/96yVz8MZ5q](https://discord.gg/96yVz8MZ5q)**
+> **Discord - основной канал по проекту.** Отдельного сайта нет, поэтому там можно найти ответы на вопросы, новости и планы по моду, анонсы релизов, а также сообщить о багах: **[discord.gg/2xBnJ7awRC](https://discord.gg/2xBnJ7awRC)**
 
+
+> ⚠️ **ИНФОРМАЦИЯ ДЛЯ РАЗРАБОТЧИКОВ**
+>
+> Мод планируется официально выпустить на версиях: **1.7.10, 1.8, 1.16.5 и 1.20.1**.
+>
+> * **Текущий статус:** Сейчас все силы идут на полировку **1.12.2** (она в процессе теста). Портирование на остальные указанные версии начнется только после сбора баг-репортов в Discord и исправления ошибок, чтобы переносить стабильный код. Соответственно, делать самостоятельные порты на эти версии не нужно - они уже в разработке.
+>
+> Портировать мод на любые **другие версии** (которых нет в списке выше) можно и нужно, соблюдая лицензию MIT.
 ## Почему Spacewar (AppID 480)?
 Мод передаёт данные через собственный API Steam (ISteamNetworkingSockets), а для этого Steam требует, чтобы оба игрока находились в одной "игре".
 
