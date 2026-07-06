@@ -1,23 +1,7 @@
 /*
  * Copyright (c) 2019-2026 Ragalikx
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * MIT License - see the LICENSE file in the repository root.
+ * If you use this code, please credit the author.
  */
 package steambridge.gui;
 
@@ -66,7 +50,7 @@ public class GuiSteamResync extends GuiScreen {
 
         // Kick off launch on first init
         if (state == State.LAUNCHING) {
-            statusLine1 = "§eЗапуск Steam...";
+            statusLine1 = "\u00A7eЗапуск Steam...";
             statusLine2 = "";
             launchAndScheduleRetry();
         }
@@ -77,8 +61,8 @@ public class GuiSteamResync extends GuiScreen {
             SteamAppIdHelper.ensureAppId(net.minecraft.client.Minecraft.getMinecraft().gameDir);
             SteamAppIdHelper.launchSteam();
             state = State.WAITING;
-            statusLine1 = "§eЗапускаем Steam...";
-            statusLine2 = "§7Это может занять несколько секунд";
+            statusLine1 = "\u00A7eЗапускаем Steam...";
+            statusLine2 = "\u00A77Это может занять несколько секунд";
         } catch (Exception e) {
             SteamBridgeMod.LOG.warn("[Resync] Failed to launch Steam: {}", e.getMessage());
             state = State.WAITING; // still wait
@@ -106,8 +90,8 @@ public class GuiSteamResync extends GuiScreen {
             boolean ok = SteamManager.getInstance().reinit();
             if (ok) {
                 state = State.SUCCESS;
-                statusLine1 = "§aSteam запущен!";
-                statusLine2 = "§7Открываем список друзей...";
+                statusLine1 = "\u00A7aSteam запущен!";
+                statusLine2 = "\u00A77Открываем список друзей...";
                 // Open friends screen on next tick
                 net.minecraft.client.Minecraft.getMinecraft().addScheduledTask(() ->
                         net.minecraft.client.Minecraft.getMinecraft().displayGuiScreen(
@@ -118,13 +102,13 @@ public class GuiSteamResync extends GuiScreen {
 
         if (remaining <= 0) {
             state = State.FAILED;
-            statusLine1 = "§cТайм-аут: Steam не запустился.";
-            statusLine2 = "§7Запустите Steam вручную и попробуйте снова.";
+            statusLine1 = "\u00A7cТайм-аут: Steam не запустился.";
+            statusLine2 = "\u00A77Запустите Steam вручную и попробуйте снова.";
             return;
         }
 
         // Update countdown message
-        statusLine1 = "§eЗапускаем Steam... (" + remaining + " сек)";
+        statusLine1 = "\u00A7eЗапускаем Steam... (" + remaining + " сек)";
         statusLine2 = "";
     }
 
@@ -139,7 +123,7 @@ public class GuiSteamResync extends GuiScreen {
     public void drawScreen(int mouseX, int mouseY, float partialTicks) {
         this.drawDefaultBackground();
 
-        String title = "§bSteam §rне запущен";
+        String title = "\u00A7bSteam \u00A7rне запущен";
         this.drawCenteredString(this.fontRenderer, title, this.width / 2, this.height / 2 - 50, 0xFFFFFF);
         this.drawCenteredString(this.fontRenderer, statusLine1, this.width / 2, this.height / 2 - 20, 0xFFFFFF);
         if (!statusLine2.isEmpty()) {
@@ -149,7 +133,7 @@ public class GuiSteamResync extends GuiScreen {
         if (state == State.WAITING) {
             // Simple animated dots indicator
             int dots = (ticksElapsed / 8) % 4;
-            StringBuilder sb = new StringBuilder("§7");
+            StringBuilder sb = new StringBuilder("\u00A77");
             for (int i = 0; i < dots; i++) sb.append('.');
             this.drawCenteredString(this.fontRenderer, sb.toString(), this.width / 2, this.height / 2 + 16, 0xFFFFFF);
         }

@@ -1,23 +1,7 @@
 /*
  * Copyright (c) 2019-2026 Ragalikx
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * MIT License - see the LICENSE file in the repository root.
+ * If you use this code, please credit the author.
  */
 package steambridge.steam;
 
@@ -54,14 +38,17 @@ public class SteamManager {
 
     private static java.io.File nativeTempDir;
 
-    private SteamUser steamUser;
-    private SteamFriends steamFriends;
-    private SteamUtils steamUtils;
+    private volatile SteamUser steamUser;
+    private volatile SteamFriends steamFriends;
+    private volatile SteamUtils steamUtils;
     private SteamID mySteamID;
-    private SteamSocketsApi socketsApi;
+    private volatile SteamSocketsApi socketsApi;
 
     private volatile SteamServer activeServer;
     private volatile SteamClient activeClient;
+
+    private volatile Thread callbackThread;
+    private volatile Thread receiveThread;
 
     private final Map<Integer, SteamConnectionStatus> statusByConnection = new ConcurrentHashMap<>();
     private final Map<Long, Integer> connectionBySteamId = new ConcurrentHashMap<>();
@@ -149,6 +136,11 @@ public class SteamManager {
         }
 
         try {
+            // Fail fast if the bundled Steam SDK's SteamNetworkingMessage_t layout no longer
+            // matches our hardcoded offsets - otherwise the raw pointer reads/writes in
+            // SteamSocketsApi would silently corrupt native memory. Throws on mismatch; caught below.
+            SteamOffsets.validateLayout();
+
             steamUser = new SteamUser(new SteamUserCallbackAdapter());
             steamFriends = new SteamFriends(new SteamFriendsCallbackAdapter());
             steamUtils = new SteamUtils(new SteamUtilsCallbackAdapter());
@@ -200,6 +192,14 @@ public class SteamManager {
         running.set(false);
         signalReceiveWake(); // unblock the receive thread if it is parked waiting for connections
 
+        // Wait for both background threads to actually exit their loop before freeing any native
+        // Steam resources below. Without this, a thread can still be inside a native JNA call
+        // (e.g. SteamAPI.runCallbacks()) when SteamAPI.shutdown() frees the SDK underneath it.
+        joinBackgroundThread(callbackThread);
+        joinBackgroundThread(receiveThread);
+        callbackThread = null;
+        receiveThread = null;
+
         SteamServer server = activeServer;
         if (server != null) {
             server.stop();
@@ -249,7 +249,7 @@ public class SteamManager {
     }
 
     private void startCallbackThread() {
-        Thread thread = new Thread(() -> {
+        callbackThread = new Thread(() -> {
             SteamBridgeMod.LOG.info("[SteamManager] Callback thread started.");
             while (running.get()) {
                 try {
@@ -271,12 +271,12 @@ public class SteamManager {
             }
             SteamBridgeMod.LOG.info("[SteamManager] Callback thread stopped.");
         }, "SteamBridge-Callbacks");
-        thread.setDaemon(true);
-        thread.start();
+        callbackThread.setDaemon(true);
+        callbackThread.start();
     }
 
     private void startReceiveThread() {
-        Thread thread = new Thread(() -> {
+        receiveThread = new Thread(() -> {
             SteamBridgeMod.LOG.info("[SteamManager] Receive thread started.");
             while (running.get()) {
                 try {
@@ -322,8 +322,8 @@ public class SteamManager {
             }
             SteamBridgeMod.LOG.info("[SteamManager] Receive thread stopped.");
         }, "SteamBridge-Receive");
-        thread.setDaemon(true);
-        thread.start();
+        receiveThread.setDaemon(true);
+        receiveThread.start();
     }
 
     /** Wakes the receive thread if it is parked waiting for the first connection. */
@@ -333,6 +333,24 @@ public class SteamManager {
             hasConnections.signalAll();
         } finally {
             receiveLock.unlock();
+        }
+    }
+
+    /**
+     * Blocks until {@code thread} exits its loop, up to a bounded timeout. Skipped if called from
+     * the thread itself (the rare onSteamShutdown fallback path below) to avoid a self-join deadlock.
+     */
+    private void joinBackgroundThread(Thread thread) {
+        if (thread == null || thread == Thread.currentThread()) {
+            return;
+        }
+        try {
+            thread.join(3000);
+            if (thread.isAlive()) {
+                SteamBridgeMod.LOG.warn("[SteamManager] {} did not stop within 3s of shutdown.", thread.getName());
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
     }
 
@@ -359,13 +377,13 @@ public class SteamManager {
         long remoteSteamID = cached != null ? cached.getSteamID() : 0L;
         for (SteamSocketsApi.ReceivedMessage message : batch) {
             if (message != null) {
-                dispatch(connection, remoteSteamID, message.getData(), message.getLane());
+                dispatch(connection, remoteSteamID, message.getData());
             }
         }
         return true;
     }
 
-    private void dispatch(int connection, long remoteSteamID, byte[] data, int lane) {
+    private void dispatch(int connection, long remoteSteamID, byte[] data) {
         // Loopback connections are delivered in batch by drainConnection() before reaching
         // here, so this path only handles non-loopback owners (legacy / safety net).
         SteamServer server = activeServer;
@@ -447,6 +465,12 @@ public class SteamManager {
                 closeConnection(connection, SteamSocketsApi.APP_CLOSE_LOCAL_ERROR, "Host is not running");
             }
         }
+
+        // The peer-side close path: drop bookkeeping once the owners above have seen the
+        // terminal event. Locally-closed connections are handled in closeConnection().
+        if (SteamSocketsApi.isTerminalState(status.getState())) {
+            forgetConnection(connection);
+        }
     }
 
     private SteamConnectionStatus buildFallbackStatus(
@@ -479,6 +503,23 @@ public class SteamManager {
                 0L,
                 ""
         );
+    }
+
+    /**
+     * Drops all bookkeeping for a connection that is gone (closed locally or reached a
+     * terminal state). Without this, {@link #statusByConnection} grows for the lifetime of
+     * the session and the receive thread keeps polling dead handles every millisecond.
+     */
+    private void forgetConnection(int connection) {
+        if (connection == 0) {
+            return;
+        }
+        loopbackConnections.remove(connection);
+        loopbackByConnection.remove(connection);
+        SteamConnectionStatus status = statusByConnection.remove(connection);
+        if (status != null && status.getSteamID() != 0L) {
+            connectionBySteamId.remove(status.getSteamID(), connection);
+        }
     }
 
     private void rememberStatus(SteamConnectionStatus status) {
@@ -556,14 +597,9 @@ public class SteamManager {
         return api != null && api.acceptConnection(connection);
     }
 
-    public int sendMessageFromByteBuf(int connection, io.netty.buffer.ByteBuf data, int len, int lane) {
+    public int sendMessageFromByteBuf(int connection, io.netty.buffer.ByteBuf data, int len) {
         SteamSocketsApi api = socketsApi;
-        return api != null ? api.sendMessageFromByteBuf(connection, data, len, SteamSocketsApi.SEND_RELIABLE, lane) : 0;
-    }
-
-    public int sendMessageFromByteBuf(int connection, io.netty.buffer.ByteBuf data, int len, int flags, int lane) {
-        SteamSocketsApi api = socketsApi;
-        return api != null ? api.sendMessageFromByteBuf(connection, data, len, flags, lane) : 0;
+        return api != null ? api.sendMessageFromByteBuf(connection, data, len, SteamSocketsApi.SEND_RELIABLE) : 0;
     }
 
     public void registerLoopback(int connection, LoopbackBridge bridge) {
@@ -631,7 +667,11 @@ public class SteamManager {
 
     public boolean closeConnection(int connection, int reason, String debug) {
         SteamSocketsApi api = socketsApi;
-        return api != null && api.closeConnection(connection, reason, debug, false);
+        boolean closed = api != null && api.closeConnection(connection, reason, debug, false);
+        // Steam does not fire a status callback for locally-closed connections,
+        // so bookkeeping must be dropped here.
+        forgetConnection(connection);
+        return closed;
     }
 
     /** @return {@code true} if a loopback bridge is currently registered for this connection. */

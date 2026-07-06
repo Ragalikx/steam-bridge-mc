@@ -1,23 +1,7 @@
 /*
  * Copyright (c) 2019-2026 Ragalikx
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * MIT License - see the LICENSE file in the repository root.
+ * If you use this code, please credit the author.
  */
 package steambridge.steam;
 
@@ -112,9 +96,16 @@ public final class SteamSocketsApi {
     private static final int CONFIG_P2P_TRANSPORT_ICE_PENALTY = 105; // k_ESteamNetworkingConfig_P2P_Transport_ICE_Penalty
     private static final int CONFIG_P2P_TRANSPORT_SDR_PENALTY = 106; // k_ESteamNetworkingConfig_P2P_Transport_SDR_Penalty
 
+    private static final int CONFIG_P2P_STUN_SERVER_LIST     = 103; // k_ESteamNetworkingConfig_P2P_STUN_ServerList (String value)
+
     private static final int CONFIG_SCOPE_GLOBAL     = 1;
     private static final int CONFIG_SCOPE_CONNECTION  = 4;
     private static final int CONFIG_TYPE_INT32   = 1;
+    private static final int CONFIG_TYPE_STRING  = 4;   // k_ESteamNetworkingConfig_String
+    // STUN servers ICE uses to discover each peer's public address (server-reflexive candidate).
+    // Without at least one, ICE cannot gather routable candidates and every connection silently
+    // falls back to SDR relay - even on a LAN. Two Google public STUN servers (primary + backup).
+    private static final String DEFAULT_STUN_SERVERS = "stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302";
     private static final int SEND_BUFFER_VAL     = 2 * 1024 * 1024; // 2MB - reduced to prevent ACK window overflow during bulk dimension loads
     private static final int SEND_RATE_MIN_VAL   = 512 * 1024;      // 512 KB/s - conservative floor (keeps Steam from over-sending on a friend's poor link)
     private static final int SEND_RATE_MAX_VAL   = 8 * 1024 * 1024; // 8 MB/s - ceiling only; lets big-modpack join bursts (registry sync + first chunks) ramp fast over relay. Steam's congestion control still governs the actual rate, so this never over-sends on a bad link. Lower toward 4MB/s to be gentler on Valve relays.
@@ -222,6 +213,18 @@ public final class SteamSocketsApi {
     public void configureForGameTraffic(boolean allowWithoutAuth) {
         try {
             Memory val32 = new Memory(4);
+
+            // 0. STUN servers for ICE (direct P2P) candidate discovery. This is a String config
+            //    value, so pArg points to the null-terminated UTF-8 string itself (NOT a pointer
+            //    to a pointer). Steam copies the string synchronously, so the local Memory is safe
+            //    to let go after the call. Must be set before initRelayNetworkAccess().
+            byte[] stunBytes = (DEFAULT_STUN_SERVERS + "\0").getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            Memory stunMem = new Memory(stunBytes.length);
+            stunMem.write(0, stunBytes, 0, stunBytes.length);
+            boolean stunOk = api.SteamAPI_ISteamNetworkingUtils_SetConfigValue(
+                    utils, CONFIG_P2P_STUN_SERVER_LIST, CONFIG_SCOPE_GLOBAL, 0L, CONFIG_TYPE_STRING, stunMem);
+            SteamBridgeMod.LOG.info("[SteamSocketsApi] STUN server list {}: {}",
+                    stunOk ? "set" : "FAILED", DEFAULT_STUN_SERVERS);
 
             // 1. Increase P2P initial-connection timeout to 30 s (value is in milliseconds)
             val32.setInt(0, 30_000);
@@ -367,43 +370,12 @@ public final class SteamSocketsApi {
 
     private static final ThreadLocal<Memory> sendBuffer = ThreadLocal.withInitial(() -> new Memory(65536));
 
-    // Pre-allocated ThreadLocal Memory for sendOnLane - eliminates per-call allocations
-    private static final ThreadLocal<Memory> TL_LANE_MSG_ARRAY  = ThreadLocal.withInitial(() -> new Memory(Native.POINTER_SIZE));
-    private static final ThreadLocal<Memory> TL_LANE_OUT_RESULT = ThreadLocal.withInitial(() -> new Memory(8));
-
-    // Precomputed struct field offsets in SteamNetworkingMessage_t (pack(8), x64).
-    // Derived from steamnetworkingtypes.h, Steam SDK 1.50+. DO NOT change without verifying
-    // against the exact SDK version bundled with steamworks4j.
-    //   +0  : m_pData    (8-byte pointer)
-    //   +8  : m_cbSize   (int32)
-    //   +12 : m_conn     (uint32 / HSteamNetConnection)
-    //   +196: m_nFlags   (int32)
-    //   +208: m_idxLane  (uint16)
-
-    /** Whether lane-aware sending has been confirmed available on this process. */
-    private volatile boolean lanesAvailable = true;
-
-    public int sendMessage(int connection, byte[] data, int flags) {
-        if (data == null) return 0;
-        return sendMessage(connection, data, 0, data.length, flags, -1);
-    }
-
-    public int sendMessage(int connection, byte[] data, int offset, int len, int flags) {
-        return sendMessage(connection, data, offset, len, flags, -1);
-    }
-
     /**
      * Zero-copy send from a Netty ByteBuf - writes directly into the pre-allocated ThreadLocal
      * native Memory via NIO ByteBuffer, avoiding an intermediate {@code byte[]} allocation.
      */
-    public int sendMessageFromByteBuf(int connection, io.netty.buffer.ByteBuf data, int len, int flags, int lane) {
+    public int sendMessageFromByteBuf(int connection, io.netty.buffer.ByteBuf data, int len, int flags) {
         if (connection == 0 || data == null || len == 0) return 0;
-
-        if (lane > 0 && lanesAvailable) {
-            int r = sendOnLaneFromByteBuf(connection, data, len, flags, (short) lane);
-            if (r != Integer.MIN_VALUE) return r;
-            lanesAvailable = false;
-        }
 
         Memory payload = sendBuffer.get();
         if (payload.size() < len) {
@@ -417,102 +389,6 @@ public final class SteamSocketsApi {
         return api.SteamAPI_ISteamNetworkingSockets_SendMessageToConnection(
                 sockets, connection, payload, len, flags, (LongByReference) null
         );
-    }
-
-    /**
-     * Sends a message, optionally on a specific priority lane.
-     *
-     * @param lane  -1 = default (SendMessageToConnection, lane 0).
-     *               0 = LANE_INTERACTIVE (high priority).
-     *               1 = LANE_BULK (low priority, used for chunk data).
-     */
-    public int sendMessage(int connection, byte[] data, int offset, int len, int flags, int lane) {
-        if (connection == 0 || data == null || len == 0) return 0;
-
-        if (lane > 0 && lanesAvailable) {
-            int r = sendOnLane(connection, data, offset, len, flags, (short) lane);
-            if (r != Integer.MIN_VALUE) return r; // MIN_VALUE = "lanes not available"
-            lanesAvailable = false;
-        }
-
-        Memory payload = sendBuffer.get();
-        if (payload.size() < len) {
-            payload = new Memory(len);
-            sendBuffer.set(payload);
-        }
-        payload.write(0, data, offset, len);
-        return api.SteamAPI_ISteamNetworkingSockets_SendMessageToConnection(
-                sockets, connection, payload, len, flags, (LongByReference) null
-        );
-    }
-
-    /**
-     * Lane-aware send via AllocateMessage + SendMessages.
-     * Steam allocates and owns the message buffer; the payload is copied into it.
-     * Returns Integer.MIN_VALUE if the API is not available (graceful fallback).
-     */
-    private int sendOnLane(int connection, byte[] data, int offset, int len, int flags, short lane) {
-        try {
-            Pointer msgPtr = api.SteamAPI_ISteamNetworkingUtils_AllocateMessage(len);
-            if (msgPtr == null || Pointer.nativeValue(msgPtr) == 0L) {
-                return Integer.MIN_VALUE;
-            }
-            Pointer dataPtr = msgPtr.getPointer(SteamOffsets.MSG_OFF_PDATA);
-            if (dataPtr == null) {
-                api.SteamAPI_SteamNetworkingMessage_t_Release(msgPtr);
-                return Integer.MIN_VALUE;
-            }
-            dataPtr.write(0, data, offset, len);
-            msgPtr.setInt(SteamOffsets.MSG_OFF_CBSIZE, len);
-            msgPtr.setInt(SteamOffsets.MSG_OFF_CONN,   connection);
-            msgPtr.setInt(SteamOffsets.MSG_OFF_FLAGS,  flags);
-            msgPtr.setShort(SteamOffsets.MSG_OFF_LANE, lane);
-
-            // Reuse pre-allocated ThreadLocal Memory - eliminates per-call allocations
-            Memory msgArray  = TL_LANE_MSG_ARRAY.get();
-            Memory outResult = TL_LANE_OUT_RESULT.get();
-            msgArray.setPointer(0, msgPtr);
-            outResult.setLong(0, 0L);
-            api.SteamAPI_ISteamNetworkingSockets_SendMessages(sockets, 1, msgArray, outResult);
-            return (int) outResult.getLong(0);
-        } catch (Throwable t) {
-            return Integer.MIN_VALUE;
-        }
-    }
-
-    /**
-     * Lane-aware zero-copy send from ByteBuf.
-     */
-    private int sendOnLaneFromByteBuf(int connection, io.netty.buffer.ByteBuf data, int len, int flags, short lane) {
-        try {
-            Pointer msgPtr = api.SteamAPI_ISteamNetworkingUtils_AllocateMessage(len);
-            if (msgPtr == null || Pointer.nativeValue(msgPtr) == 0L) {
-                return Integer.MIN_VALUE;
-            }
-            Pointer dataPtr = msgPtr.getPointer(SteamOffsets.MSG_OFF_PDATA);
-            if (dataPtr == null) {
-                api.SteamAPI_SteamNetworkingMessage_t_Release(msgPtr);
-                return Integer.MIN_VALUE;
-            }
-            // Direct copy: ByteBuf -> NIO view of Steam's message buffer
-            java.nio.ByteBuffer nioView = dataPtr.getByteBuffer(0, len);
-            nioView.clear();
-            data.getBytes(data.readerIndex(), nioView);
-
-            msgPtr.setInt(SteamOffsets.MSG_OFF_CBSIZE, len);
-            msgPtr.setInt(SteamOffsets.MSG_OFF_CONN,   connection);
-            msgPtr.setInt(SteamOffsets.MSG_OFF_FLAGS,  flags);
-            msgPtr.setShort(SteamOffsets.MSG_OFF_LANE, lane);
-
-            Memory msgArray  = TL_LANE_MSG_ARRAY.get();
-            Memory outResult = TL_LANE_OUT_RESULT.get();
-            msgArray.setPointer(0, msgPtr);
-            outResult.setLong(0, 0L);
-            api.SteamAPI_ISteamNetworkingSockets_SendMessages(sockets, 1, msgArray, outResult);
-            return (int) outResult.getLong(0);
-        } catch (Throwable t) {
-            return Integer.MIN_VALUE;
-        }
     }
 
 
@@ -539,31 +415,14 @@ public final class SteamSocketsApi {
             //   +12 m_conn   (int32)
             int    cbSize  = msgPtr.getInt(SteamOffsets.MSG_OFF_CBSIZE);
             int    conn    = msgPtr.getInt(SteamOffsets.MSG_OFF_CONN);
-            int    lane    = msgPtr.getShort(SteamOffsets.MSG_OFF_LANE) & 0xFFFF;
             Pointer dataPtr = msgPtr.getPointer(SteamOffsets.MSG_OFF_PDATA);
             byte[] payload = (dataPtr != null && cbSize > 0)
                     ? dataPtr.getByteArray(0, cbSize)
                     : new byte[0];
             api.SteamAPI_SteamNetworkingMessage_t_Release(msgPtr);
-            results[i] = new ReceivedMessage(conn, payload, lane);
+            results[i] = new ReceivedMessage(conn, payload);
         }
         return results;
-    }
-
-    /**
-     * @deprecated Uses single-slot receive - allocates {@code new Memory} on every call
-     *             and leaves up to 63 messages queued in Steam during burst traffic.
-     *             Use {@link #receiveMessages(int)} which drains up to 64 messages per JNA call
-     *             via the pre-allocated {@link #recvBatchMem}.
-     *             Kept only for binary compatibility - do not call in new code.
-     * @throws UnsupportedOperationException always
-     */
-    @Deprecated
-    public ReceivedMessage receiveMessage() {
-        throw new UnsupportedOperationException(
-            "receiveMessage() is disabled - use receiveMessages(int) for batch receive. " +
-            "Single-slot polling causes allocation per call and leaves up to 63 messages unread per tick."
-        );
     }
 
     // ThreadLocal reuse for snapshotConnection - eliminates two JNA Structure allocations per call.
@@ -774,12 +633,10 @@ public final class SteamSocketsApi {
     public static final class ReceivedMessage {
         private final int connection;
         private final byte[] data;
-        private final int lane;
 
-        private ReceivedMessage(int connection, byte[] data, int lane) {
+        private ReceivedMessage(int connection, byte[] data) {
             this.connection = connection;
             this.data = data;
-            this.lane = lane;
         }
 
         public int getConnection() {
@@ -788,10 +645,6 @@ public final class SteamSocketsApi {
 
         public byte[] getData() {
             return data;
-        }
-
-        public int getLane() {
-            return lane;
         }
     }
 
@@ -833,15 +686,6 @@ public final class SteamSocketsApi {
         void SteamAPI_SteamNetworkingIdentity_SetSteamID64(Pointer identity, long steamID);
         long SteamAPI_SteamNetworkingIdentity_GetSteamID64(Pointer identity);
         void SteamAPI_SteamNetworkingMessage_t_Release(Pointer message);
-        /** Allocates a SteamNetworkingMessage_t with an embedded data buffer of cbAllocateBuffer bytes. */
-        Pointer SteamAPI_ISteamNetworkingUtils_AllocateMessage(int cbAllocateBuffer);
-        /** Sends an array of pre-built messages (enables per-message lane assignment). */
-        void SteamAPI_ISteamNetworkingSockets_SendMessages(
-                Pointer sockets, int nMessages, Pointer ppOutMessages, Pointer pOutMessageNumberOrResult
-        );
-        int SteamAPI_ISteamNetworkingSockets_ConfigureConnectionLanes(
-                Pointer sockets, int connection, int numLanes, Pointer lanePriorities, Pointer laneWeights
-        );
         boolean SteamAPI_ISteamNetworkingUtils_SetConfigValue(
                 Pointer utils, int eValue, int eScopeType, long scopeObj,
                 int eDataType, Pointer pArg

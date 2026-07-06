@@ -1,23 +1,7 @@
 /*
  * Copyright (c) 2019-2026 Ragalikx
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * MIT License - see the LICENSE file in the repository root.
+ * If you use this code, please credit the author.
  */
 package steambridge.steam;
 
@@ -54,9 +38,8 @@ import java.util.function.IntConsumer;
 /**
  * Steam transport layer - Loopback Socket architecture.
  * <p>
- * This replaces the previous PhantomSocket architecture with a simpler setup:
  * Real Netty pipelines connect to a local TCP proxy (LoopbackBridge). The proxy
- * forwards bytes to SteamNetworkingSockets native methods.
+ * forwards bytes directly to SteamNetworkingSockets native methods.
  * <p>
  * This provides 100% compatibility with Minecraft and forge mods expecting a raw
  * TCP channel, without needing pipeline reflection injection.
@@ -179,6 +162,15 @@ public final class SteamTransport {
             Minecraft mc = Minecraft.getMinecraft();
             NetworkManager[] nmHolder = new NetworkManager[1];
 
+            // The screen we hand to the net handler becomes GuiDisconnected's parent
+            // when the server later drops us. Re-showing the stale connect/add-server
+            // screen the player launched from leaves its buttons unresponsive, so use a
+            // fresh multiplayer list instead - the same fallback vanilla uses when it has
+            // no origin screen. This is the "Back to server list" target after a kick.
+            final net.minecraft.client.gui.GuiScreen returnScreen =
+                    new net.minecraft.client.gui.GuiMultiplayer(
+                            new net.minecraft.client.gui.GuiMainMenu());
+
             io.netty.bootstrap.Bootstrap bootstrap = new io.netty.bootstrap.Bootstrap()
                 .group(NIO_GROUP)
                 .channel(NioSocketChannel.class)
@@ -200,7 +192,7 @@ public final class SteamTransport {
                             .addLast("packet_handler",  nm);
 
                         nm.setNetHandler(
-                            new net.minecraft.client.network.NetHandlerLoginClient(nm, mc, currentScreen));
+                            new net.minecraft.client.network.NetHandlerLoginClient(nm, mc, returnScreen));
                     }
                 });
 
@@ -229,15 +221,6 @@ public final class SteamTransport {
     }
 }
 
-// --- Packet constants -----------------------------------------------------
-
-final class Packet {
-    static final int SEND_FLAGS                  = SteamSocketsApi.SEND_RELIABLE_NO_NAGLE;
-    /** Single lane - strict FIFO, no interleaving. */
-    static final int LANE_SINGLE                 = 0;
-    private Packet() {}
-}
-
 // --- LoopbackBridge - buffered TCP<->Steam proxy --------------------------
 
 final class LoopbackBridge extends io.netty.channel.ChannelInboundHandlerAdapter {
@@ -247,7 +230,9 @@ final class LoopbackBridge extends io.netty.channel.ChannelInboundHandlerAdapter
     private final java.util.concurrent.ConcurrentLinkedQueue<byte[]> preActivateQueue = new java.util.concurrent.ConcurrentLinkedQueue<>();
     private volatile boolean closed = false;
 
-    // Backpressure queue
+    // Backpressure queue. A plain LinkedList is safe here only because Netty guarantees every
+    // call into a channel's handlers (read, write, flush) runs on that channel's single event-loop
+    // thread - if this queue is ever touched from outside the event loop, this needs to change.
     private final java.util.Queue<io.netty.buffer.ByteBuf> pendingOutbound = new java.util.LinkedList<>();
     private final int STEAM_MAX_CHUNK = 256 * 1024; // 256KB safe max
 
@@ -296,7 +281,7 @@ final class LoopbackBridge extends io.netty.channel.ChannelInboundHandlerAdapter
 
             int toSend = Math.min(readable, STEAM_MAX_CHUNK);
 
-            int r = SteamManager.getInstance().sendMessageFromByteBuf(connectionHandle, buf, toSend, Packet.LANE_SINGLE);
+            int r = SteamManager.getInstance().sendMessageFromByteBuf(connectionHandle, buf, toSend);
             if (r == SteamSocketsApi.RESULT_OK) {
                 // Buffer space was directly read by Steam natively! No Java byte array needed!
                 buf.skipBytes(toSend);

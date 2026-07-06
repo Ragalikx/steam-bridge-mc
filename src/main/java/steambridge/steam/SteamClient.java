@@ -1,23 +1,7 @@
 /*
  * Copyright (c) 2019-2026 Ragalikx
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * MIT License - see the LICENSE file in the repository root.
+ * If you use this code, please credit the author.
  */
 package steambridge.steam;
 
@@ -38,7 +22,7 @@ public class SteamClient {
     private volatile String statusMsg = "";
     private final AtomicBoolean alive = new AtomicBoolean(false);
 
-    private SteamID hostSteamID;
+    private volatile SteamID hostSteamID;
     private volatile int connectionHandle = 0;
 
     /** Screen shown when connection was initiated - passed to NetHandlerLoginClient. */
@@ -51,7 +35,8 @@ public class SteamClient {
     }
 
     public void connect(SteamID host, net.minecraft.client.gui.GuiScreen currentScreen) {
-        if (alive.get()) {
+        // Atomic claim: two racing connect() calls must not both proceed.
+        if (!alive.compareAndSet(false, true)) {
             SteamBridgeMod.LOG.warn("[SteamClient] connect() called while already active.");
             return;
         }
@@ -59,9 +44,8 @@ public class SteamClient {
         connectLatch = new CountDownLatch(1);
         connectingScreen = currentScreen;
         hostSteamID = host;
-        alive.set(true);
         state = State.CONNECTING;
-        statusMsg = "Connecting through Steam Relay...";
+        statusMsg = i18n("steambridge.status.connecting", "Connecting through Steam Relay...");
         SteamManager.getInstance().setActiveClient(this);
 
         long hostKey = SteamNativeHandle.getNativeHandle(host);
@@ -73,23 +57,34 @@ public class SteamClient {
     }
 
     public void disconnect() {
-        boolean wasAlive = alive.getAndSet(false);
-        SteamBridgeMod.LOG.info("[SteamClient] disconnect() called. wasAlive={}", wasAlive);
+        closeSteamTransport("Client disconnected", true);
+    }
 
-        state = State.IDLE;
-        statusMsg = "Disconnected.";
+    public void closeAfterMinecraftFailure(String reason, String details) {
+        onMinecraftDisconnect(reason, details);
+        closeSteamTransport(compact(details).isEmpty() ? "Minecraft login rejected" : compact(details), false);
+    }
+
+    private void closeSteamTransport(String steamCloseReason, boolean resetStatus) {
+        SteamBridgeMod.LOG.info("[SteamClient] closeSteamTransport() called. wasAlive={} resetStatus={}",
+            alive.getAndSet(false), resetStatus);
+
+        if (resetStatus) {
+            state = State.IDLE;
+            statusMsg = "Disconnected.";
+        }
         connectLatch.countDown();
         SteamManager.getInstance().setActiveClient(null);
 
         if (connectionHandle != 0) {
             SteamManager.getInstance().unregisterLoopback(connectionHandle);
             SteamManager.getInstance().closeConnection(
-                connectionHandle, SteamSocketsApi.APP_CLOSE_NORMAL, "Client disconnected"
+                connectionHandle, SteamSocketsApi.APP_CLOSE_NORMAL, safeText(steamCloseReason, "Client disconnected")
             );
         }
 
         connectionHandle = 0;
-        SteamBridgeMod.LOG.info("[SteamClient] Disconnected.");
+        SteamBridgeMod.LOG.info("[SteamClient] Steam transport closed.");
     }
 
     private void doConnect(SteamID host) {
@@ -98,14 +93,14 @@ public class SteamClient {
             connectionHandle = SteamManager.getInstance().connectP2P(
                 host, steambridge.SteamBridgeConfig.virtualPort);
             if (connectionHandle == 0) {
-                fail("Steam refused to create a relay connection.");
+                fail(i18n("steambridge.status.fail_create", "Steam refused to create a relay connection."));
                 return;
             }
 
             final long remoteSteamID = hostKey;
             final int conn = connectionHandle;
 
-            statusMsg = "Waiting for Steam route to host...";
+            statusMsg = i18n("steambridge.status.waiting_route", "Waiting for Steam route to host...");
             SteamBridgeMod.LOG.info(
                 "[SteamClient] ConnectP2P started. hostSteamID={} conn={}",
                 hostKey, conn
@@ -118,7 +113,7 @@ public class SteamClient {
             );
 
             if (!connected) {
-                fail("Timeout: Steam route to host did not become ready within 30 seconds.");
+                fail(i18n("steambridge.status.fail_timeout", "Timeout: Steam route to host did not become ready within 30 seconds."));
                 return;
             }
 
@@ -130,12 +125,12 @@ public class SteamClient {
                 return;
             }
 
-            statusMsg = "Steam path ready - activating Netty pipeline...";
+            statusMsg = i18n("steambridge.status.path_ready", "Steam path ready - activating pipeline...");
             final net.minecraft.client.gui.GuiScreen screen = connectingScreen;
 
             int proxyPort = SteamTransport.allocateClientLoopbackPort(conn);
             if (proxyPort < 0) {
-                fail("Failed to start loopback proxy for connection.");
+                fail(i18n("steambridge.status.fail_proxy", "Failed to start loopback proxy for connection."));
                 return;
             }
 
@@ -148,11 +143,11 @@ public class SteamClient {
                             conn, remoteSteamID, finalProxyPort, screen);
                     if (ok2) {
                         state = State.STEAM_READY;
-                        statusMsg = "Steam path ready - waiting for Minecraft login...";
+                        statusMsg = i18n("steambridge.status.steam_ready", "Steam path ready - waiting for Minecraft login...");
                         SteamBridgeMod.LOG.info("[SteamClient] Loopback mode active - Steam transport is ready.");
                     } else {
                         SteamBridgeMod.LOG.error("[SteamClient] Loopback connect to port {} failed.", finalProxyPort);
-                        fail("Failed to connect to loopback proxy port " + finalProxyPort);
+                        fail(i18n("steambridge.status.fail_proxy", "Failed to connect to loopback proxy port ") + finalProxyPort);
                     }
                 } catch (Exception e) {
                     SteamBridgeMod.LOG.error("[SteamClient] Loopback connect failed: {}", e.getMessage(), e);
@@ -184,8 +179,8 @@ public class SteamClient {
 
         if (status.getState() == SteamSocketsApi.STATE_CONNECTED) {
             statusMsg = status.isUsingRelay()
-                ? "Relay path ready - activating channel..."
-                : "Direct path ready - activating channel...";
+                ? i18n("steambridge.status.route_relay", "Relay path ready - activating channel...")
+                : i18n("steambridge.status.route_direct", "Direct path ready - activating channel...");
             connectLatch.countDown();
             return;
         }
@@ -194,9 +189,12 @@ public class SteamClient {
             String error = status.getLastError().isEmpty()
                 ? status.describeState()
                 : status.getLastError();
+                
+            // If the server sent a raw localization key, translate it on the client side
+            error = i18n(error, error);
 
             if (alive.get()) {
-                fail("Steam connection closed: " + error);
+                fail(i18n("steambridge.status.fail_closed", "Steam connection closed: ") + error);
             }
         }
     }
@@ -229,10 +227,6 @@ public class SteamClient {
         return statusMsg;
     }
 
-    public int getLocalPort() {
-        return -1; // unused in SteamChannel mode, kept for API compatibility
-    }
-
     public SteamID getHostSteamID() {
         return hostSteamID;
     }
@@ -253,7 +247,7 @@ public class SteamClient {
         if (state != State.IN_WORLD) {
             state = State.NEGOTIATING;
         }
-        statusMsg = "Steam ready - Minecraft/Forge handshake in progress...";
+        statusMsg = i18n("steambridge.status.handshake", "Steam ready - Minecraft/Forge handshake in progress...");
         SteamBridgeMod.LOG.info(
             "[SteamClient] Minecraft handshake started. connectionType={} conn={}",
             safeText(connectionType, "unknown"),
@@ -267,7 +261,7 @@ public class SteamClient {
         }
 
         state = State.NEGOTIATING;
-        statusMsg = "Login accepted - loading world...";
+        statusMsg = i18n("steambridge.status.loading_world", "Login accepted - loading world...");
         SteamBridgeMod.LOG.info("[SteamClient] Minecraft accepted the login. Loading world...");
     }
 
@@ -277,7 +271,7 @@ public class SteamClient {
         }
 
         state = State.IN_WORLD;
-        statusMsg = "Connected as " + safeText(playerName, "?") + " (dim " + dimension + ")";
+        statusMsg = i18n("steambridge.status.in_world", "Connected as ") + safeText(playerName, "?") + " (dim " + dimension + ")";
         SteamBridgeMod.LOG.info(
             "[SteamClient] Minecraft world joined successfully. player={} dimension={} conn={}",
             safeText(playerName, "?"),
@@ -360,6 +354,10 @@ public class SteamClient {
         String text = (reason + "\n" + details).toLowerCase(Locale.ROOT);
         return text.contains("mod rejection")
             || text.contains("missing mods")
+            || text.contains("mod mismatch")
+            || text.contains("mods do not match")
+            || text.contains("mods don't match")
+            || text.contains("your mods")
             || text.contains("requires version")
             || text.contains("mod is not found");
     }
@@ -384,5 +382,16 @@ public class SteamClient {
     private static class TextColors {
         static final String RED = "\u00a7c";
     }
-}
 
+    /** Returns the I18n translation for {@code key}, or {@code fallback} if unavailable. */
+    private static String i18n(String key, String fallback) {
+        try {
+            if (net.minecraft.client.resources.I18n.hasKey(key)) {
+                return net.minecraft.client.resources.I18n.format(key);
+            }
+        } catch (Exception ignored) {
+            // Minecraft not yet fully initialised - use English fallback.
+        }
+        return fallback;
+    }
+}

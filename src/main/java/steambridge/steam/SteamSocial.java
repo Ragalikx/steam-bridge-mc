@@ -1,23 +1,7 @@
 /*
  * Copyright (c) 2019-2026 Ragalikx
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * MIT License - see the LICENSE file in the repository root.
+ * If you use this code, please credit the author.
  */
 package steambridge.steam;
 
@@ -374,7 +358,6 @@ public final class SteamSocial {
             public boolean allowCommands    = false;
             public String  accessPolicy     = SteamServer.AccessPolicy.EVERYONE.name();
             public String  transportMode    = SteamServer.TransportMode.AUTO.name();
-            public String  compressionMode  = SteamServer.CompressionMode.VANILLA.name();
         }
 
         private static final class Store {
@@ -398,7 +381,6 @@ public final class SteamSocial {
             if (saved.gametype      == null) saved.gametype      = GameType.SURVIVAL.name();
             if (saved.accessPolicy  == null) saved.accessPolicy  = SteamServer.AccessPolicy.EVERYONE.name();
             if (saved.transportMode == null) saved.transportMode = SteamServer.TransportMode.AUTO.name();
-            if (saved.compressionMode == null) saved.compressionMode = SteamServer.CompressionMode.VANILLA.name();
             return saved;
         }
 
@@ -413,7 +395,6 @@ public final class SteamSocial {
             s.allowCommands    = allowCommands;
             s.accessPolicy     = accessPolicy  != null ? accessPolicy.name()  : SteamServer.AccessPolicy.EVERYONE.name();
             s.transportMode    = transportMode != null ? transportMode.name() : SteamServer.TransportMode.AUTO.name();
-            s.compressionMode  = SteamServer.CompressionMode.VANILLA.name();
             store.worlds.put(normalizeKey(worldKey), s);
             persist();
         }
@@ -431,11 +412,6 @@ public final class SteamSocial {
         public static SteamServer.TransportMode parseTransportMode(String value) {
             if (value == null) return SteamServer.TransportMode.AUTO;
             try { return SteamServer.TransportMode.valueOf(value); } catch (IllegalArgumentException ignored) { return SteamServer.TransportMode.AUTO; }
-        }
-
-        public static SteamServer.CompressionMode parseCompressionMode(String value) {
-            if (value == null) return SteamServer.CompressionMode.VANILLA;
-            try { return SteamServer.CompressionMode.valueOf(value); } catch (IllegalArgumentException ignored) { return SteamServer.CompressionMode.VANILLA; }
         }
 
         private void ensureLoaded() {

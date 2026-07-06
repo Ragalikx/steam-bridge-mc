@@ -1,0 +1,125 @@
+LEGACY / REFERENCE ONLY - NOT COMPILED, NOT ON THE CLASSPATH
+============================================================
+
+Priority-lane sending, extracted from SteamSocketsApi when it was cut from the
+live transport (single-lane strict FIFO is what actually shipped).
+
+WHY IT WAS REMOVED
+------------------
+The data path always sent on lane 0, so the `lane > 0` branch never executed and
+none of this ran. Worse, it *looked* like priority channels existed when they did
+not - misleading for anyone reading the code.
+
+WHAT IS USEFUL HERE (keep as a reference)
+-----------------------------------------
+The raw JNA "build a SteamNetworkingMessage_t by hand and send it" dance:
+AllocateMessage(len) -> write payload into m_pData -> set m_cbSize / m_conn /
+m_nFlags / m_idxLane by offset -> SendMessages(1, ...). Getting the offset writes
+and the ThreadLocal reuse right is fiddly; this is a correct, GC-free version.
+
+WHAT IS MISSING (why this is NOT a foundation - expect to redesign)
+-------------------------------------------------------------------
+1. No ConfigureConnectionLanes() call. Steam needs
+   ISteamNetworkingSockets_ConfigureConnectionLanes(conn, numLanes, priorities,
+   weights) ONCE per connection to define what a lane index means. Setting
+   m_idxLane = 1 on a connection that only has lane 0 configured does nothing.
+2. No packet classification. LoopbackBridge forwards an opaque TCP byte stream
+   from Minecraft's pipeline - it cannot tell a chunk packet from a movement
+   packet without re-parsing the MC protocol (framing + packet IDs + connection
+   state) inside the bridge. Routing chunks onto a "bulk" lane requires that
+   parsing, which is the bulk of the real work and is not here.
+
+To actually ship priority lanes you would: call ConfigureConnectionLanes on each
+connection after STATE_CONNECTED (e.g. 2 lanes: interactive=high, bulk=low), add
+a lightweight MC-protocol classifier in the bridge, then map packet class -> lane.
+
+----------------------------------------------------------------------------------
+
+    /** Whether lane-aware sending has been confirmed available on this process. */
+    private volatile boolean lanesAvailable = true;
+
+    // Pre-allocated ThreadLocal Memory for sendOnLane - eliminates per-call allocations
+    private static final ThreadLocal<Memory> TL_LANE_MSG_ARRAY  = ThreadLocal.withInitial(() -> new Memory(Native.POINTER_SIZE));
+    private static final ThreadLocal<Memory> TL_LANE_OUT_RESULT = ThreadLocal.withInitial(() -> new Memory(8));
+
+    // Call site inside a send method: try a lane, fall back to plain SendMessageToConnection.
+    //   if (lane > 0 && lanesAvailable) {
+    //       int r = sendOnLane(connection, data, offset, len, flags, (short) lane);
+    //       if (r != Integer.MIN_VALUE) return r; // MIN_VALUE = "lanes not available"
+    //       lanesAvailable = false;
+    //   }
+
+    /**
+     * Lane-aware send via AllocateMessage + SendMessages.
+     * Steam allocates and owns the message buffer; the payload is copied into it.
+     * Returns Integer.MIN_VALUE if the API is not available (graceful fallback).
+     */
+    private int sendOnLane(int connection, byte[] data, int offset, int len, int flags, short lane) {
+        try {
+            Pointer msgPtr = api.SteamAPI_ISteamNetworkingUtils_AllocateMessage(len);
+            if (msgPtr == null || Pointer.nativeValue(msgPtr) == 0L) {
+                return Integer.MIN_VALUE;
+            }
+            Pointer dataPtr = msgPtr.getPointer(SteamOffsets.MSG_OFF_PDATA);
+            if (dataPtr == null) {
+                api.SteamAPI_SteamNetworkingMessage_t_Release(msgPtr);
+                return Integer.MIN_VALUE;
+            }
+            dataPtr.write(0, data, offset, len);
+            msgPtr.setInt(SteamOffsets.MSG_OFF_CBSIZE, len);
+            msgPtr.setInt(SteamOffsets.MSG_OFF_CONN,   connection);
+            msgPtr.setInt(SteamOffsets.MSG_OFF_FLAGS,  flags);
+            msgPtr.setShort(SteamOffsets.MSG_OFF_LANE, lane);
+
+            // Reuse pre-allocated ThreadLocal Memory - eliminates per-call allocations
+            Memory msgArray  = TL_LANE_MSG_ARRAY.get();
+            Memory outResult = TL_LANE_OUT_RESULT.get();
+            msgArray.setPointer(0, msgPtr);
+            outResult.setLong(0, 0L);
+            api.SteamAPI_ISteamNetworkingSockets_SendMessages(sockets, 1, msgArray, outResult);
+            return (int) outResult.getLong(0);
+        } catch (Throwable t) {
+            return Integer.MIN_VALUE;
+        }
+    }
+
+    /**
+     * Lane-aware zero-copy send from ByteBuf.
+     */
+    private int sendOnLaneFromByteBuf(int connection, io.netty.buffer.ByteBuf data, int len, int flags, short lane) {
+        try {
+            Pointer msgPtr = api.SteamAPI_ISteamNetworkingUtils_AllocateMessage(len);
+            if (msgPtr == null || Pointer.nativeValue(msgPtr) == 0L) {
+                return Integer.MIN_VALUE;
+            }
+            Pointer dataPtr = msgPtr.getPointer(SteamOffsets.MSG_OFF_PDATA);
+            if (dataPtr == null) {
+                api.SteamAPI_SteamNetworkingMessage_t_Release(msgPtr);
+                return Integer.MIN_VALUE;
+            }
+            // Direct copy: ByteBuf -> NIO view of Steam's message buffer
+            java.nio.ByteBuffer nioView = dataPtr.getByteBuffer(0, len);
+            nioView.clear();
+            data.getBytes(data.readerIndex(), nioView);
+
+            msgPtr.setInt(SteamOffsets.MSG_OFF_CBSIZE, len);
+            msgPtr.setInt(SteamOffsets.MSG_OFF_CONN,   connection);
+            msgPtr.setInt(SteamOffsets.MSG_OFF_FLAGS,  flags);
+            msgPtr.setShort(SteamOffsets.MSG_OFF_LANE, lane);
+
+            Memory msgArray  = TL_LANE_MSG_ARRAY.get();
+            Memory outResult = TL_LANE_OUT_RESULT.get();
+            msgArray.setPointer(0, msgPtr);
+            outResult.setLong(0, 0L);
+            api.SteamAPI_ISteamNetworkingSockets_SendMessages(sockets, 1, msgArray, outResult);
+            return (int) outResult.getLong(0);
+        } catch (Throwable t) {
+            return Integer.MIN_VALUE;
+        }
+    }
+
+    // Required FlatApi (JNA) declarations for the above:
+    //   Pointer SteamAPI_ISteamNetworkingUtils_AllocateMessage(int cbAllocateBuffer);
+    //   void    SteamAPI_ISteamNetworkingSockets_SendMessages(Pointer sockets, int nMessages, Pointer ppOutMessages, Pointer pOutMessageNumberOrResult);
+    //   int     SteamAPI_ISteamNetworkingSockets_ConfigureConnectionLanes(Pointer sockets, int connection, int numLanes, Pointer lanePriorities, Pointer laneWeights);
+    //   void    SteamAPI_SteamNetworkingMessage_t_Release(Pointer message); // still used by receiveMessages()

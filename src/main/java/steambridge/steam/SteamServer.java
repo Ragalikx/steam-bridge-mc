@@ -1,23 +1,7 @@
 /*
  * Copyright (c) 2019-2026 Ragalikx
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * MIT License - see the LICENSE file in the repository root.
+ * If you use this code, please credit the author.
  */
 package steambridge.steam;
 
@@ -45,19 +29,6 @@ public class SteamServer {
         AUTO,
         P2P_ONLY,
         RELAY_ONLY
-    }
-
-    /**
-     * Compression method used for Steam session traffic (server -> client only).
-     * <ul>
-     *   <li>{@link #VANILLA} - No Steam-level compression. Minecraft's own zlib handles it as-is.</li>
-     * </ul>
-     * Note: a separate ZLIB mode was removed - Minecraft already compresses packets with ZLIB
-     * internally, so adding a second ZLIB layer on top only wastes CPU without any gain.
-     */
-    public enum CompressionMode {
-        /** Disables Steam transport compression; Minecraft's built-in zlib is used as-is. */
-        VANILLA
     }
 
     public static final class PlayerSnapshot {
@@ -147,15 +118,14 @@ public class SteamServer {
         }
     }
 
-    private static final String MC_HOST = "127.0.0.1";
-    private static final long KICK_BLOCK_MS = 10_000L;
+    /** How long a kicked player's reconnect attempts stay blocked (1 minute). */
+    private static final long KICK_BLOCK_DURATION_MS = 60_000L;
 
     private volatile int mcPort = 25565;
     private volatile boolean running = false;
     private volatile int listenSocket = 0;
     private volatile AccessPolicy accessPolicy = AccessPolicy.EVERYONE;
     private volatile TransportMode transportMode = TransportMode.AUTO;
-    private volatile CompressionMode compressionMode = CompressionMode.VANILLA;
     private volatile String worldKey = "__default_world__";
     private volatile String worldDisplayName = "World";
 
@@ -197,14 +167,6 @@ public class SteamServer {
 
     public TransportMode getTransportMode() {
         return transportMode;
-    }
-
-    public void setCompressionMode(CompressionMode mode) {
-        this.compressionMode = mode != null ? mode : CompressionMode.VANILLA;
-    }
-
-    public CompressionMode getCompressionMode() {
-        return compressionMode;
     }
 
     public void setWorldIdentity(String worldKey, String worldDisplayName) {
@@ -413,9 +375,7 @@ public class SteamServer {
         String steamName      = SteamSocial.ProfileCache.get().getDisplayName(steamId);
         String minecraftName  = session != null ? session.minecraftName : "";
         SteamSocial.Bans.get().ban(worldKey, steamId, steamName, minecraftName);
-        String msg = net.minecraft.client.resources.I18n.hasKey("steambridge.disconnect.banned") ?
-                     net.minecraft.client.resources.I18n.format("steambridge.disconnect.banned") : "You are banned from this world";
-        disconnectSteamPeer(steamId, msg);
+        disconnectSteamPeer(steamId, "steambridge.disconnect.banned");
         SteamBridgeMod.LOG.warn("Banned: {} (steamID={}){}", SteamBridgeMod.safeLog(steamName), steamId,
                 minecraftName.isEmpty() ? "" : " mc=" + SteamBridgeMod.safeLog(minecraftName));
         return true;
@@ -436,10 +396,8 @@ public class SteamServer {
         String steamName      = SteamSocial.ProfileCache.get().getDisplayName(steamId);
         String minecraftName  = session != null ? session.minecraftName : "";
 
-        kickBlockedUntilBySteamId.put(steamId, System.currentTimeMillis() + 300_000L); 
-        String msg = net.minecraft.client.resources.I18n.hasKey("steambridge.disconnect.kicked") ? 
-                     net.minecraft.client.resources.I18n.format("steambridge.disconnect.kicked") : "Host temporarily blocked this connection";
-        disconnectSteamPeer(steamId, msg);
+        kickBlockedUntilBySteamId.put(steamId, System.currentTimeMillis() + KICK_BLOCK_DURATION_MS);
+        disconnectSteamPeer(steamId, "steambridge.disconnect.kicked");
 
         SteamBridgeMod.LOG.info("Kicked: {} (steamID={}){}", SteamBridgeMod.safeLog(steamName), steamId,
                 minecraftName.isEmpty() ? "" : " mc=" + SteamBridgeMod.safeLog(minecraftName));
@@ -490,48 +448,52 @@ public class SteamServer {
             return; // already registered
         }
 
+        // This runs on the SteamBridge-Callbacks thread; getIntegratedServer() and everything
+        // below it touches world/server state, which must only be read/mutated on the main thread.
         net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getMinecraft();
-        if (mc.getIntegratedServer() != null) {
-            // Reconnect guard
-            Integer oldConn = connectionBySteamId.get(steamID);
-            if (oldConn != null && oldConn != connection) {
-                if (SteamManager.getInstance().isLoopbackRegistered(oldConn)) {
-                    SteamBridgeMod.LOG.info(
-                        "[SteamServer] Proactively closing stale loopback bridge conn={} for reconnecting steamID={}",
-                        oldConn, steamID);
-                    SteamManager.getInstance().unregisterLoopback(oldConn);
+        mc.addScheduledTask(() -> {
+            if (mc.getIntegratedServer() != null) {
+                // Reconnect guard
+                Integer oldConn = connectionBySteamId.get(steamID);
+                if (oldConn != null && oldConn != connection) {
+                    if (SteamManager.getInstance().isLoopbackRegistered(oldConn)) {
+                        SteamBridgeMod.LOG.info(
+                            "[SteamServer] Proactively closing stale loopback bridge conn={} for reconnecting steamID={}",
+                            oldConn, steamID);
+                        SteamManager.getInstance().unregisterLoopback(oldConn);
+                    }
+                    SteamManager.getInstance().closeConnection(
+                        oldConn, SteamSocketsApi.APP_CLOSE_NORMAL, "Replaced by reconnect");
                 }
-                SteamManager.getInstance().closeConnection(
-                    oldConn, SteamSocketsApi.APP_CLOSE_NORMAL, "Replaced by reconnect");
-            }
 
-            PlayerSession session = sessionsBySteamId.computeIfAbsent(
-                    steamID, key -> new PlayerSession(steamID, connection));
-            session.connectionHandle = connection;
+                PlayerSession session = sessionsBySteamId.computeIfAbsent(
+                        steamID, key -> new PlayerSession(steamID, connection));
+                session.connectionHandle = connection;
 
-            boolean success = SteamTransport.createServerLoopbackBridge(
-                connection, steamID, mcPort,
-                localPort -> {
-                    session.localProxyPort = localPort;
-                    steamIdByProxyPort.put(localPort, steamID);
-                    proxyPortByConnection.put(connection, localPort);
+                boolean success = SteamTransport.createServerLoopbackBridge(
+                    connection, steamID, mcPort,
+                    localPort -> {
+                        session.localProxyPort = localPort;
+                        steamIdByProxyPort.put(localPort, steamID);
+                        proxyPortByConnection.put(connection, localPort);
+                    }
+                );
+
+                if (!success) {
+                    SteamBridgeMod.LOG.error("[SteamServer] Loopback bridge creation failed for conn={} - closing.", connection);
+                    closeAndCleanup(connection, steamID, "Loopback bridge creation failed");
+                    return;
                 }
-            );
 
-            if (!success) {
-                SteamBridgeMod.LOG.error("[SteamServer] Loopback bridge creation failed for conn={} - closing.", connection);
-                closeAndCleanup(connection, steamID, "Loopback bridge creation failed");
+                rememberConnection(connection, steamID);
+                SteamBridgeMod.LOG.info("[SteamServer] Loopback bridge ready for conn={} steamID={}", connection, steamID);
                 return;
             }
 
-            rememberConnection(connection, steamID);
-            SteamBridgeMod.LOG.info("[SteamServer] Loopback bridge ready for conn={} steamID={}", connection, steamID);
-            return;
-        }
-
-        SteamBridgeMod.LOG.error(
-            "[SteamServer] No integrated server for conn={} steamID={} - closing connection.", connection, steamID);
-        closeAndCleanup(connection, steamID, "No integrated server");
+            SteamBridgeMod.LOG.error(
+                "[SteamServer] No integrated server for conn={} steamID={} - closing connection.", connection, steamID);
+            closeAndCleanup(connection, steamID, "No integrated server");
+        });
     }
 
     private void rememberConnection(int connection, long steamID) {
@@ -560,27 +522,16 @@ public class SteamServer {
         }
     }
 
-    private void onBridgeClosed(int connection, long steamID) {
-        // Kept for potential future use; not called in SteamChannel mode.
-        cleanupConnection(connection, steamID);
-    }
-
     private AccessDecision evaluateAccess(long steamId) {
         expireKickBlocks();
         if (SteamSocial.Bans.get().isBanned(worldKey, steamId)) {
-            String msg = net.minecraft.client.resources.I18n.hasKey("steambridge.disconnect.banned") ? 
-                         net.minecraft.client.resources.I18n.format("steambridge.disconnect.banned") : "You are banned from this world";
-            return new AccessDecision(false, msg);
+            return new AccessDecision(false, "steambridge.disconnect.banned");
         }
         if (isKickBlocked(steamId)) {
-            String msg = net.minecraft.client.resources.I18n.hasKey("steambridge.disconnect.kicked") ? 
-                         net.minecraft.client.resources.I18n.format("steambridge.disconnect.kicked") : "Host temporarily blocked this connection";
-            return new AccessDecision(false, msg);
+            return new AccessDecision(false, "steambridge.disconnect.kicked");
         }
         if (accessPolicy == AccessPolicy.FRIENDS_ONLY && !SteamManager.getInstance().isFriend(steamId)) {
-            String msg = net.minecraft.client.resources.I18n.hasKey("steambridge.disconnect.friends_only") ? 
-                         net.minecraft.client.resources.I18n.format("steambridge.disconnect.friends_only") : "Host allows only Steam friends";
-            return new AccessDecision(false, msg);
+            return new AccessDecision(false, "steambridge.disconnect.friends_only");
         }
         return new AccessDecision(true, "");
     }
