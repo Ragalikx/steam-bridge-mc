@@ -34,7 +34,6 @@ That's why **AppID 480 (Spacewar)** is used by default. It's Valve's old interna
 ## Development Environment
 Versions used while building and testing the mod:
 - **Java:** 8u492 (Eclipse Adoptium / Temurin, build 25.492-b09)
-> **Note:** `gradle.properties` has `org.gradle.java.home` hardcoded to the author's local JDK path. If Gradle can't find a JDK on your machine, either set the `JAVA_HOME` environment variable yourself, or edit that line to point to your own JDK 8 installation.
 - **Minecraft Forge:** 1.12.2 - 14.23.5.2860
 - **Gradle:** 4.10.3
 - **OS:** Windows 11 (amd64), builds should work fine on 10 as well
