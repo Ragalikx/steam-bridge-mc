@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019-2026 Ragalikx
+ * Copyright (c) 2026 Ragalikx
  * MIT License - see the LICENSE file in the repository root.
  * If you use this code, please credit the author.
  */
