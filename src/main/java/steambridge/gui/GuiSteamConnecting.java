@@ -6,74 +6,63 @@
 package steambridge.gui;
 
 import steambridge.steam.SteamClient;
-import net.minecraft.client.gui.GuiButton;
-import net.minecraft.client.gui.GuiDisconnected;
-import net.minecraft.client.gui.GuiMainMenu;
-import net.minecraft.client.gui.GuiMultiplayer;
-import net.minecraft.client.gui.GuiScreen;
-import net.minecraft.client.resources.I18n;
-import net.minecraft.util.text.TextComponentString;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.screens.DisconnectedScreen;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.TitleScreen;
+import net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen;
+import net.minecraft.network.chat.Component;
 
-import java.io.IOException;
+public class GuiSteamConnecting extends Screen {
 
-public class GuiSteamConnecting extends GuiScreen {
-
-    private final GuiScreen  previousGuiScreen;
+    private final Screen  previousGuiScreen;
     private final SteamClient client;
 
-    public GuiSteamConnecting(GuiScreen parent, SteamClient client) {
+    public GuiSteamConnecting(Screen parent, SteamClient client) {
+        super(Component.empty());
         this.previousGuiScreen = parent;
         this.client            = client;
     }
 
     @Override
-    public void initGui() {
-        this.buttonList.clear();
-        this.buttonList.add(new GuiButton(0,
-                this.width / 2 - 100, this.height / 4 + 120 + 12,
-                I18n.format("gui.cancel")));
-    }
-
-    @Override
-    protected void actionPerformed(GuiButton button) throws IOException {
-        if (button.id == 0) {
+    protected void init() {
+        this.addRenderableWidget(Button.builder(Component.translatable("gui.cancel"), b -> {
             client.disconnect();
-            this.mc.displayGuiScreen(buildServerListScreen());
-        }
+            this.minecraft.setScreen(buildServerListScreen());
+        }).bounds(this.width / 2 - 100, this.height / 4 + 120 + 12, 200, 20).build());
     }
 
     @Override
-    public void drawScreen(int mouseX, int mouseY, float partialTicks) {
-        this.drawDefaultBackground();
+    public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+        this.renderBackground(g);
 
         if (client != null) {
-            this.drawCenteredString(this.fontRenderer,
+            g.drawCenteredString(this.font,
                     client.getStatusMsg(),
                     this.width / 2, this.height / 2 - 50,
                     0xFFFFFF);
 
             SteamClient.State state = client.getState();
             if (state == SteamClient.State.FAILED) {
-                this.mc.displayGuiScreen(new GuiDisconnected(
+                this.minecraft.setScreen(new DisconnectedScreen(
                         buildServerListScreen(),
-                        "connect.failed",
-                        new TextComponentString(client.getStatusMsg())));
+                        Component.translatable("connect.failed"),
+                        Component.literal(client.getStatusMsg())));
             }
         }
 
-        super.drawScreen(mouseX, mouseY, partialTicks);
+        super.render(g, mouseX, mouseY, partialTick);
     }
 
-
-
     /**
-     * Returns the previous screen if it is a server list, or a fresh {@link GuiMultiplayer}
-     * to avoid landing on a dead DirectConnect screen.
+     * Returns the previous screen if it is a server list, or a fresh
+     * {@link JoinMultiplayerScreen} to avoid landing on a dead DirectConnect screen.
      */
-    private GuiScreen buildServerListScreen() {
-        if (previousGuiScreen instanceof GuiMultiplayer) {
+    private Screen buildServerListScreen() {
+        if (previousGuiScreen instanceof JoinMultiplayerScreen) {
             return previousGuiScreen;
         }
-        return new GuiMultiplayer(new GuiMainMenu());
+        return new JoinMultiplayerScreen(new TitleScreen());
     }
 }

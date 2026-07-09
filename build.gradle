@@ -1,31 +1,28 @@
-buildscript {
-    repositories {
-        maven { url = 'https://maven.minecraftforge.net' }
-        mavenCentral()
-    }
-    dependencies {
-        classpath group: 'net.minecraftforge.gradle', name: 'ForgeGradle', version: '3.+', changing: true
-    }
+plugins {
+    id 'java'
+    id 'net.neoforged.moddev.legacyforge' version '2.0.141'
 }
 
-apply plugin: 'net.minecraftforge.gradle'
-apply plugin: 'java'
+def buildDate    = new Date()
+version          = "1.${buildDate.format('yyMMdd')}"
+group            = project.mod_group
 
-def buildDate   = new Date()
-version         = "1.${buildDate.format('yyMMdd')}"
-group           = 'steambridge'
-archivesBaseName = 'steambridge'
+base {
+    archivesName = project.mod_id
+}
 
-sourceCompatibility = JavaVersion.VERSION_1_8
-targetCompatibility = JavaVersion.VERSION_1_8
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(17)
+}
 
-def generatedSrcDir = "$buildDir/generated/java"
+// -- Auto-generated BuildInfo (author/version stamped into bytecode) -----------
+def generatedSrcDir = layout.buildDirectory.dir('generated/java').get().asFile
 
 sourceSets {
     main { java { srcDir generatedSrcDir } }
 }
 
-task generateBuildInfo {
+tasks.register('generateBuildInfo') {
     outputs.dir(generatedSrcDir)
     doFirst {
         def f = new File("${generatedSrcDir}/steambridge/BuildInfo.java")
@@ -44,20 +41,36 @@ public final class BuildInfo {
     }
 }
 
-tasks.withType(JavaCompile) {
-    dependsOn generateBuildInfo
+tasks.withType(JavaCompile).configureEach {
+    dependsOn 'generateBuildInfo'
     options.encoding = 'UTF-8'
 }
 
-minecraft {
-    mappings channel: 'stable', version: '39-1.12'
-    accessTransformer = file('src/main/resources/META-INF/accesstransformer.cfg')
+// -- NeoForge (legacy/Forge-compat) toolchain ----------------------------------
+// ModDevGradle's "legacyforge" preset targets MinecraftForge/NeoForge 1.17-1.20.1.
+// Unlike the old net.neoforged.gradle.userdev plugin, it automatically wires up
+// reobfuscation (official Mojang mappings -> the SRG names the shipped game runs
+// with) for the 'jar' task - obfuscateJar defaults to true, so no extra config needed.
+legacyForge {
+    // Use neoForgeVersion (net.neoforged:forge coordinate), NOT the version= shorthand,
+    // which resolves net.minecraftforge:forge (real MinecraftForge) instead of NeoForge.
+    enable {
+        neoForgeVersion = project.neoforge_version
+    }
+
     runs {
         client {
-            workingDirectory project.file('run')
-            property 'forge.logging.markers', 'SCAN,REGISTRIES,REGISTRYDUMP'
-            property 'forge.logging.console.level', 'debug'
-            mods { steambridge { source sourceSets.main } }
+            client()
+        }
+        configureEach {
+            systemProperty 'forge.logging.markers', 'REGISTRIES'
+            systemProperty 'forge.logging.console.level', 'debug'
+        }
+    }
+
+    mods {
+        "${project.mod_id}" {
+            sourceSet sourceSets.main
         }
     }
 }
@@ -66,69 +79,89 @@ repositories {
     mavenCentral()
 }
 
+// Resolved (transitive-free) copy of the steamworks4j artifact, used only to pull its Java
+// API classes + win64 native DLLs into the mod jar (see the jar task). It is NOT a classpath
+// config - compilation/dev-runtime get steamworks4j via `implementation` below.
 configurations {
-    shade
-    compile.extendsFrom shade
+    steamBundle { transitive = false }
 }
 
+// -- Steam bridge native deps ---------------------------------------------------------
+//
+// steamworks4j: its Java API classes are shaded FLAT into the mod jar (see the jar task),
+// exactly as the 1.12.2 build did. `com.codedisaster.steamworks` is a package no other mod
+// or the loader provides, so there is no split-package/module clash; the classes just ride
+// along in the steambridge automatic module and reach JNA (a named module the loader always
+// ships) through the implicit reads every automatic module gets. This is both smaller and
+// simpler than Jar-in-Jar, which nested the *entire* upstream jar - including ~2.3 MB of
+// macOS/Linux/32-bit natives this Windows-only mod never loads.
+//
+// JNA: NOT bundled at all - three approaches were tried for that and all failed:
+//  1. shadowJar + relocate(com.sun.jna -> steambridge.shaded.com.sun.jna): breaks JNA's
+//     native bootstrap (jnidispatch.dll's exported symbols are compiled against the
+//     original `com.sun.jna.Native` class name -> UnsatisfiedLinkError at class-init).
+//  2. shadowJar without relocation: NeoForge's production launch resolves JNA as a real
+//     Java *module* on the module path (`-p ...jna-5.12.1.jar`); our mod jar becomes an
+//     automatic module that also exports the unrelocated `com.sun.jna` package, and the
+//     JPMS module resolver refuses two modules exporting the same package
+//     (`ResolutionException: Modules steambridge and com.sun.jna export package
+//     com.sun.jna to module forge`).
+//  3. jarJar-embedding our own JNA copy: NeoForge's loader *also* exposes jar-in-jar
+//     GAMELIBRARY dependencies as real modules on the same layer, so our embedded
+//     jna-5.14.0 and the loader's own jna-5.12.1 both register as a module named
+//     "com.sun.jna" -> `ResolutionException: Module steambridge reads more than one
+//     module named com.sun.jna`.
+// NeoForge itself depends on and always ships JNA at runtime, so the fix is to not bundle
+// a second copy at all: compile against it (compileOnly, pinned to the exact version the
+// 1.20.1 loader provides) and let the game supply the real one.
 dependencies {
-    minecraft 'net.minecraftforge:forge:1.12.2-14.23.5.2860'
-    shade('com.code-disaster.steamworks4j:steamworks4j:1.10.0') { transitive = false }
-    shade('net.java.dev.jna:jna:5.14.0')                        { transitive = false }
+    compileOnly "net.java.dev.jna:jna:${project.jna_version}"
+
+    // Compile + dev-runtime classpath for the steamworks4j API. Not auto-bundled by the
+    // default `jar` task (only jarJar does that) - we copy its classes in ourselves.
+    implementation("com.code-disaster.steamworks4j:steamworks4j:${project.steamworks4j_version}") {
+        exclude group: 'net.java.dev.jna' // the loader provides JNA; never pull a second copy
+    }
+
+    steamBundle "com.code-disaster.steamworks4j:steamworks4j:${project.steamworks4j_version}"
+}
+
+// -- Resource templating (mods.toml version substitution) ---------------------
+tasks.named('processResources', ProcessResources).configure {
+    var replaceProperties = [
+        mod_id           : project.mod_id,
+        mod_name         : project.mod_name,
+        mod_version      : project.version,
+        minecraft_version: project.minecraft_version,
+        neoforge_version : project.neoforge_version
+    ]
+    inputs.properties replaceProperties
+    filesMatching(['META-INF/mods.toml', 'pack.mcmeta']) {
+        expand replaceProperties
+    }
 }
 
 jar {
-    from('third_party_licenses') { into 'META-INF/licenses' }
-    exclude 'module-info.class'
-    exclude 'META-INF/versions/**'
-
-    exclude 'com/sun/jna/darwin*/**'
-    exclude 'com/sun/jna/linux*/**'
-    exclude 'com/sun/jna/sunos*/**'
-    exclude 'com/sun/jna/freebsd*/**'
-    exclude 'com/sun/jna/openbsd*/**'
-    exclude 'com/sun/jna/aix*/**'
-    exclude 'com/sun/jna/win32-x86/**'
-    exclude 'com/sun/jna/win32-aarch64/**'
-
-    exclude 'libsteam_api.dylib'
-    exclude 'libsteamworks4j.dylib'
-    exclude 'libsteam_api.so'
-    exclude 'libsteamworks4j.so'
-    exclude 'steam_api.dll'
-    exclude 'steamworks4j.dll'
-
-    exclude 'com/codedisaster/steamworks/SteamController*'
-    exclude 'com/codedisaster/steamworks/SteamHTTP*'
-    exclude 'com/codedisaster/steamworks/SteamLeaderboard*'
-    exclude 'com/codedisaster/steamworks/SteamMatchmaking*'
-    exclude 'com/codedisaster/steamworks/SteamNetworking*'
-    exclude 'com/codedisaster/steamworks/SteamPublishedFile*'
-    exclude 'com/codedisaster/steamworks/SteamRemoteStorage*'
-    exclude 'com/codedisaster/steamworks/SteamScreenshot*'
-    exclude 'com/codedisaster/steamworks/SteamServer*'
-    exclude 'com/codedisaster/steamworks/SteamUGC*'
-    exclude 'com/codedisaster/steamworks/SteamUserStats*'
-    exclude 'com/codedisaster/steamworks/SteamApps*'
+    // Shade steamworks4j's Java API classes flat into the mod jar, and lay the win64 Steam
+    // native binaries FLAT at the jar root (steam_api64.dll / steamworks4j64.dll).
+    // SteamManager's loader reads the DLLs via getClass().getResourceAsStream("/steam_api64.dll")
+    // - getClass() belongs to THIS mod jar, so the DLLs must be resolvable from the mod jar's
+    // own classloader at its root. Everything else in the upstream artifact is dropped:
+    // the macOS/Linux natives (unsupported) and the 32-bit DLLs (1.20.1 requires 64-bit Java).
+    from({ project.configurations.steamBundle.collect { zipTree(it) } }) {
+        include 'com/codedisaster/**'                    // steamworks4j Java API
+        include 'steam_api64.dll', 'steamworks4j64.dll'  // win64 natives only, at the jar root
+    }
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 
     manifest {
         attributes([
-            "Specification-Title"   : "steambridge",
-            "Implementation-Title"  : "steambridge",
-            "Implementation-Version": version,
-            "Implementation-Vendor" : "Ragalikx",
-            "Implementation-URL"    : "https://github.com/Ragalikx/steam-bridge-mc",
-            "Built-By"              : "Ragalikx"
+            'Specification-Title'   : project.mod_id,
+            'Implementation-Title'  : project.mod_id,
+            'Implementation-Version': project.version,
+            'Implementation-Vendor' : 'Ragalikx',
+            'Implementation-URL'    : 'https://github.com/Ragalikx/steam-bridge-mc',
+            'Built-By'              : 'Ragalikx'
         ])
     }
-    from { configurations.shade.collect { it.isDirectory() ? it : zipTree(it) } }
-}
-
-processResources {
-    inputs.property 'version', project.version
-    from(sourceSets.main.resources.srcDirs) {
-        include 'mcmod.info'
-        expand 'version': project.version, 'mcversion': '1.12.2'
-    }
-    from(sourceSets.main.resources.srcDirs) { exclude 'mcmod.info' }
 }

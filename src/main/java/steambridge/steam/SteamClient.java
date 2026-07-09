@@ -9,6 +9,14 @@ import com.codedisaster.steamworks.SteamID;
 import com.codedisaster.steamworks.SteamNativeHandle;
 import steambridge.SteamBridgeMod;
 
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.ConnectScreen;
+import net.minecraft.client.gui.screens.DisconnectedScreen;
+import net.minecraft.client.gui.screens.ReceivingLevelScreen;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.TitleScreen;
+import net.minecraft.network.chat.Component;
+
 import java.util.Locale;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -25,8 +33,8 @@ public class SteamClient {
     private volatile SteamID hostSteamID;
     private volatile int connectionHandle = 0;
 
-    /** Screen shown when connection was initiated - passed to NetHandlerLoginClient. */
-    private volatile net.minecraft.client.gui.GuiScreen connectingScreen;
+    /** Screen shown when connection was initiated - passed to the login net handler. */
+    private volatile Screen connectingScreen;
 
     private volatile CountDownLatch connectLatch = new CountDownLatch(1);
 
@@ -34,7 +42,7 @@ public class SteamClient {
         connect(host, null);
     }
 
-    public void connect(SteamID host, net.minecraft.client.gui.GuiScreen currentScreen) {
+    public void connect(SteamID host, Screen currentScreen) {
         // Atomic claim: two racing connect() calls must not both proceed.
         if (!alive.compareAndSet(false, true)) {
             SteamBridgeMod.LOG.warn("[SteamClient] connect() called while already active.");
@@ -126,7 +134,7 @@ public class SteamClient {
             }
 
             statusMsg = i18n("steambridge.status.path_ready", "Steam path ready - activating pipeline...");
-            final net.minecraft.client.gui.GuiScreen screen = connectingScreen;
+            final Screen screen = connectingScreen;
 
             int proxyPort = SteamTransport.allocateClientLoopbackPort(conn);
             if (proxyPort < 0) {
@@ -136,8 +144,8 @@ public class SteamClient {
 
             // Connect Minecraft to the proxy port on the MC main thread.
             final int finalProxyPort = proxyPort;
-            net.minecraft.client.Minecraft mc2 = net.minecraft.client.Minecraft.getMinecraft();
-            mc2.addScheduledTask(() -> {
+            Minecraft mc2 = Minecraft.getInstance();
+            mc2.execute(() -> {
                 try {
                     boolean ok2 = SteamTransport.connectClientToLoopback(
                             conn, remoteSteamID, finalProxyPort, screen);
@@ -189,7 +197,7 @@ public class SteamClient {
             String error = status.getLastError().isEmpty()
                 ? status.describeState()
                 : status.getLastError();
-                
+
             // If the server sent a raw localization key, translate it on the client side
             error = i18n(error, error);
 
@@ -336,15 +344,14 @@ public class SteamClient {
 
         connectionHandle = 0;
 
-        net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getMinecraft();
-        mc.addScheduledTask(() -> {
-            net.minecraft.client.gui.GuiScreen current = mc.currentScreen;
-            if (current instanceof net.minecraft.client.gui.GuiDownloadTerrain ||
-                current instanceof net.minecraft.client.multiplayer.GuiConnecting) {
-                mc.displayGuiScreen(new net.minecraft.client.gui.GuiDisconnected(
-                    connectingScreen != null ? connectingScreen : new net.minecraft.client.gui.GuiMainMenu(),
-                    "connect.failed",
-                    new net.minecraft.util.text.TextComponentString(msg)
+        Minecraft mc = Minecraft.getInstance();
+        mc.execute(() -> {
+            Screen current = mc.screen;
+            if (current instanceof ReceivingLevelScreen || current instanceof ConnectScreen) {
+                mc.setScreen(new DisconnectedScreen(
+                    connectingScreen != null ? connectingScreen : new TitleScreen(),
+                    Component.translatable("connect.failed"),
+                    Component.literal(msg)
                 ));
             }
         });
@@ -380,14 +387,14 @@ public class SteamClient {
     }
 
     private static class TextColors {
-        static final String RED = "\u00a7c";
+        static final String RED = "§c";
     }
 
     /** Returns the I18n translation for {@code key}, or {@code fallback} if unavailable. */
     private static String i18n(String key, String fallback) {
         try {
-            if (net.minecraft.client.resources.I18n.hasKey(key)) {
-                return net.minecraft.client.resources.I18n.format(key);
+            if (net.minecraft.client.resources.language.I18n.exists(key)) {
+                return net.minecraft.client.resources.language.I18n.get(key);
             }
         } catch (Exception ignored) {
             // Minecraft not yet fully initialised - use English fallback.
