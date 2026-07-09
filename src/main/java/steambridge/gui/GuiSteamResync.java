@@ -10,6 +10,7 @@ import steambridge.SteamBridgeMod;
 import steambridge.steam.SteamManager;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
+import net.minecraft.client.resources.I18n;
 
 import java.io.IOException;
 import java.util.function.Consumer;
@@ -46,11 +47,11 @@ public class GuiSteamResync extends GuiScreen {
     public void initGui() {
         this.buttonList.clear();
         this.buttonList.add(new GuiButton(0, this.width / 2 - 100, this.height - 40, 200, 20,
-                net.minecraft.client.resources.I18n.format("gui.cancel")));
+                I18n.format("gui.cancel")));
 
         // Kick off launch on first init
         if (state == State.LAUNCHING) {
-            statusLine1 = "\u00A7eЗапуск Steam...";
+            statusLine1 = "§e" + I18n.format("steambridge.gui.resync_launching");
             statusLine2 = "";
             launchAndScheduleRetry();
         }
@@ -61,8 +62,8 @@ public class GuiSteamResync extends GuiScreen {
             SteamAppIdHelper.ensureAppId(net.minecraft.client.Minecraft.getMinecraft().gameDir);
             SteamAppIdHelper.launchSteam();
             state = State.WAITING;
-            statusLine1 = "\u00A7eЗапускаем Steam...";
-            statusLine2 = "\u00A77Это может занять несколько секунд";
+            statusLine1 = "§e" + I18n.format("steambridge.gui.resync_starting");
+            statusLine2 = "§7" + I18n.format("steambridge.gui.resync_starting_hint");
         } catch (Exception e) {
             SteamBridgeMod.LOG.warn("[Resync] Failed to launch Steam: {}", e.getMessage());
             state = State.WAITING; // still wait
@@ -90,8 +91,8 @@ public class GuiSteamResync extends GuiScreen {
             boolean ok = SteamManager.getInstance().reinit();
             if (ok) {
                 state = State.SUCCESS;
-                statusLine1 = "\u00A7aSteam запущен!";
-                statusLine2 = "\u00A77Открываем список друзей...";
+                statusLine1 = "§a" + I18n.format("steambridge.gui.resync_success");
+                statusLine2 = "§7" + I18n.format("steambridge.gui.resync_success_hint");
                 // Open friends screen on next tick
                 net.minecraft.client.Minecraft.getMinecraft().addScheduledTask(() ->
                         net.minecraft.client.Minecraft.getMinecraft().displayGuiScreen(
@@ -102,13 +103,13 @@ public class GuiSteamResync extends GuiScreen {
 
         if (remaining <= 0) {
             state = State.FAILED;
-            statusLine1 = "\u00A7cТайм-аут: Steam не запустился.";
-            statusLine2 = "\u00A77Запустите Steam вручную и попробуйте снова.";
+            statusLine1 = "§c" + I18n.format("steambridge.gui.resync_timeout");
+            statusLine2 = "§7" + I18n.format("steambridge.gui.resync_timeout_hint");
             return;
         }
 
         // Update countdown message
-        statusLine1 = "\u00A7eЗапускаем Steam... (" + remaining + " сек)";
+        statusLine1 = "§e" + I18n.format("steambridge.gui.resync_countdown", remaining);
         statusLine2 = "";
     }
 
@@ -123,7 +124,7 @@ public class GuiSteamResync extends GuiScreen {
     public void drawScreen(int mouseX, int mouseY, float partialTicks) {
         this.drawDefaultBackground();
 
-        String title = "\u00A7bSteam \u00A7rне запущен";
+        String title = "§b" + I18n.format("steambridge.gui.resync_title");
         this.drawCenteredString(this.fontRenderer, title, this.width / 2, this.height / 2 - 50, 0xFFFFFF);
         this.drawCenteredString(this.fontRenderer, statusLine1, this.width / 2, this.height / 2 - 20, 0xFFFFFF);
         if (!statusLine2.isEmpty()) {
@@ -133,7 +134,7 @@ public class GuiSteamResync extends GuiScreen {
         if (state == State.WAITING) {
             // Simple animated dots indicator
             int dots = (ticksElapsed / 8) % 4;
-            StringBuilder sb = new StringBuilder("\u00A77");
+            StringBuilder sb = new StringBuilder("§7");
             for (int i = 0; i < dots; i++) sb.append('.');
             this.drawCenteredString(this.fontRenderer, sb.toString(), this.width / 2, this.height / 2 + 16, 0xFFFFFF);
         }

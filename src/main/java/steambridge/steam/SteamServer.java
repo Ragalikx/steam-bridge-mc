@@ -182,10 +182,10 @@ public class SteamServer {
         return worldDisplayName;
     }
 
-    public void start() {
+    public boolean start() {
         if (running) {
             SteamBridgeMod.LOG.warn("[SteamServer] start() while already running - ignoring.");
-            return;
+            return true;
         }
 
         running = true;
@@ -205,7 +205,7 @@ public class SteamServer {
             running = false;
             SteamManager.getInstance().setActiveServer(null);
             SteamBridgeMod.LOG.error("[SteamServer] Failed to create listen socket for Steam relay.");
-            return;
+            return false;
         }
 
         SteamBridgeMod.LOG.info(
@@ -213,6 +213,7 @@ public class SteamServer {
             listenSocket, worldKey, accessPolicy
         );
         SteamBridgeMod.LOG.info("Server started. World=" + worldKey + " access=" + accessPolicy);
+        return true;
     }
 
     public void stop() {

@@ -43,8 +43,7 @@ public class GuiSteamBanList extends GuiScreen {
             int yStart = 40;
             for (int i = 0; i < bans.size(); i++) {
                 int y = yStart + (i * 25);
-                String unbanText = net.minecraft.client.resources.I18n.hasKey("steambridge.gui.unban") ? 
-                                   net.minecraft.client.resources.I18n.format("steambridge.gui.unban") : "Unban";
+                String unbanText = net.minecraft.client.resources.I18n.format("steambridge.gui.unban");
                 this.buttonList.add(new GuiButton(100 + i, this.width / 2 + 50, y, 60, 20, unbanText));
             }
         }
@@ -81,8 +80,7 @@ public class GuiSteamBanList extends GuiScreen {
     @Override
     public void drawScreen(int mouseX, int mouseY, float partialTicks) {
         this.drawDefaultBackground();
-        String bannedText = net.minecraft.client.resources.I18n.hasKey("steambridge.gui.banned") ? 
-                            net.minecraft.client.resources.I18n.format("steambridge.gui.banned") : "Ban List";
+        String bannedText = net.minecraft.client.resources.I18n.format("steambridge.gui.banned");
         this.drawCenteredString(this.fontRenderer, bannedText, this.width / 2, 10, 16777215);
 
         if (server != null) {

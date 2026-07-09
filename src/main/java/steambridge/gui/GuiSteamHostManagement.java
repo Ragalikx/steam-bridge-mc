@@ -59,8 +59,7 @@ public class GuiSteamHostManagement extends GuiScreen {
         this.buttonList.clear();
         this.buttonList.add(new GuiButton(BUTTON_BACK, this.width / 2 - 100, this.height - 30, 200, 20, net.minecraft.client.resources.I18n.format("gui.back")));
         
-        String bannedText = net.minecraft.client.resources.I18n.hasKey("steambridge.gui.banned") ? 
-                            net.minecraft.client.resources.I18n.format("steambridge.gui.banned") : "Ban List";
+        String bannedText = net.minecraft.client.resources.I18n.format("steambridge.gui.banned");
         this.buttonList.add(new GuiButton(BUTTON_BAN_LIST, this.width - 110, 10, 100, 20, bannedText));
 
         updatePlayerButtons();
@@ -140,7 +139,9 @@ public class GuiSteamHostManagement extends GuiScreen {
                     SteamConnectionStatus status = snap.getConnectionStatus();
                     String pingStr  = (status != null && status.getPingMs() >= 0) ? status.getPingMs() + "ms" : "~";
                     String connType = (status != null && status.isConnectionActive())
-                            ? (status.isUsingRelay() ? "relay" : "p2p")
+                            ? (status.isUsingRelay()
+                                ? net.minecraft.client.resources.I18n.format("steambridge.gui.conn_relay")
+                                : net.minecraft.client.resources.I18n.format("steambridge.gui.conn_p2p"))
                             : "?";
                     this.drawString(this.fontRenderer,
                             snap.getSteamName() + " (" + snap.getMinecraftName() + ") "

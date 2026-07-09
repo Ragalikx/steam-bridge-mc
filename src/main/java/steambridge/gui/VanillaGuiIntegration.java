@@ -5,6 +5,7 @@
  */
 package steambridge.gui;
 
+import steambridge.SteamAppIdHelper;
 import steambridge.SteamBridgeMod;
 import steambridge.steam.SteamClient;
 import steambridge.steam.SteamManager;
@@ -214,11 +215,8 @@ public class VanillaGuiIntegration {
     public static void onDrawScreenPost(GuiScreenEvent.DrawScreenEvent.Post event) {
         GuiScreen gui = event.getGui();
         if (gui instanceof GuiShareToLan) {
-            String title = "Steam settings";
-            if (net.minecraft.client.resources.I18n.hasKey("steambridge.gui.steam_settings")) {
-                title = net.minecraft.client.resources.I18n.format("steambridge.gui.steam_settings");
-            }
-            
+            String title = net.minecraft.client.resources.I18n.format("steambridge.gui.steam_settings");
+
             // Find the Game Mode button (id = 104) to anchor our text
             int textY = gui.height / 4 + 40; // fallback
             try {
@@ -381,7 +379,8 @@ public class VanillaGuiIntegration {
             GuiTextField ipField = findIpTextField(gui);
             if (ipField != null) {
                 event.getButtonList().add(new GuiButton(BTN_FRIENDS,
-                        ipField.x + ipField.width + 4, ipField.y, 20, 20, "S"));
+                        ipField.x + ipField.width + 4, ipField.y, 20, 20,
+                        net.minecraft.client.resources.I18n.format("steambridge.gui.friends_short")));
             }
         }
 
@@ -406,7 +405,7 @@ public class VanillaGuiIntegration {
                         btn.enabled       = true;
                         btn.displayString = net.minecraft.client.resources.I18n.format("steambridge.gui.manage_session");
                     } else if (isLan) {
-                        btn.displayString += " (LAN)";
+                        btn.displayString += net.minecraft.client.resources.I18n.format("steambridge.gui.lan_suffix");
                     }
                     break;
                 }
@@ -452,6 +451,20 @@ public class VanillaGuiIntegration {
         if (gui instanceof GuiShareToLan && btn.id == BTN_STEAM_HOST) {
             Minecraft mc = Minecraft.getMinecraft();
             if (mc.getIntegratedServer() != null) {
+                if (!SteamManager.getInstance().isInitialized()) {
+                    if (!SteamManager.getInstance().reinit()) {
+                        try {
+                            SteamAppIdHelper.ensureAppId(mc.gameDir);
+                            SteamAppIdHelper.launchSteam();
+                        } catch (Exception e) {
+                            SteamBridgeMod.logger.warn("[SteamHost] Failed to launch Steam: {}", e.getMessage());
+                        }
+                        mc.ingameGUI.getChatGUI().printChatMessage(new net.minecraft.util.text.TextComponentString(
+                                "\u00A7e" + net.minecraft.client.resources.I18n.format("steambridge.gui.host_steam_launching")));
+                        return;
+                    }
+                }
+
                 boolean ac = false;
                 String gm  = "survival";
                 try {
@@ -471,12 +484,18 @@ public class VanillaGuiIntegration {
                 SteamServer server = new SteamServer(pendingAccessPolicy, worldKey, "World");
                 server.setTransportMode(pendingTransportMode);
                 if (port != null) { try { server.setMcPort(Integer.parseInt(port)); } catch (NumberFormatException ignored) {} }
-                server.start();
+                boolean started = server.start();
 
-                mc.getSoundHandler().playSound(PositionedSoundRecord.getMasterRecord(SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, 1.0F));
-                mc.ingameGUI.getChatGUI().printChatMessage(new net.minecraft.util.text.TextComponentString("\u00A7bSteam Host started!"));
-                mc.displayGuiScreen(null);
-                mc.setIngameFocus();
+                if (started) {
+                    mc.getSoundHandler().playSound(PositionedSoundRecord.getMasterRecord(SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, 1.0F));
+                    mc.ingameGUI.getChatGUI().printChatMessage(new net.minecraft.util.text.TextComponentString(
+                            "\u00A7a" + net.minecraft.client.resources.I18n.format("steambridge.gui.host_started")));
+                    mc.displayGuiScreen(null);
+                    mc.setIngameFocus();
+                } else {
+                    mc.ingameGUI.getChatGUI().printChatMessage(new net.minecraft.util.text.TextComponentString(
+                            "\u00A7c" + net.minecraft.client.resources.I18n.format("steambridge.gui.host_failed")));
+                }
             }
         }
 
@@ -520,15 +539,7 @@ public class VanillaGuiIntegration {
             case AUTO:
             default:         key = "steambridge.gui.route_auto";  break;
         }
-        if (net.minecraft.client.resources.I18n.hasKey(key)) {
-            return net.minecraft.client.resources.I18n.format(key);
-        }
-        switch (mode) {                     // fallback if lang file lacks the key
-            case P2P_ONLY:   return "Route: P2P";
-            case RELAY_ONLY: return "Route: Relay";
-            case AUTO:
-            default:         return "Route: Auto";
-        }
+        return net.minecraft.client.resources.I18n.format(key);
     }
 
     private static String accessPolicyButtonLabel(SteamServer.AccessPolicy policy) {
@@ -536,10 +547,7 @@ public class VanillaGuiIntegration {
                 ? "steambridge.gui.access_everyone"
                 : "steambridge.gui.access_friends";
                 
-        if (net.minecraft.client.resources.I18n.hasKey(key)) {
-            return net.minecraft.client.resources.I18n.format(key);
-        }
-        return (policy == SteamServer.AccessPolicy.EVERYONE) ? "Access: Everyone" : "Access: Friends Only";
+        return net.minecraft.client.resources.I18n.format(key);
     }
 
     private static void saveShareToLanSettings(GuiScreen gui) {

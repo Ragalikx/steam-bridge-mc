@@ -1,42 +1,56 @@
-steambridge.gui.open_steam=Відкрити для Steam
-steambridge.gui.select_friend=Виберіть друга зі Steam
+steambridge.gui.open_steam=Відкрити через Steam
+steambridge.gui.select_friend=Оберіть друга зі Steam
 steambridge.gui.kick=Вигнати
 steambridge.gui.ban=Заблокувати
 steambridge.gui.unban=Розблокувати
-steambridge.gui.banned=Список заблокованих
-steambridge.gui.management=Керування сервером Steam
-steambridge.gui.manage_session=Керування Steam сесією
-steambridge.gui.not_running=Steam сервер не запущено
-steambridge.gui.no_players=Поки що немає гравців, які приєдналися цим способом...
+steambridge.gui.banned=Заблоковані гравці
+steambridge.gui.management=Steam-сесія
+steambridge.gui.manage_session=Керування Steam-сесією
+steambridge.gui.not_running=Steam-сесія не активна
+steambridge.gui.no_players=Ніхто ще не підключився через Steam...
 steambridge.gui.route_auto=Маршрут: Авто
 steambridge.gui.route_p2p=Маршрут: Прямий P2P
-steambridge.gui.route_relay=Маршрут: Релей-сервер Valve
+steambridge.gui.route_relay=Маршрут: Relay-сервер Valve
 steambridge.gui.access_everyone=Доступ: Усі
 steambridge.gui.access_friends=Доступ: Тільки друзі
 
-# Причини відключення
-steambridge.disconnect.kicked=Хост вигнав вас із сервера (тимчасове блокування 1 хв)
+steambridge.disconnect.kicked=Хост тимчасово заблокував вас (1 хв)
 steambridge.disconnect.banned=Вас заблоковано на цьому сервері
-steambridge.disconnect.friends_only=Хост дозволяє підключення лише друзям Steam
-steambridge.disconnect.mod_mismatch_hint=З'єднання закрито під час входу Forge. Найімовірніше, ваші моди не збігаються з модами хоста. Встановіть такий самий набір модів і версії, потім спробуйте ще раз.
+steambridge.disconnect.friends_only=Хост приймає лише друзів зі Steam
+steambridge.disconnect.mod_mismatch_hint=З'єднання закрилось під час входу Forge — скоріш за все, ваші моди не збігаються з модами хоста. Встановіть той самий набір модів і спробуйте знову.
 
-# Помилки Steam
-steambridge.error.steam_shutdown=Зв'язок зі Steam втрачено. Будь ласка, перевірте клієнт Steam.
-steambridge.error.host_steam_shutdown=Локальний Steam міст вимкнено через помилку клієнта Steam! Багатокористувацька гра більше недоступна.
+steambridge.error.steam_shutdown=Втрачено зв'язок зі Steam. Перевірте, чи запущено клієнт Steam.
+steambridge.error.host_steam_shutdown=Steam-міст відключився через помилку клієнта Steam — мультиплеєр більше недоступний.
 
-# Статуси підключення
-steambridge.status.connecting=Підключення через Steam Relay...
-steambridge.status.waiting_route=Очікування маршруту Steam до хоста...
-steambridge.status.path_ready=Шлях Steam готовий — активація каналу...
-steambridge.status.steam_ready=Шлях Steam готовий — очікування входу в Minecraft...
-steambridge.status.route_relay=Маршрут через Relay готовий — активація каналу...
-steambridge.status.route_direct=Прямий P2P маршрут готовий — активація каналу...
-steambridge.status.handshake=Steam готовий — обмін даними Minecraft/Forge...
-steambridge.status.loading_world=Вхід прийнято — завантаження світу...
-steambridge.status.in_world=Підключено як 
-steambridge.status.fail_create=Steam відмовив у створенні з'єднання через Relay
-steambridge.status.fail_timeout=Таймаут: маршрут Steam не став доступним за 30 секунд
-steambridge.status.fail_proxy=Не вдалося запустити проксі для підключення
-steambridge.status.fail_closed=З'єднання Steam закрито: 
+steambridge.status.connecting=Встановлюємо з'єднання через Steam...
+steambridge.status.waiting_route=Шукаємо маршрут до хоста...
+steambridge.status.path_ready=Маршрут знайдено — підключаємось до сервера...
+steambridge.status.steam_ready=Підключено — входимо у світ...
+steambridge.status.route_relay=Relay-маршрут знайдено — підключаємось...
+steambridge.status.route_direct=Пряме P2P-з'єднання — підключаємось...
+steambridge.status.handshake=Входимо — синхронізація з сервером...
+steambridge.status.loading_world=Вхід прийнято — завантажуємо світ...
+steambridge.status.in_world=У грі як
+steambridge.status.fail_create=Steam не зміг створити з'єднання через Relay
+steambridge.status.fail_timeout=Час вийшов — маршрут Steam не знайшовся за 30 секунд
+steambridge.status.fail_proxy=Не вдалося запустити локальний проксі для підключення
+steambridge.status.fail_closed=З'єднання Steam закрито:
 steambridge.gui.steam_settings=Налаштування Steam
-steambridge.gui.no_bans=Ви ще нікого не заблокували.
+steambridge.gui.no_bans=Ніхто ще не заблокований.
+steambridge.gui.friends_short=S
+steambridge.gui.lan_suffix= (LAN)
+steambridge.gui.host_started=Світ відкрито через Steam. Підключення доступне!
+steambridge.gui.host_failed=Не вдалося відкрити світ через Steam. Перевірте, чи запущено Steam.
+steambridge.gui.host_steam_launching=Steam не запущено — спробуємо запустити його автоматично. Зачекайте трохи і натисніть «Відкрити через Steam» знову.
+steambridge.gui.conn_relay=relay
+steambridge.gui.conn_p2p=p2p
+
+steambridge.gui.resync_title=Steam не запущено
+steambridge.gui.resync_launching=Запускаємо Steam...
+steambridge.gui.resync_starting=Очікуємо запуску Steam...
+steambridge.gui.resync_starting_hint=Це може зайняти кілька секунд
+steambridge.gui.resync_success=Steam запущено!
+steambridge.gui.resync_success_hint=Відкриваємо список друзів...
+steambridge.gui.resync_timeout=Час вийшов — Steam так і не запустився.
+steambridge.gui.resync_timeout_hint=Запустіть Steam вручну і спробуйте знову.
+steambridge.gui.resync_countdown=Очікуємо Steam... (%s сек)
