@@ -195,10 +195,11 @@ public class SteamClientEvents {
                 deferredClientDisconnectTicks = -1;
                 SteamBridgeMod.LOG.info("[SteamBridge] Preserved Steam client across transient world reload.");
             } else if (--deferredClientDisconnectTicks <= 0) {
-                deferredClientDisconnectTicks = TRANSIENT_DISCONNECT_GRACE_TICKS;
+                deferredClientDisconnectTicks = -1;
                 SteamBridgeMod.LOG.info(
-                    "[SteamBridge] Still waiting on transient Steam client disconnect. screen={} channelOpen={}",
+                    "[SteamBridge] Transient disconnect grace window expired; tearing down Steam client. screen={} channelOpen={}",
                     screenName(mc.screen), client.isSteamChannelOpen());
+                client.disconnect();
             }
         }
 
@@ -216,10 +217,11 @@ public class SteamClientEvents {
                 deferredServerStopTicks = -1;
                 SteamBridgeMod.LOG.info("[SteamBridge] Preserved Steam host across transient world reload.");
             } else if (--deferredServerStopTicks <= 0) {
-                deferredServerStopTicks = TRANSIENT_DISCONNECT_GRACE_TICKS;
+                deferredServerStopTicks = -1;
                 SteamBridgeMod.LOG.info(
-                    "[SteamBridge] Still waiting on transient Steam host disconnect. screen={} integratedServer={}",
+                    "[SteamBridge] Transient host grace window expired; stopping Steam server. screen={} integratedServer={}",
                     screenName(mc.screen), mc.getSingleplayerServer() != null);
+                server.stop();
             }
         }
     }
