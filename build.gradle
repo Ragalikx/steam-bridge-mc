@@ -118,20 +118,41 @@ configurations {
 
 // -- Steam bridge native deps ---------------------------------------------------------
 //
-// steamworks4j: its Java API classes are shaded FLAT into the mod jar (see the jar task).
-// `com.codedisaster.steamworks` is a package no other mod or the loader provides,
-// so there is no split-package/module clash.
+// steamworks4j: its Java API classes are shaded FLAT into the mod jar (see the jar task),
+// exactly as the 1.12.2 build did. `com.codedisaster.steamworks` is a package no other mod
+// or the loader provides, so there is no split-package/module clash; the classes just ride
+// along in the steambridge automatic module and reach JNA (a named module the loader always
+// ships) through the implicit reads every automatic module gets. This is both smaller and
+// simpler than Jar-in-Jar, which nested the *entire* upstream jar including ~2.3 MB of
+// macOS/Linux/32-bit natives this Windows-only mod never loads.
 //
-// JNA: NOT bundled at all. NeoForge itself always ships JNA at runtime; compile against
-// the exact version the 1.21.1 loader provides (compileOnly) and let the game supply it.
-// (See the 1.20.1 build for the three failed bundling approaches.)
+// JNA: NOT bundled at all. Three approaches were tried for that and all failed:
+//  1. shadowJar + relocate(com.sun.jna -> steambridge.shaded.com.sun.jna): breaks JNA's
+//     native bootstrap (jnidispatch.dll's exported symbols are compiled against the
+//     original `com.sun.jna.Native` class name -> UnsatisfiedLinkError at class-init).
+//  2. shadowJar without relocation: NeoForge's production launch resolves JNA as a real
+//     Java *module* on the module path (`-p ...jna-....jar`); our mod jar becomes an
+//     automatic module that also exports the unrelocated `com.sun.jna` package, and the
+//     JPMS module resolver refuses two modules exporting the same package
+//     (`ResolutionException: Modules steambridge and com.sun.jna export package
+//     com.sun.jna to module ...`).
+//  3. jarJar-embedding our own JNA copy: NeoForge's loader *also* exposes jar-in-jar
+//     GAMELIBRARY dependencies as real modules on the same layer, so our embedded
+//     jna copy and the loader's own jna both register as a module named
+//     "com.sun.jna" -> `ResolutionException: Module steambridge reads more than one
+//     module named com.sun.jna`.
+// NeoForge itself depends on and always ships JNA at runtime, so the fix is to not bundle
+// a second copy at all: compile against it (compileOnly, pinned to the exact version the
+// 1.21.1 loader provides) and let the game supply the real one.
 dependencies {
     implementation "net.neoforged:neoforge:${project.neo_version}"
 
     compileOnly "net.java.dev.jna:jna:${project.jna_version}"
 
+    // Compile + dev-runtime classpath for the steamworks4j API. Not auto-bundled by the
+    // default `jar` task (only jarJar does that); we copy selected classes/natives ourselves.
     implementation("com.code-disaster.steamworks4j:steamworks4j:${project.steamworks4j_version}") {
-        exclude group: 'net.java.dev.jna'
+        exclude group: 'net.java.dev.jna' // the loader provides JNA; never pull a second copy
     }
 
     steamBundle "com.code-disaster.steamworks4j:steamworks4j:${project.steamworks4j_version}"
@@ -156,12 +177,29 @@ tasks.withType(ProcessResources).configureEach {
 }
 
 jar {
-    // Shade steamworks4j's Java API classes flat into the mod jar, and lay the win64 Steam
-    // native binaries FLAT at the jar root (steam_api64.dll / steamworks4j64.dll).
-    // Only win64: 1.21.1 requires 64-bit Java, macOS/Linux natives stripped.
+    // SteamManager loads DLLs via getClass().getResourceAsStream("/steam_api64.dll"),
+    // so win64 natives must sit at this mod jar's root (not nested jar-in-jar).
+    // Only win64 is shipped: 1.21.1 requires 64-bit Java; macOS/Linux natives are dropped.
     from({ project.configurations.steamBundle.collect { zipTree(it) } }) {
         include 'com/codedisaster/**'
         include 'steam_api64.dll', 'steamworks4j64.dll'
+        // Drop steamworks4j APIs this mod never calls (same trim as 1.12.2).
+        exclude 'com/codedisaster/steamworks/SteamController*'
+        exclude 'com/codedisaster/steamworks/SteamHTTP*'
+        exclude 'com/codedisaster/steamworks/SteamLeaderboard*'
+        exclude 'com/codedisaster/steamworks/SteamMatchmaking*'
+        exclude 'com/codedisaster/steamworks/SteamNetworking*'
+        exclude 'com/codedisaster/steamworks/SteamPublishedFile*'
+        exclude 'com/codedisaster/steamworks/SteamRemoteStorage*'
+        exclude 'com/codedisaster/steamworks/SteamScreenshot*'
+        exclude 'com/codedisaster/steamworks/SteamServer*'
+        exclude 'com/codedisaster/steamworks/SteamUGC*'
+        exclude 'com/codedisaster/steamworks/SteamUserStats*'
+        exclude 'com/codedisaster/steamworks/SteamApps*'
+    }
+    // Third-party license texts next to the shaded bits (steamworks4j MIT, JNA Apache 2.0).
+    from('third_party_licenses') {
+        into 'META-INF/licenses'
     }
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 
