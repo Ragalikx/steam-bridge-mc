@@ -358,20 +358,15 @@ public class SteamManager {
         SteamSocketsApi api = socketsApi;
         if (api == null || connection == 0) return false;
 
-        // Receive up to 64 messages per JNA call instead of one
         SteamSocketsApi.ReceivedMessage[] batch = api.receiveMessages(connection);
         if (batch == null) return false;
 
-        // Fast path: every message in a batch belongs to this one connection, hence the same
-        // loopback bridge. Hand the whole batch over in a single event-loop hop with one flush
-        // instead of one execute()+flush per message (the gameplay hot path during chunk streaming).
         LoopbackBridge loopback = loopbackByConnection.get(connection);
         if (loopback != null) {
             loopback.deliverBatchFromSteam(batch);
             return true;
         }
 
-        // UDP proxy connections: route to SteamUdpProxy without loopback overhead.
         steambridge.proxy.SteamUdpProxy udpProxy = steambridge.proxy.SteamUdpProxy.getInstance();
         if (udpProxy.ownsClientConn(connection)) {
             for (SteamSocketsApi.ReceivedMessage m : batch) {
@@ -386,7 +381,7 @@ public class SteamManager {
             return true;
         }
 
-        // Fallback (non-loopback owners). remoteSteamID is fixed for a connection's lifetime,
+        // Non-loopback fallback.
         // so read it from the cached status rather than a live JNA snapshot on every batch.
         SteamConnectionStatus cached = statusByConnection.get(connection);
         long remoteSteamID = cached != null ? cached.getSteamID() : 0L;
@@ -469,9 +464,7 @@ public class SteamManager {
             handled = true;
         }
 
-        // UDP proxy is checked BEFORE SteamClient to prevent steamID-based false match:
-        // SteamClient.ownsConnection() falls back to matching by remoteSteamID, which would
-        // incorrectly claim the UDP proxy connection (same steamID, different conn handle).
+        // UDP before SteamClient (ownsConnection can match by steamID alone).
         steambridge.proxy.SteamUdpProxy udpProxy = steambridge.proxy.SteamUdpProxy.getInstance();
         if (!handled) {
             if (udpProxy.ownsListenSocket(event.m_info.m_hListenSocket) || udpProxy.ownsServerConn(connection)) {

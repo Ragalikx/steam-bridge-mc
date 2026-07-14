@@ -19,21 +19,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
-/**
- * Tunnels arbitrary UDP traffic over Steam virtual port (MC port + 1).
- *
- * <h3>Port detection</h3>
- * Port discovery is handled by {@link UdpInterceptFactory} / {@link SteamAwareDatagramImpl}:
- * <ul>
- *   <li>Host side: when a voice mod binds an <b>explicit</b> UDP port (e.g. SVC
- *       {@code changePort(gamePort)} / dedicated config), {@link #registerBoundPort} records it
- *       for {@link UdpHostRelay}. OS-assigned {@code bind(0)} is ignored (client sockets,
- *       relay sockets). Fallback chain: detected bind -> host game/LAN port -> 24454.</li>
- *   <li>Client side: when SVC sends its first packet to {@code 127.0.0.1:<voicePort>},
- *       {@link SteamAwareDatagramImpl} switches to steam mode, records the server port
- *       via {@link #setServerVoicePort}, and registers itself as the active receive sink.</li>
- * </ul>
- */
+/** UDP/voice tunnel on Steam virtual port (MC port + 1). */
 public final class SteamUdpProxy {
 
     private static final SteamUdpProxy INSTANCE = new SteamUdpProxy();
@@ -41,14 +27,12 @@ public final class SteamUdpProxy {
 
     public static SteamUdpProxy getInstance() { return INSTANCE; }
 
-    // ── Server side ──────────────────────────────────────────────────────────
+    // Server
     private volatile int udpListenSocket = 0;
     private final Map<Integer, UdpHostRelay> relayByConn = new ConcurrentHashMap<>();
     private final Set<Integer> acceptedConns = ConcurrentHashMap.newKeySet();
 
-    // Explicit voice-server bind (SVC changePort / dedicated config). Not OS-assigned sockets.
     private final AtomicInteger knownVoiceServerPort = new AtomicInteger(0);
-    // Minecraft LAN/game port - SVC on integrated host rebinds voice to this after publish.
     private final AtomicInteger hostGamePort = new AtomicInteger(0);
 
     private final AtomicLong serverVoicePacketsIn = new AtomicLong();
@@ -56,7 +40,6 @@ public final class SteamUdpProxy {
     private final AtomicLong clientVoicePacketsIn = new AtomicLong();
     private final AtomicLong clientVoicePacketsOut = new AtomicLong();
 
-    // ── Client side ──────────────────────────────────────────────────────────
     private volatile int udpClientConn = 0;
     private volatile SteamAwareDatagramImpl activeClientImpl;
     private volatile int serverVoicePort = 0;
@@ -65,7 +48,6 @@ public final class SteamUdpProxy {
 
     private SteamUdpProxy() {}
 
-    // ── Server-side API ──────────────────────────────────────────────────────
 
     public void startServer() {
         int udpVirtualPort = SteamBridgeConfig.virtualPort + 1;
@@ -168,10 +150,7 @@ public final class SteamUdpProxy {
         relay.forwardToLocalService(data);
     }
 
-    /**
-     * Called when a voice service socket binds an explicit non-zero port
-     * (SVC changePort / dedicated config - not bind(0)).
-     */
+    /** Explicit voice bind (not OS-assigned bind(0)). */
     public void registerBoundPort(int port) {
         if (port <= 1024 || port > 65535) {
             SteamBridgeMod.LOG.warn("[UdpProxy] Ignoring invalid voice bind port {}", port);
@@ -186,7 +165,6 @@ public final class SteamUdpProxy {
         }
     }
 
-    /** Minecraft LAN/game port of the host; SVC rebinds voice here after publish. */
     public void setHostGamePort(int port) {
         if (port <= 0 || port > 65535) return;
         int prev = hostGamePort.getAndSet(port);
@@ -202,10 +180,7 @@ public final class SteamUdpProxy {
         return knownVoiceServerPort.get();
     }
 
-    /**
-     * Target for host-side voice relay:
-     * detected explicit bind -> host game/LAN port -> SVC default 24454.
-     */
+    /** detected bind, else game port, else 24454. */
     public int resolveVoiceTargetPort() {
         int known = knownVoiceServerPort.get();
         if (known > 0) return known;
@@ -224,8 +199,6 @@ public final class SteamUdpProxy {
         else source = "default";
         return resolved + " (" + source + ", detected=" + known + ", gamePort=" + game + ")";
     }
-
-    // ── Client-side API ──────────────────────────────────────────────────────
 
     public void startClient(SteamID hostId) {
         if (udpClientConn != 0) return;
@@ -321,7 +294,6 @@ public final class SteamUdpProxy {
         serverVoicePacketsOut.incrementAndGet();
     }
 
-    // ── Package-internal: called by SteamAwareDatagramImpl ───────────────────
 
     void setServerVoicePort(int port) {
         serverVoicePort = port;

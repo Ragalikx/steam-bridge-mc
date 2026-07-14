@@ -134,11 +134,7 @@ public class SteamClient {
                 return;
             }
 
-            // Start UDP proxy here, not in the Steam callback thread.
-            // Calling connectP2P() from the callback thread blocked it long enough
-            // to delay the handshake and cause a 30-second login timeout on
-            // the first connection attempt. Starting it here frees the callback
-            // thread while still running well before SVC receives its secret.
+            // UDP client after route is ready (not on Steam callback thread).
             if (steambridge.SteamBridgeConfig.interceptUdp) {
                 steambridge.proxy.SteamUdpProxy.getInstance().startClient(hostSteamID);
             }

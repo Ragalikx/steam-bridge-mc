@@ -38,7 +38,6 @@ final class SteamAwareDatagramImpl extends DatagramSocketImpl {
 
     private static final int RECV_BUF_SIZE = 65536;
 
-    // ──────────────────────────────────────────────────────────────── Lifecycle
 
     @Override
     protected void create() {
@@ -58,7 +57,6 @@ final class SteamAwareDatagramImpl extends DatagramSocketImpl {
             InetSocketAddress bound = (InetSocketAddress) channel.getLocalAddress();
             localPort = bound.getPort();
 
-            // Only explicit binds (lport != 0). SVC changePort/dedicated config; not bind(0).
             if (lport != 0 && localPort > 1024) {
                 SteamUdpProxy.getInstance().registerBoundPort(localPort);
             }
@@ -84,7 +82,6 @@ final class SteamAwareDatagramImpl extends DatagramSocketImpl {
         }
     }
 
-    // ──────────────────────────────────────────────────────────────────── Send
 
     @Override
     protected void send(DatagramPacket p) throws IOException {
@@ -143,7 +140,6 @@ final class SteamAwareDatagramImpl extends DatagramSocketImpl {
         mode = Mode.CHANNEL;
     }
 
-    // ─────────────────────────────────────────────────────────────── Receive
 
     @Override
     protected void receive(DatagramPacket p) throws IOException {
@@ -234,7 +230,6 @@ final class SteamAwareDatagramImpl extends DatagramSocketImpl {
         }
     }
 
-    // ──────────────────────────────────────────────────────────────── Options
 
     @Override
     public void setOption(int optID, Object value) throws SocketException {
@@ -287,7 +282,6 @@ final class SteamAwareDatagramImpl extends DatagramSocketImpl {
         if (soBroadcast != null) ch.setOption(StandardSocketOptions.SO_BROADCAST, soBroadcast);
     }
 
-    // ─────────────────────────────────────────────────────────────── Helpers
 
     private synchronized void ensureChannel() throws SocketException {
         if (channel == null || !channel.isOpen()) {
@@ -315,14 +309,12 @@ final class SteamAwareDatagramImpl extends DatagramSocketImpl {
         return v instanceof Boolean b && b;
     }
 
-    // ──────────────────────── Multicast stubs (voice mods don't use multicast)
 
     @Override protected void join(InetAddress g) throws IOException { throw new UnsupportedOperationException("Multicast not supported"); }
     @Override protected void leave(InetAddress g) throws IOException { throw new UnsupportedOperationException("Multicast not supported"); }
     @Override protected void joinGroup(SocketAddress m, NetworkInterface i) throws IOException { throw new UnsupportedOperationException("Multicast not supported"); }
     @Override protected void leaveGroup(SocketAddress m, NetworkInterface i) throws IOException { throw new UnsupportedOperationException("Multicast not supported"); }
 
-    // ──────────────────────────────────────────── Deprecated but still abstract
 
     @Override protected int  peek(InetAddress i) { return 0; }
     @Override protected int  peekData(DatagramPacket p) { return 0; }

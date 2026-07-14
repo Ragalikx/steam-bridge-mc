@@ -13,14 +13,7 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.util.concurrent.atomic.AtomicLong;
 
-/**
- * Host-side per-client UDP relay.
- *
- * Binds an ephemeral local UDP socket and acts as a fake local client talking to whatever
- * voice service is running on this machine (Simple Voice Chat, Plasmo Voice, etc.).
- * The target port is resolved via {@link SteamUdpProxy#resolveVoiceTargetPort()}
- * (detected explicit bind -> host game port -> 24454).
- */
+/** Host-side per-client UDP relay to local voice service. */
 final class UdpHostRelay {
 
     private static final int BUF_SIZE = 4096;

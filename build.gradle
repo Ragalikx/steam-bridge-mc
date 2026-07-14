@@ -3,14 +3,8 @@ plugins {
     id 'net.neoforged.gradle.userdev' version '7.0.170'
 }
 
-// -- Versioning ----------------------------------------------------------------
-// Release (cmd):        gradlew build -PmodVersion=1.145
-// Release (PowerShell): .\gradlew.bat build "-PmodVersion=1.145"   // quotes required:
-//                       bare 1.145 is split so Gradle sees task ".145"
-// Result: project.version / jar / neoforge.mods.toml / BuildInfo = "1.145+mc1.21.1"
-// Dev (no -P):          "0.0.0-dev+mc1.21.1"
-// Optional leading "v" is stripped (CI: -PmodVersion=v1.145).
-// Do NOT use positional "gradlew build 1.145" - Gradle treats that as a task name.
+// Version: -PmodVersion=1.145 -> 1.145+mc1.21.1  |  no -P -> 0.0.0-dev+mc1.21.1
+// PowerShell: .\gradlew.bat build "-PmodVersion=1.145"  (quotes required)
 def rawModVersion = (findProperty('modVersion') ?: '0.0.0-dev').toString().trim()
 if (rawModVersion.isEmpty()) {
     throw new GradleException("modVersion is empty. Pass -PmodVersion=1.145 (or omit for 0.0.0-dev).")
@@ -18,7 +12,6 @@ if (rawModVersion.isEmpty()) {
 if (rawModVersion.startsWith('v') || rawModVersion.startsWith('V')) {
     rawModVersion = rawModVersion.substring(1)
 }
-// Reject accidental full strings that already contain +mc… (avoid 1.145+mc1.21.1+mc1.21.1).
 if (rawModVersion.contains('+mc')) {
     throw new GradleException(
         "modVersion must be the mod release only (e.g. 1.145), not '${rawModVersion}'. " +
@@ -37,13 +30,11 @@ base {
     archivesName = project.mod_id
 }
 
-// Mojang ships Java 21 to end-users starting in 1.20.5; NeoForge 1.21.1 requires it.
-// foojay-resolver in settings.gradle auto-provisions JDK 21 for compilation.
+// NeoForge 1.21.1 needs Java 21 (foojay may provision it if the daemon is on 17).
 java {
     toolchain.languageVersion = JavaLanguageVersion.of(21)
 }
 
-// -- Auto-generated BuildInfo (author/version stamped into bytecode) -----------
 def generatedSrcDir = layout.buildDirectory.dir('generated/java').get().asFile
 
 sourceSets {
@@ -63,15 +54,11 @@ tasks.register('generateBuildInfo') {
         f.parentFile.mkdirs()
         f.text = """\
 package steambridge;
-/** Auto-generated at build time. Do not edit or commit. */
+/** Generated at build time. */
 public final class BuildInfo {
-    /** Full release id, e.g. {@code 1.145+mc1.21.1}. */
     public static final String VERSION     = "${verFull}";
-    /** Mod-only version from {@code -PmodVersion}, e.g. {@code 1.145}. */
     public static final String MOD_VERSION = "${verMod}";
-    /** Target Minecraft version baked at build time. */
     public static final String MC_VERSION  = "${verMc}";
-    /** Embedded in bytecode - visible in hex/strings dump of the jar. */
     public static final String AUTHOR      = "Ragalikx";
     public static final String GITHUB      = "https://github.com/Ragalikx/steam-bridge-mc";
     private BuildInfo() {}
@@ -85,12 +72,7 @@ tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }
 
-// -- NeoForge 1.21.1 toolchain -------------------------------------------------
-// NeoGradle 7.x (net.neoforged.gradle.userdev) for 1.21.1+. Unlike the legacyforge
-// preset used for 1.17-1.20.1, there is NO reobfuscation step: NeoForge 1.21+
-// ships with official Mojang names at runtime, so the compiled jar is shipped as-is.
-// Access transformers (META-INF/accesstransformer.cfg) are also declared in
-// neoforge.mods.toml; listing them here applies them at compile time too.
+// AT also listed in neoforge.mods.toml; this applies it at compile time.
 minecraft {
     accessTransformers {
         file 'src/main/resources/META-INF/accesstransformer.cfg'
@@ -110,55 +92,26 @@ repositories {
     mavenCentral()
 }
 
-// Resolved (transitive-free) copy of the steamworks4j artifact, used only to pull its Java
-// API classes + win64 native DLLs into the mod jar (see the jar task).
+// steamworks4j zip for shading into the jar (API classes + win64 DLLs only).
 configurations {
     steamBundle { transitive = false }
 }
 
-// -- Steam bridge native deps ---------------------------------------------------------
-//
-// steamworks4j: its Java API classes are shaded FLAT into the mod jar (see the jar task),
-// exactly as the 1.12.2 build did. `com.codedisaster.steamworks` is a package no other mod
-// or the loader provides, so there is no split-package/module clash; the classes just ride
-// along in the steambridge automatic module and reach JNA (a named module the loader always
-// ships) through the implicit reads every automatic module gets. This is both smaller and
-// simpler than Jar-in-Jar, which nested the *entire* upstream jar including ~2.3 MB of
-// macOS/Linux/32-bit natives this Windows-only mod never loads.
-//
-// JNA: NOT bundled at all. Three approaches were tried for that and all failed:
-//  1. shadowJar + relocate(com.sun.jna -> steambridge.shaded.com.sun.jna): breaks JNA's
-//     native bootstrap (jnidispatch.dll's exported symbols are compiled against the
-//     original `com.sun.jna.Native` class name -> UnsatisfiedLinkError at class-init).
-//  2. shadowJar without relocation: NeoForge's production launch resolves JNA as a real
-//     Java *module* on the module path (`-p ...jna-....jar`); our mod jar becomes an
-//     automatic module that also exports the unrelocated `com.sun.jna` package, and the
-//     JPMS module resolver refuses two modules exporting the same package
-//     (`ResolutionException: Modules steambridge and com.sun.jna export package
-//     com.sun.jna to module ...`).
-//  3. jarJar-embedding our own JNA copy: NeoForge's loader *also* exposes jar-in-jar
-//     GAMELIBRARY dependencies as real modules on the same layer, so our embedded
-//     jna copy and the loader's own jna both register as a module named
-//     "com.sun.jna" -> `ResolutionException: Module steambridge reads more than one
-//     module named com.sun.jna`.
-// NeoForge itself depends on and always ships JNA at runtime, so the fix is to not bundle
-// a second copy at all: compile against it (compileOnly, pinned to the exact version the
-// 1.21.1 loader provides) and let the game supply the real one.
+// steamworks4j: shade selected classes/natives into the mod jar (see jar {}).
+// JNA: compileOnly only; NeoForge already ships it. Do not shade/relocate/jarJar a second copy.
 dependencies {
     implementation "net.neoforged:neoforge:${project.neo_version}"
 
     compileOnly "net.java.dev.jna:jna:${project.jna_version}"
 
-    // Compile + dev-runtime classpath for the steamworks4j API. Not auto-bundled by the
-    // default `jar` task (only jarJar does that); we copy selected classes/natives ourselves.
     implementation("com.code-disaster.steamworks4j:steamworks4j:${project.steamworks4j_version}") {
-        exclude group: 'net.java.dev.jna' // the loader provides JNA; never pull a second copy
+        exclude group: 'net.java.dev.jna'
     }
 
     steamBundle "com.code-disaster.steamworks4j:steamworks4j:${project.steamworks4j_version}"
 }
 
-// -- Resource templating (neoforge.mods.toml version substitution) ------------
+// ${...} expansion for neoforge.mods.toml / pack.mcmeta
 tasks.withType(ProcessResources).configureEach {
     var replaceProperties = [
         mod_id                 : project.mod_id,
@@ -177,13 +130,10 @@ tasks.withType(ProcessResources).configureEach {
 }
 
 jar {
-    // SteamManager loads DLLs via getClass().getResourceAsStream("/steam_api64.dll"),
-    // so win64 natives must sit at this mod jar's root (not nested jar-in-jar).
-    // Only win64 is shipped: 1.21.1 requires 64-bit Java; macOS/Linux natives are dropped.
+    // Win64 natives at jar root (SteamManager loads /steam_api64.dll). Drop unused APIs.
     from({ project.configurations.steamBundle.collect { zipTree(it) } }) {
         include 'com/codedisaster/**'
         include 'steam_api64.dll', 'steamworks4j64.dll'
-        // Drop steamworks4j APIs this mod never calls (same trim as 1.12.2).
         exclude 'com/codedisaster/steamworks/SteamController*'
         exclude 'com/codedisaster/steamworks/SteamHTTP*'
         exclude 'com/codedisaster/steamworks/SteamLeaderboard*'
@@ -197,7 +147,6 @@ jar {
         exclude 'com/codedisaster/steamworks/SteamUserStats*'
         exclude 'com/codedisaster/steamworks/SteamApps*'
     }
-    // Third-party license texts next to the shaded bits (steamworks4j MIT, JNA Apache 2.0).
     from('third_party_licenses') {
         into 'META-INF/licenses'
     }

@@ -372,10 +372,7 @@ public final class SteamSocketsApi {
 
     private static final ThreadLocal<Memory> sendBuffer = ThreadLocal.withInitial(() -> new Memory(65536));
 
-    /**
-     * Send raw bytes (used by the UDP voice proxy). Writes into the ThreadLocal native buffer
-     * and hands the pointer to SteamNetworkingSockets.
-     */
+    /** Raw send (voice / UDP proxy). */
     public int sendBytes(int connection, byte[] data, int flags) {
         if (connection == 0 || data == null || data.length == 0) return 0;
         Memory payload = sendBuffer.get();
@@ -389,10 +386,6 @@ public final class SteamSocketsApi {
         );
     }
 
-    /**
-     * Zero-copy send from a Netty ByteBuf: writes directly into the pre-allocated ThreadLocal
-     * native Memory via NIO ByteBuffer, avoiding an intermediate {@code byte[]} allocation.
-     */
     public int sendMessageFromByteBuf(int connection, io.netty.buffer.ByteBuf data, int len, int flags) {
         if (connection == 0 || data == null || len == 0) return 0;
 
@@ -401,7 +394,6 @@ public final class SteamSocketsApi {
             payload = new Memory(len);
             sendBuffer.set(payload);
         }
-        // One copy: ByteBuf -> NIO ByteBuffer view of native Memory (avoids intermediate byte[])
         java.nio.ByteBuffer nioView = payload.getByteBuffer(0, len);
         nioView.clear();
         data.getBytes(data.readerIndex(), nioView);
@@ -411,11 +403,6 @@ public final class SteamSocketsApi {
     }
 
 
-    /**
-     * Receives up to RECV_BATCH messages in a single JNA call.
-     * Fields are read directly from native Pointer offsets; no JNA Structure allocation per message.
-     * Returns null if no messages are available; otherwise an array (may contain null elements).
-     */
     public ReceivedMessage[] receiveMessages(int connection) {
         if (connection == 0) return null;
 
@@ -428,10 +415,6 @@ public final class SteamSocketsApi {
         for (int i = 0; i < received; i++) {
             Pointer msgPtr = recvBatchMem.getPointer((long) i * Native.POINTER_SIZE);
             if (msgPtr == null) continue;
-            // Read fields directly by offset to avoid allocating a JNA Structure per message:
-            //   +0  m_pData  (Pointer, 8 bytes)
-            //   +8  m_cbSize (int32)
-            //   +12 m_conn   (int32)
             int    cbSize  = msgPtr.getInt(SteamOffsets.MSG_OFF_CBSIZE);
             int    conn    = msgPtr.getInt(SteamOffsets.MSG_OFF_CONN);
             Pointer dataPtr = msgPtr.getPointer(SteamOffsets.MSG_OFF_PDATA);
@@ -444,9 +427,6 @@ public final class SteamSocketsApi {
         return results;
     }
 
-    // ThreadLocal reuse for snapshotConnection; eliminates two JNA Structure allocations per call.
-    // snapshotConnection() is called from the callback thread and receive thread independently,
-    // so ThreadLocal gives each thread its own private instance (safe for concurrent use).
     private static final ThreadLocal<SteamNetConnectionInfo> TL_CONN_INFO =
             ThreadLocal.withInitial(SteamNetConnectionInfo::new);
     private static final ThreadLocal<SteamNetConnectionRealTimeStatus> TL_REALTIME =

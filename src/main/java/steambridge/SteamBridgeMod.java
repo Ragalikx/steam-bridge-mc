@@ -18,14 +18,7 @@ import org.slf4j.Logger;
 import steambridge.event.SteamClientEvents;
 import steambridge.steam.SteamManager;
 
-/**
- * Steam Bridge entry point (NeoForge 1.21.1).
- *
- * <p>Client-only mod: launches the Steam bridge during client setup and wires up the
- * client-side event handlers. In NeoForge 1.21.1 the {@code @Mod} constructor receives
- * {@link IEventBus} and {@link ModContainer} via injection, so static
- * {@code FMLJavaModLoadingContext.get()} calls are not needed.</p>
- */
+/** Steam Bridge entry (NeoForge 1.21.1, client-only). */
 @Mod(SteamBridgeMod.MODID)
 public class SteamBridgeMod {
 
@@ -43,15 +36,12 @@ public class SteamBridgeMod {
         modEventBus.addListener(SteamBridgeConfig::onReload);
 
         modContainer.registerConfig(ModConfig.Type.CLIENT, SteamBridgeConfig.SPEC);
-
-        // NeoForge game event bus: client-side gameplay/GUI hooks.
         NeoForge.EVENT_BUS.register(new SteamClientEvents());
     }
 
     private void onClientSetup(FMLClientSetupEvent event) {
         event.enqueueWork(() -> {
             LOG.info("=== SteamBridge client setup: initializing Steam... ===");
-            // Install UDP intercept factory before any voice mod creates DatagramSockets.
             if (SteamBridgeConfig.interceptUdp) {
                 steambridge.proxy.UdpInterceptFactory.install();
             }
@@ -61,10 +51,7 @@ public class SteamBridgeMod {
         });
     }
 
-    /**
-     * Neutralises log4j message-lookup syntax in untrusted strings (Steam persona names,
-     * Minecraft names, remote disconnect messages) before they reach the logger.
-     */
+    /** Strip log4j lookup syntax from untrusted strings before logging. */
     public static String safeLog(String s) {
         if (s == null) {
             return "";
