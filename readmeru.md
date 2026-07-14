@@ -18,13 +18,13 @@
 
 | Версия Minecraft | Платформа | Версия загрузчика | Windows | Linux | macOS | Статус |
 |---|---|---|---|---|---|---|
-| [1.21.1](https://github.com/Ragalikx/steam-bridge-mc/tree/NeoForge-1.21.1) | NeoForge | ? | ✅ | ⏳ (В планах на будущее) | ❌ | Доступно |
+| [1.21.1](https://github.com/Ragalikx/steam-bridge-mc/tree/NeoForge-1.21.1) | NeoForge | 21.1.234 | ✅ | ⏳ (В планах на будущее) | ❌ | Доступно |
 | [1.21.1](https://github.com/Ragalikx/steam-bridge-mc/tree/Fabric-1.21.1) | Fabric | ? | ? | ? | ❌ | В разработке |
-| [1.20.1](https://github.com/Ragalikx/steam-bridge-mc/tree/NeoForge-1.20.1) | NeoForge/Forge | ? | ✅ | ⏳ (В планах на будущее) | ❌ | Доступно |
+| [1.20.1](https://github.com/Ragalikx/steam-bridge-mc/tree/NeoForge-1.20.1) | NeoForge/Forge | 47.1.106 | ✅ | ⏳ (В планах на будущее) | ❌ | Доступно |
 | [1.20.1](https://github.com/Ragalikx/steam-bridge-mc/tree/Fabric-1.20.1) | Fabric | ? | ? | ? | ❌ | В разработке |
 | [1.16.5](https://github.com/Ragalikx/steam-bridge-mc/tree/Forge-1.16.5) | Forge | ? | ? | ? | ❌ | В разработке |
 | [1.16.5](https://github.com/Ragalikx/steam-bridge-mc/tree/Fabric-1.16.5) | Fabric | ? | ? | ? | ❌ | В разработке |
-| [1.12.2](https://github.com/Ragalikx/steam-bridge-mc/tree/Forge-1.12.2) | Forge | 14.23.5.2861 | ✅ | ⏳ (В планах на будущее) | ❌ | Доступно |
+| [1.12.2](https://github.com/Ragalikx/steam-bridge-mc/tree/Forge-1.12.2) | Forge | 14.23.5.2860 | ✅ | ⏳ (В планах на будущее) | ❌ | Доступно |
 | [1.7.10](https://github.com/Ragalikx/steam-bridge-mc/tree/Forge-1.7.10) | Forge | ? | ? | ? | ❌ | В разработке |
 
 *(Для сборок на базе Fabric обязательно требуется наличие Fabric API)*
@@ -37,11 +37,9 @@
 
 | Версия Minecraft | Платформа | Версия Java | Версия Gradle |
 |---|---|---|---|
-| 1.21.1 | NeoForge / Fabric | Java 21 | 8.x |
-| 1.20.1 | NeoForge/Forge / Fabric | Java 17 | 8.x |
-| 1.16.5 | Forge / Fabric | Java 8 / 11 | 7.x |
+| 1.21.1 | NeoForge | Java 21 | 8.13 |
+| 1.20.1 | NeoForge/Forge | Java 17 | 8.13 |
 | 1.12.2 | Forge | Java 8 | 4.10.3 |
-| 1.7.10 | Forge | Java 8 | 4.4.1 |
 
 ---
 
