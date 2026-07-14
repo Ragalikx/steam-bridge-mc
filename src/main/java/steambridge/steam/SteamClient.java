@@ -82,6 +82,7 @@ public class SteamClient {
             statusMsg = "Disconnected.";
         }
         connectLatch.countDown();
+        steambridge.proxy.SteamUdpProxy.getInstance().stopClient();
         SteamManager.getInstance().setActiveClient(null);
 
         if (connectionHandle != 0) {
@@ -133,6 +134,14 @@ public class SteamClient {
                 return;
             }
 
+            // Start UDP proxy here, not in the Steam callback thread.
+            // Calling connectP2P() from the callback thread blocked it long enough
+            // to delay the handshake and cause a 30-second login timeout on
+            // the first connection attempt. Starting it here frees the callback
+            // thread while still running well before SVC receives its secret.
+            if (steambridge.SteamBridgeConfig.interceptUdp) {
+                steambridge.proxy.SteamUdpProxy.getInstance().startClient(hostSteamID);
+            }
             statusMsg = i18n("steambridge.status.path_ready", "Steam path ready - activating pipeline...");
             final Screen screen = connectingScreen;
 
@@ -152,7 +161,7 @@ public class SteamClient {
                     if (ok2) {
                         state = State.STEAM_READY;
                         statusMsg = i18n("steambridge.status.steam_ready", "Steam path ready - waiting for Minecraft login...");
-                        SteamBridgeMod.LOG.info("[SteamClient] Loopback mode active - Steam transport is ready.");
+                        SteamBridgeMod.LOG.info("[SteamClient] Loopback mode active; Steam transport is ready.");
                     } else {
                         SteamBridgeMod.LOG.error("[SteamClient] Loopback connect to port {} failed.", finalProxyPort);
                         fail(i18n("steambridge.status.fail_proxy", "Failed to connect to loopback proxy port ") + finalProxyPort);
@@ -333,6 +342,7 @@ public class SteamClient {
         statusMsg = TextColors.RED + msg;
         alive.set(false);
         connectLatch.countDown();
+        steambridge.proxy.SteamUdpProxy.getInstance().stopClient();
         SteamManager.getInstance().setActiveClient(null);
 
         if (connectionHandle != 0) {
@@ -397,7 +407,7 @@ public class SteamClient {
                 return net.minecraft.client.resources.language.I18n.get(key);
             }
         } catch (Exception ignored) {
-            // Minecraft not yet fully initialised - use English fallback.
+            // Minecraft not yet fully initialised; use English fallback.
         }
         return fallback;
     }

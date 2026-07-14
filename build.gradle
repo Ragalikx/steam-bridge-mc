@@ -50,8 +50,16 @@ tasks.withType(JavaCompile).configureEach {
 
 // -- NeoForge 1.21.1 toolchain -------------------------------------------------
 // NeoGradle 7.x (net.neoforged.gradle.userdev) for 1.21.1+. Unlike the legacyforge
-// preset used for 1.17-1.20.1, there is NO reobfuscation step - NeoForge 1.21+
+// preset used for 1.17-1.20.1, there is NO reobfuscation step: NeoForge 1.21+
 // ships with official Mojang names at runtime, so the compiled jar is shipped as-is.
+// Access transformers (META-INF/accesstransformer.cfg) are also declared in
+// neoforge.mods.toml; listing them here applies them at compile time too.
+minecraft {
+    accessTransformers {
+        file 'src/main/resources/META-INF/accesstransformer.cfg'
+    }
+}
+
 runs {
     configureEach {
         systemProperty 'forge.logging.markers', 'REGISTRIES'
@@ -113,7 +121,7 @@ tasks.withType(ProcessResources).configureEach {
 jar {
     // Shade steamworks4j's Java API classes flat into the mod jar, and lay the win64 Steam
     // native binaries FLAT at the jar root (steam_api64.dll / steamworks4j64.dll).
-    // Only win64 - 1.21.1 requires 64-bit Java, macOS/Linux natives stripped.
+    // Only win64: 1.21.1 requires 64-bit Java, macOS/Linux natives stripped.
     from({ project.configurations.steamBundle.collect { zipTree(it) } }) {
         include 'com/codedisaster/**'
         include 'steam_api64.dll', 'steamworks4j64.dll'

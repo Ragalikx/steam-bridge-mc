@@ -120,12 +120,12 @@ public final class SteamTransport {
             // The screen we hand to the net handler becomes DisconnectedScreen's parent
             // when the server later drops us. Re-showing the stale connect/add-server
             // screen the player launched from leaves its buttons unresponsive, so use a
-            // fresh multiplayer list instead - the same fallback vanilla uses when it has
+            // fresh multiplayer list instead, the same fallback vanilla uses when it has
             // no origin screen. This is the "Back to server list" target after a kick.
             final Screen returnScreen = new JoinMultiplayerScreen(new TitleScreen());
 
             // Connection.connect builds the full vanilla client pipeline (frame codecs,
-            // packet codecs, the Connection as packet handler) and connects the socket -
+            // packet codecs, the Connection as packet handler) and connects the socket;
             // no reflection into the channel/address fields required.
             Connection connection = new Connection(PacketFlow.CLIENTBOUND);
             InetSocketAddress addr = new InetSocketAddress("127.0.0.1", proxyPort);
@@ -137,7 +137,7 @@ public final class SteamTransport {
             }
 
             // initiateServerboundPlayConnection sends only ClientIntentionPacket.
-            // ServerboundHelloPacket must follow immediately - without it the server
+            // ServerboundHelloPacket must follow immediately; without it the server
             // waits indefinitely for the login hello and times out after 30s.
             connection.initiateServerboundPlayConnection(
                     "SteamRelay",
@@ -150,7 +150,7 @@ public final class SteamTransport {
 
             // pendingConnection makes Minecraft.tick() call connection.tick() each game tick,
             // which drives TickablePacketListeners during the login/config phase and fires
-            // handleDisconnection() if the channel closes. Field is private - use reflection.
+            // handleDisconnection() if the channel closes. Field is private; use reflection.
             try {
                 java.lang.reflect.Field f = Minecraft.class.getDeclaredField("pendingConnection");
                 f.setAccessible(true);
@@ -170,7 +170,7 @@ public final class SteamTransport {
     }
 }
 
-// --- LoopbackBridge - buffered TCP<->Steam proxy --------------------------
+// --- LoopbackBridge: buffered TCP<->Steam proxy --------------------------
 
 final class LoopbackBridge extends io.netty.channel.ChannelInboundHandlerAdapter {
 
@@ -181,7 +181,7 @@ final class LoopbackBridge extends io.netty.channel.ChannelInboundHandlerAdapter
 
     // Backpressure queue. A plain LinkedList is safe here only because Netty guarantees every
     // call into a channel's handlers (read, write, flush) runs on that channel's single event-loop
-    // thread - if this queue is ever touched from outside the event loop, this needs to change.
+    // thread; if this queue is ever touched from outside the event loop, this needs to change.
     private final java.util.Queue<io.netty.buffer.ByteBuf> pendingOutbound = new java.util.LinkedList<>();
     private final int STEAM_MAX_CHUNK = 256 * 1024; // 256KB safe max
 
@@ -272,7 +272,7 @@ final class LoopbackBridge extends io.netty.channel.ChannelInboundHandlerAdapter
      * Delivers a whole receive-batch (all for this connection) to the Netty channel in a
      * single event-loop hop: queue every message with write(), then one flush(). This
      * collapses N per-message flushes (one syscall each) into one, and allocates one
-     * Runnable instead of N - the gameplay hot path during chunk streaming.
+     * Runnable instead of N (the gameplay hot path during chunk streaming).
      */
     void deliverBatchFromSteam(SteamSocketsApi.ReceivedMessage[] batch) {
         if (closed || batch == null) return;

@@ -23,8 +23,8 @@ import steambridge.steam.SteamManager;
  *
  * <p>Client-only mod: launches the Steam bridge during client setup and wires up the
  * client-side event handlers. In NeoForge 1.21.1 the {@code @Mod} constructor receives
- * {@link IEventBus} and {@link ModContainer} via injection - no static
- * {@code FMLJavaModLoadingContext.get()} calls needed.</p>
+ * {@link IEventBus} and {@link ModContainer} via injection, so static
+ * {@code FMLJavaModLoadingContext.get()} calls are not needed.</p>
  */
 @Mod(SteamBridgeMod.MODID)
 public class SteamBridgeMod {
@@ -50,7 +50,11 @@ public class SteamBridgeMod {
 
     private void onClientSetup(FMLClientSetupEvent event) {
         event.enqueueWork(() -> {
-            LOG.info("=== SteamBridge client setup - initializing Steam... ===");
+            LOG.info("=== SteamBridge client setup: initializing Steam... ===");
+            // Install UDP intercept factory before any voice mod creates DatagramSockets.
+            if (SteamBridgeConfig.interceptUdp) {
+                steambridge.proxy.UdpInterceptFactory.install();
+            }
             SteamAppIdHelper.ensureAppId(Minecraft.getInstance().gameDirectory);
             boolean ok = SteamManager.getInstance().init();
             LOG.info("=== Steam init result: {} ===", ok ? "SUCCESS" : "FAILED");

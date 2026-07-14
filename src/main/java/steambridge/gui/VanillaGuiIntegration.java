@@ -179,7 +179,7 @@ public final class VanillaGuiIntegration {
                 ServerData data = list.get(i);
                 if (isSteamServerId(data.ip)) {
                     // ServerData.pinged removed in 1.21.1; Steam servers will show a ping error
-                    // in the list, which is expected - they are not real TCP addresses.
+                    // in the list, which is expected; they are not real TCP addresses.
                     if (i > steamIndex) list.swap(i, steamIndex);
                     steamIndex++;
                 }
@@ -381,7 +381,7 @@ public final class VanillaGuiIntegration {
         // Anchor a standalone "Manage Steam session" button directly above the NeoForge
         // "Mods" button. Once a world is already shared, vanilla removes the "Open to LAN"
         // entry, so that button is not available as an anchor. "Mods" is always present.
-        // We do NOT hide or repurpose any vanilla button - only add our own widget and
+        // We do NOT hide or repurpose any vanilla button; only add our own widget and
         // nudge "Mods" and everything below it down one row.
         Button mods = findButtonByMessage(event, "fml.menu.mods");
         if (mods == null) return;
@@ -407,7 +407,7 @@ public final class VanillaGuiIntegration {
         if (srv == null) return;
 
         if (!SteamManager.getInstance().isInitialized()) {
-            // Try reinit first - covers the case where Steam was launched recently
+            // Try reinit first; covers the case where Steam was launched recently
             // but the mod hasn't detected it yet.
             if (!SteamManager.getInstance().reinit()) {
                 try {
@@ -420,7 +420,7 @@ public final class VanillaGuiIntegration {
                         Component.literal("§e" + I18n.get("steambridge.gui.host_steam_launching")), false);
                 return;
             }
-            // reinit succeeded - fall through and open the world
+            // reinit succeeded: fall through and open the world
         }
 
         GameType gameType = findByType(gui, GameType.class);

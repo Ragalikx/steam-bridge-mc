@@ -36,9 +36,9 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <p>Sub-classes:
  * <ul>
- *   <li>{@link ProfileCache} - caches Steam persona names and avatar textures.</li>
- *   <li>{@link Bans}         - per-world Steam ban list.</li>
- *   <li>{@link Worlds}       - per-world host settings.</li>
+ *   <li>{@link ProfileCache}: caches Steam persona names and avatar textures.</li>
+ *   <li>{@link Bans}: per-world Steam ban list.</li>
+ *   <li>{@link Worlds}: per-world host settings.</li>
  * </ul>
  */
 public final class SteamSocial {
@@ -50,7 +50,7 @@ public final class SteamSocial {
 
     /**
      * Caches Steam persona names and avatar textures.
-     * Singleton - obtain via {@code SteamSocial.ProfileCache.get()}. 
+     * Singleton; obtain via {@code SteamSocial.ProfileCache.get()}. 
      */
     public static final class ProfileCache {
 
@@ -201,7 +201,7 @@ public final class SteamSocial {
     /**
      * Manages the per-world Steam ban list.
      * Stored at {@code <gameDir>/steambridge/ban-cache.json}.
-     * Singleton - obtain via {@code SteamSocial.Bans.get()}. 
+     * Singleton; obtain via {@code SteamSocial.Bans.get()}. 
      */
     public static final class Bans {
 
@@ -351,7 +351,7 @@ public final class SteamSocial {
     /**
      * Persists per-world host settings across sessions.
      * Stored at {@code <gameDir>/steambridge/world-settings.json}.
-     * Singleton - obtain via {@code SteamSocial.Worlds.get()}. 
+     * Singleton; obtain via {@code SteamSocial.Worlds.get()}. 
      */
     public static final class Worlds {
 

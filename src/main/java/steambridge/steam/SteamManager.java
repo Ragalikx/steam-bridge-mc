@@ -137,7 +137,7 @@ public class SteamManager {
 
         try {
             // Fail fast if the bundled Steam SDK's SteamNetworkingMessage_t layout no longer
-            // matches our hardcoded offsets - otherwise the raw pointer reads/writes in
+            // matches our hardcoded offsets; otherwise the raw pointer reads/writes in
             // SteamSocketsApi would silently corrupt native memory. Throws on mismatch; caught below.
             SteamOffsets.validateLayout();
 
@@ -364,10 +364,25 @@ public class SteamManager {
 
         // Fast path: every message in a batch belongs to this one connection, hence the same
         // loopback bridge. Hand the whole batch over in a single event-loop hop with one flush
-        // instead of one execute()+flush per message - the gameplay hot path (chunk streaming).
+        // instead of one execute()+flush per message (the gameplay hot path during chunk streaming).
         LoopbackBridge loopback = loopbackByConnection.get(connection);
         if (loopback != null) {
             loopback.deliverBatchFromSteam(batch);
+            return true;
+        }
+
+        // UDP proxy connections: route to SteamUdpProxy without loopback overhead.
+        steambridge.proxy.SteamUdpProxy udpProxy = steambridge.proxy.SteamUdpProxy.getInstance();
+        if (udpProxy.ownsClientConn(connection)) {
+            for (SteamSocketsApi.ReceivedMessage m : batch) {
+                if (m != null && m.getData().length > 0) udpProxy.deliverFromSteamToClient(m.getData());
+            }
+            return true;
+        }
+        if (udpProxy.ownsServerConn(connection)) {
+            for (SteamSocketsApi.ReceivedMessage m : batch) {
+                if (m != null && m.getData().length > 0) udpProxy.deliverFromSteamToServer(connection, m.getData());
+            }
             return true;
         }
 
@@ -437,7 +452,7 @@ public class SteamManager {
 
             loopbackConnections.add(connection);
             SteamBridgeMod.LOG.info(
-                "[SteamManager] Loopback connection detected: conn={} steamID={} ping={}ms - enabling fast-path",
+                "[SteamManager] Loopback connection detected: conn={} steamID={} ping={}ms; enabling fast-path",
                 connection, remoteSteamID, status.getPingMs());
 
             SteamSocketsApi api2 = socketsApi;
@@ -454,8 +469,22 @@ public class SteamManager {
             handled = true;
         }
 
+        // UDP proxy is checked BEFORE SteamClient to prevent steamID-based false match:
+        // SteamClient.ownsConnection() falls back to matching by remoteSteamID, which would
+        // incorrectly claim the UDP proxy connection (same steamID, different conn handle).
+        steambridge.proxy.SteamUdpProxy udpProxy = steambridge.proxy.SteamUdpProxy.getInstance();
+        if (!handled) {
+            if (udpProxy.ownsListenSocket(event.m_info.m_hListenSocket) || udpProxy.ownsServerConn(connection)) {
+                udpProxy.onServerConnectionStatusChanged(connection, remoteSteamID, status, event.m_eOldState);
+                handled = true;
+            } else if (udpProxy.ownsClientConn(connection)) {
+                udpProxy.onClientConnectionStatusChanged(connection, remoteSteamID, status, event.m_eOldState);
+                handled = true;
+            }
+        }
+
         SteamClient client = activeClient;
-        if (client != null && client.ownsConnection(connection, remoteSteamID)) {
+        if (!handled && client != null && client.ownsConnection(connection, remoteSteamID)) {
             client.onConnectionStatusChanged(connection, remoteSteamID, status, event.m_eOldState);
             handled = true;
         }
@@ -602,6 +631,13 @@ public class SteamManager {
         return api != null ? api.sendMessageFromByteBuf(connection, data, len, SteamSocketsApi.SEND_RELIABLE) : 0;
     }
 
+    public void sendVoiceBytes(int connection, byte[] data) {
+        SteamSocketsApi api = socketsApi;
+        if (api != null) {
+            api.sendBytes(connection, data, SteamSocketsApi.SEND_UNRELIABLE_NO_NAGLE);
+        }
+    }
+
     public void registerLoopback(int connection, LoopbackBridge bridge) {
         if (connection != 0 && bridge != null) {
             loopbackByConnection.put(connection, bridge);
@@ -745,7 +781,7 @@ public class SteamManager {
      * so the game never crashes with a raw JNA exception.
      */
     public void handleSteamShutdown() {
-        SteamBridgeMod.LOG.warn("[SteamManager] Steam shutdown signal received - scheduling graceful disconnect.");
+        SteamBridgeMod.LOG.warn("[SteamManager] Steam shutdown signal received; scheduling graceful disconnect.");
         // Stop background threads immediately; they will finish their current iteration and exit.
         running.set(false);
         signalReceiveWake();
@@ -764,15 +800,15 @@ public class SteamManager {
                     if (server != null) server.stop();
 
                     if (wasClient && mc.level != null) {
-                        // Was a client inside a Steam-hosted world - kick to main menu with a friendly screen.
-                        // clearLevel() removed in 1.21.1 - setScreen triggers the cleanup
+                        // Was a client inside a Steam-hosted world: kick to main menu with a friendly screen.
+                        // clearLevel() removed in 1.21.1; setScreen triggers the cleanup
                         mc.setScreen(new net.minecraft.client.gui.screens.DisconnectedScreen(
                             new net.minecraft.client.gui.screens.TitleScreen(),
                             net.minecraft.network.chat.Component.translatable("disconnect.lost"),
                             net.minecraft.network.chat.Component.translatable("steambridge.error.steam_shutdown")
                         ));
                     } else if (wasHost && mc.player != null) {
-                        // Was the host - Steam bridge died but the local world keeps running.
+                        // Was the host: Steam bridge died but the local world keeps running.
                         // Just warn the host in chat; they are NOT kicked.
                         mc.player.displayClientMessage(
                             net.minecraft.network.chat.Component.translatable("steambridge.error.host_steam_shutdown")

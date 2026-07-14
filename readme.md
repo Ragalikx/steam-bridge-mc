@@ -16,7 +16,7 @@ The mod hooks into Minecraft's networking and routes it through **Steam Datagram
 >
 > Official releases are planned for the following versions: **1.7.10, 1.8, 1.16.5, and 1.20.1**.
 >
-> * **Current Status:** All focus is currently on polishing **1.12.2** (under active testing). Porting to the other listed versions will begin only after gathering bug reports in Discord and fixing major issues, ensuring a stable codebase is transferred. Therefore, there is no need to make standalone ports for these versions - they are already in development.
+> * **Current Status:** All focus is currently on polishing **1.12.2** (under active testing). Porting to the other listed versions will begin only after gathering bug reports in Discord and fixing major issues, ensuring a stable codebase is transferred. Therefore, there is no need to make standalone ports for these versions; they are already in development.
 >
 > Porting the mod to **any other versions** (not included in the list above) is highly encouraged, provided the MIT license is followed.
 > 
@@ -30,6 +30,7 @@ That's why **AppID 480 (Spacewar)** is used by default. It's Valve's old interna
 ## Configuration Notes
 - **Port 25565:** if you're hosting through Steam Bridge, make sure nothing else on your machine is already using this port. If you also want a regular Minecraft LAN game running alongside it, just point Steam Bridge's virtual port somewhere else in the config.
 - **allowWithoutAuth:** controls whether Steam Session Ticket validation is enforced. Turning it off tightens security a bit, but it can cause connection issues on stricter/symmetric NAT setups.
+- **interceptUdp:** installs a JVM-wide `DatagramSocket` factory so voice-chat mods (Simple Voice Chat, Plasmo Voice, etc.) can ride Steam next to game traffic. Takes effect only at launch; cannot be toggled at runtime.
 
 ## Development Environment
 Versions used while building and testing the mod:
