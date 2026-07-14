@@ -11,10 +11,25 @@ buildscript {
 apply plugin: 'net.minecraftforge.gradle'
 apply plugin: 'java'
 
-def buildDate   = new Date()
-version         = "1.${buildDate.format('yyMMdd')}"
-group           = 'steambridge'
+// -- Versioning ----------------------------------------------------------------
+// Release (cmd):        gradlew build -PmodVersion=1.145
+// Release (PowerShell): .\gradlew.bat build "-PmodVersion=1.145"
+// Result: project.version / jar / mcmod.info = "1.145"
+// Dev (no -P):          "0.0.0-dev"
+// Optional leading "v" is stripped (CI: -PmodVersion=v1.145).
+def rawModVersion = (findProperty('modVersion') ?: '0.0.0-dev').toString().trim()
+if (rawModVersion.isEmpty()) {
+    throw new GradleException("modVersion is empty. Pass -PmodVersion=1.145 (or omit for 0.0.0-dev).")
+}
+if (rawModVersion.startsWith('v') || rawModVersion.startsWith('V')) {
+    rawModVersion = rawModVersion.substring(1)
+}
+ext.modVersionOnly = rawModVersion
+version          = rawModVersion
+group            = 'steambridge'
 archivesBaseName = 'steambridge'
+
+logger.lifecycle("Steam Bridge version: {}  (modVersion={})", version, rawModVersion)
 
 sourceCompatibility = JavaVersion.VERSION_1_8
 targetCompatibility = JavaVersion.VERSION_1_8
@@ -26,6 +41,9 @@ sourceSets {
 }
 
 task generateBuildInfo {
+    def verMod = project.ext.modVersionOnly.toString()
+    inputs.property('version', project.version)
+    inputs.property('modVersion', verMod)
     outputs.dir(generatedSrcDir)
     doFirst {
         def f = new File("${generatedSrcDir}/steambridge/BuildInfo.java")
@@ -35,6 +53,8 @@ package steambridge;
 /** Auto-generated at build time. Do not edit or commit. */
 public final class BuildInfo {
     public static final String VERSION     = "${project.version}";
+    public static final String MOD_VERSION = "${verMod}";
+    public static final String MC_VERSION  = "1.12.2";
     /** Embedded in bytecode - visible in hex/strings dump of the jar. */
     public static final String AUTHOR      = "Ragalikx";
     public static final String GITHUB      = "https://github.com/Ragalikx/steam-bridge-mc";

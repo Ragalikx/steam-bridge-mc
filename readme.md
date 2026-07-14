@@ -1,61 +1,76 @@
-# Steam Bridge - Minecraft 1.12.2 Forge Mod
+# Steam Bridge - Minecraft Mod
+
 [![Author](https://img.shields.io/badge/author-Ragalikx-blue)](https://github.com/Ragalikx)
-[![MC](https://img.shields.io/badge/Minecraft-1.12.2-green)](https://www.minecraft.net)
-[![Forge](https://img.shields.io/badge/Forge-14.23.5.2861-orange)](https://files.minecraftforge.net)
-[![Discord](https://img.shields.io/badge/Discord-Join%20the%20server-5865F2?logo=discord&logoColor=white)](https://discord.gg/2xBnJ7awRC)
+[![Discord](https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white)](https://discord.gg/2xBnJ7awRC)
 
 🇷🇺 [Читать на русском](readmeru.md)
 
-**Steam Bridge** lets you play with friends over the network without forwarding ports, buying a white IP, or setting up a VPN.
-The mod hooks into Minecraft's networking and routes it through **Steam Datagram Relay (SDR)**. Ping stays low and it gets through pretty much any NAT you throw at it.
+**Steam Bridge** is a mod that lets you host a Minecraft world for friends without VPN, proxy, or tunnel software.
+It works at the network layer and routes traffic through the Steam Networking Sockets API, using it as the transport for all game traffic. This keeps latency low via Steam's global server infrastructure and allows stable connections even through strict NAT.
 
-> **Discord is the main hub for this project.** There's no separate website, so that's the place to get answers, news and roadmap updates, release announcements, and to report bugs: **[discord.gg/2xBnJ7awRC](https://discord.gg/2xBnJ7awRC)**
+> **Discord is the main hub for the project.** Questions, development plans, release announcements, and bug reports all live there: **[discord.gg/2xBnJ7awRC](https://discord.gg/2xBnJ7awRC)**
 
+---
 
-> ⚠️ **DEVELOPER INFORMATION**
->
-> Official releases are planned for the following versions: **1.7.10, 1.8, 1.16.5, and 1.20.1**.
->
-> * **Current Status:** All focus is currently on polishing **1.12.2** (under active testing). Porting to the other listed versions will begin only after gathering bug reports in Discord and fixing major issues, ensuring a stable codebase is transferred. Therefore, there is no need to make standalone ports for these versions — they are already in development.
->
-> Porting the mod to **any other versions** (not included in the list above) is highly encouraged, provided the MIT license is followed.
-> 
-## Why Spacewar (AppID 480)?
-The mod moves data through Steam's own API (ISteamNetworkingSockets), and Steam requires everyone involved to be sitting in the same "game" for that to work.
+## Supported versions
 
-That's why **AppID 480 (Spacewar)** is used by default. It's Valve's old internal test app, and over the years the community has quietly adopted it for network experiments, co-op tricks, and non-Steam builds of games. Valve has never really cracked down on this, so it's the safest bet if you don't want to burn a real game license just to link two players together.
+All active branches are listed below. Minecraft version links in the table point directly to the corresponding branch.
 
-- **Note:** the AppID is hardcoded to Spacewar and there's no config option to swap it out - that's on purpose. Pointing this at a real game's AppID (especially anything running VAC or EAC) could get your account banned, so don't go digging for a workaround.
+| Minecraft version | Platform | Loader version | Windows | Linux | macOS | Status |
+|---|---|---|---|---|---|---|
+| [1.21.1](https://github.com/Ragalikx/steam-bridge-mc/tree/NeoForge-1.21.1) | NeoForge | 21.1.234 | ✅ | ⏳ (Planned) | ❌ | Available |
+| [1.21.1](https://github.com/Ragalikx/steam-bridge-mc/tree/Fabric-1.21.1) | Fabric | ? | ? | ? | ❌ | In development |
+| [1.20.1](https://github.com/Ragalikx/steam-bridge-mc/tree/NeoForge-1.20.1) | NeoForge/Forge | 47.1.106 | ✅ | ⏳ (Planned) | ❌ | Available |
+| [1.20.1](https://github.com/Ragalikx/steam-bridge-mc/tree/Fabric-1.20.1) | Fabric | ? | ? | ? | ❌ | In development |
+| [1.16.5](https://github.com/Ragalikx/steam-bridge-mc/tree/Forge-1.16.5) | Forge | ? | ? | ? | ❌ | In development |
+| [1.16.5](https://github.com/Ragalikx/steam-bridge-mc/tree/Fabric-1.16.5) | Fabric | ? | ? | ? | ❌ | In development |
+| [1.12.2](https://github.com/Ragalikx/steam-bridge-mc/tree/Forge-1.12.2) | Forge | 14.23.5.2860 | ✅ | ⏳ (Planned) | ❌ | Available |
+| [1.7.10](https://github.com/Ragalikx/steam-bridge-mc/tree/Forge-1.7.10) | Forge | ? | ? | ? | ❌ | In development |
 
-## Configuration Notes
-- **Port 25565:** if you're hosting through Steam Bridge, make sure nothing else on your machine is already using this port. If you also want a regular Minecraft LAN game running alongside it, just point Steam Bridge's virtual port somewhere else in the config.
-- **allowWithoutAuth:** controls whether Steam Session Ticket validation is enforced. Turning it off tightens security a bit, but it can cause connection issues on stricter/symmetric NAT setups.
+*(Fabric builds require Fabric API)*
 
-## Development Environment
-Versions used while building and testing the mod:
-- **Java:** 8u492 (Eclipse Adoptium / Temurin, build 25.492-b09)
-- **Minecraft Forge:** 1.12.2 - 14.23.5.2860
-- **Gradle:** 4.10.3
-- **OS:** Windows 11 (amd64), builds should work fine on 10 as well
+---
 
-## Platforms & Optimization
-To keep the .jar small (around 775 KB), the release build only ships native libraries for **Windows x64**. Once this version has been tested properly, Linux support is planned.
+## Developer info
 
-> **Linux / macOS**
-> If you want to build for Linux or macOS, open `build.gradle` and remove the `exclude` rules for `linux`/`darwin` and the `.so`/`.dylib` files, then rebuild. You'll likely need to uncomment a couple of packages too, and possibly poke around the code a bit before it runs cleanly on your OS.
+Versions used during development. Native libraries are bundled with the mod, no extra linking steps needed.
 
-## Dependencies & Licenses
-- **Steam Bridge** - [MIT License](LICENSE). Copyright (c) 2026 [Ragalikx](https://github.com/Ragalikx).
-- **steamworks4j** - [MIT License](third_party_licenses/steamworks4j_LICENSE.txt) (Daniel Ludwig / code-disaster).
-- **Java Native Access (JNA)** - [Apache License 2.0](third_party_licenses/JNA_AL2.0.txt) (dual-licensed with LGPL 2.1; this project uses the Apache terms).
+| Minecraft version | Platform | Java version | Gradle version |
+|---|---|---|---|
+| 1.21.1 | NeoForge | Java 21 | 8.13 |
+| 1.20.1 | NeoForge/Forge | Java 17 | 8.13 |
+| 1.12.2 | Forge | Java 8 | 4.10.3 |
 
-> **Disclaimer:** this is an educational, open-source community project and isn't affiliated with, endorsed by, or sponsored by Valve Corporation. "Steam" and the Steam logo belong to Valve Corporation. The mod bundles the Steamworks SDK (`steam_api64.dll`) and links against it through steamworks4j to reach `ISteamNetworkingSockets`; the SDK itself stays Valve's property and is redistributed here under the terms Valve provides to developers using the Steamworks API.
+---
+
+## Priorities and technical notes
+
+The main development priority is stable traffic routing and minimal connection latency.
+
+One thing worth knowing: the mod uses AppID 480 (Spacewar), a legacy Valve test application well-suited for this purpose. The ID is hardcoded and cannot be changed via config. Using a real game's AppID (especially one with VAC or EAC anti-cheat) could cause issues with the license agreement and may result in a ban from that specific game. It also would not work as reliably as Spacewar.
+
+---
+
+## Configuration
+
+- **Port 25565:** when hosting through Steam Bridge, make sure this port is free locally. If you need a regular LAN server alongside it, set a different virtual port in the config.
+- **allowWithoutAuth:** controls Steam Session Ticket verification. Disabling it slightly improves connectivity behind strict or symmetric NAT, but reduces session security.
+
+---
+
+## Licenses
+
+- **Steam Bridge** : [MIT License](LICENSE). Copyright (c) 2026 [Ragalikx](https://github.com/Ragalikx).
+- **steamworks4j** : [MIT License](third_party_licenses/steamworks4j_LICENSE.txt) (Daniel Ludwig / code-disaster).
+- **Java Native Access (JNA)** : [Apache License 2.0](third_party_licenses/JNA_AL2.0.txt).
+
+> **Disclaimer:** this project is educational and is not affiliated with Valve Corporation. "Steam" and the Steam logo are trademarks of Valve. The mod bundles `steam_api64.dll` for Steam networking calls; that file remains the property of Valve.
 
 ---
 
 ## Support the author
 
-If the mod saved you a headache or two, a tip is always appreciated - never expected.
+Donations are not required, but if the mod has been useful for playing with friends, any support is appreciated.
 
 **Bitcoin (BTC)**
 ```
@@ -67,7 +82,7 @@ bc1q2e7hxvv90qm5menfc9m9nd8q43g4w6hmdfuhk3
 ltc1q075u480ug7c7wne9tv34yf8suskvtr68rd4q9y
 ```
 
-**USDT (TRC-20, Tron network)**
+**USDT (TRC-20 network, Tron)**
 ```
 TVzTdidAdYnQyTth1RoY8duyHQnxcuHDrC
 ```
