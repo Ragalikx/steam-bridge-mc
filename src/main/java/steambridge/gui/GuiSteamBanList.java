@@ -7,108 +7,95 @@ package steambridge.gui;
 
 import steambridge.steam.SteamServer;
 import steambridge.steam.SteamSocial;
-import net.minecraft.client.gui.GuiButton;
-import net.minecraft.client.gui.GuiScreen;
-import java.io.IOException;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.resources.language.I18n;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
+
 import java.util.List;
 
-public class GuiSteamBanList extends GuiScreen {
-    private final GuiScreen parent;
+public class GuiSteamBanList extends Screen {
+    private final Screen parent;
     private final SteamServer server;
     private int banCount = -1;
-    private static final int BUTTON_BACK = 0;
 
-    public GuiSteamBanList(GuiScreen parent, SteamServer server) {
+    public GuiSteamBanList(Screen parent, SteamServer server) {
+        super(Component.translatable("steambridge.gui.banned"));
         this.parent = parent;
         this.server = server;
     }
 
     @Override
-    public boolean doesGuiPauseGame() {
+    protected void renderBlurredBackground(float partialTick) {}
+
+    @Override
+    public boolean isPauseScreen() {
         return false;
     }
 
     @Override
-    public void initGui() {
-        this.buttonList.clear();
-        this.buttonList.add(new GuiButton(BUTTON_BACK, this.width / 2 - 100, this.height - 30, 200, 20, net.minecraft.client.resources.I18n.format("gui.back")));
-        updateBanButtons();
-    }
+    protected void init() {
+        this.addRenderableWidget(Button.builder(Component.translatable("gui.back"),
+                b -> this.minecraft.setScreen(parent))
+                .bounds(this.width / 2 - 100, this.height - 30, 200, 20).build());
 
-    private void updateBanButtons() {
-        this.buttonList.removeIf(b -> b.id >= 100);
         if (server != null) {
             List<SteamSocial.Bans.Record> bans = server.getBanRecords();
             banCount = bans.size();
             int yStart = 40;
             for (int i = 0; i < bans.size(); i++) {
                 int y = yStart + (i * 25);
-                String unbanText = net.minecraft.client.resources.I18n.hasKey("steambridge.gui.unban") ? 
-                                   net.minecraft.client.resources.I18n.format("steambridge.gui.unban") : "Unban";
-                this.buttonList.add(new GuiButton(100 + i, this.width / 2 + 50, y, 60, 20, unbanText));
+                final long steamId = bans.get(i).getSteamId();
+                this.addRenderableWidget(Button.builder(
+                        Component.translatable("steambridge.gui.unban"),
+                        b -> {
+                            server.unbanPlayer(steamId);
+                            this.rebuildWidgets();
+                        })
+                        .bounds(this.width / 2 + 50, y, 60, 20).build());
             }
         }
     }
 
     @Override
-    public void updateScreen() {
-        super.updateScreen();
+    public void tick() {
+        super.tick();
         if (server != null) {
             List<SteamSocial.Bans.Record> bans = server.getBanRecords();
             if (bans.size() != banCount) {
-                updateBanButtons();
+                this.rebuildWidgets();
             }
         }
     }
 
     @Override
-    protected void actionPerformed(GuiButton button) throws IOException {
-        if (button.id == BUTTON_BACK) {
-            this.mc.displayGuiScreen(parent);
-        } else if (button.id >= 100) {
-            int idx = button.id - 100;
-            if (server != null) {
-                List<SteamSocial.Bans.Record> bans = server.getBanRecords();
-                if (idx < bans.size()) {
-                    long steamId = bans.get(idx).getSteamId();
-                    server.unbanPlayer(steamId);
-                    updateBanButtons();
-                }
-            }
-        }
-    }
-
-    @Override
-    public void drawScreen(int mouseX, int mouseY, float partialTicks) {
-        this.drawDefaultBackground();
-        String bannedText = net.minecraft.client.resources.I18n.hasKey("steambridge.gui.banned") ? 
-                            net.minecraft.client.resources.I18n.format("steambridge.gui.banned") : "Ban List";
-        this.drawCenteredString(this.fontRenderer, bannedText, this.width / 2, 10, 16777215);
+    public void render(GuiGraphics g, int mouseX, int mouseY, float partialTicks) {
+        super.renderBackground(g, mouseX, mouseY, partialTicks);
+        g.drawCenteredString(this.font, I18n.get("steambridge.gui.banned"), this.width / 2, 10, 16777215);
 
         if (server != null) {
             List<SteamSocial.Bans.Record> bans = server.getBanRecords();
             int yStart = 40;
 
             if (bans.isEmpty()) {
-                this.drawCenteredString(this.fontRenderer, net.minecraft.client.resources.I18n.format("steambridge.gui.no_bans"), this.width / 2, yStart + 10, 0xAAAAAA);
+                g.drawCenteredString(this.font, I18n.get("steambridge.gui.no_bans"), this.width / 2, yStart + 10, 0xAAAAAA);
             } else {
                 for (int i = 0; i < bans.size(); i++) {
                     SteamSocial.Bans.Record ban = bans.get(i);
                     int y = yStart + (i * 25);
 
-                    String avatar = steambridge.steam.SteamSocial.ProfileCache.get().getAvatarTexture(ban.getSteamId());
+                    String avatar = SteamSocial.ProfileCache.get().getAvatarTexture(ban.getSteamId());
                     if (avatar != null && !avatar.isEmpty()) {
-                        this.mc.getTextureManager().bindTexture(new net.minecraft.util.ResourceLocation(avatar));
-                        net.minecraft.client.renderer.GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
-                        net.minecraft.client.gui.Gui.drawModalRectWithCustomSizedTexture(this.width / 2 - 170, y + 2, 0, 0, 16, 16, 16, 16);
+                        g.blit(ResourceLocation.parse(avatar), this.width / 2 - 170, y + 2, 0.0F, 0.0F, 16, 16, 16, 16);
                     }
 
-                    this.drawString(this.fontRenderer, ban.getSteamName() + " (" + ban.getMinecraftName() + ")", this.width / 2 - 150, y + 6, 16777215);
+                    g.drawString(this.font, ban.getSteamName() + " (" + ban.getMinecraftName() + ")", this.width / 2 - 150, y + 6, 16777215);
                 }
             }
         }
 
-        super.drawScreen(mouseX, mouseY, partialTicks);
+        super.render(g, mouseX, mouseY, partialTicks);
     }
 }
-

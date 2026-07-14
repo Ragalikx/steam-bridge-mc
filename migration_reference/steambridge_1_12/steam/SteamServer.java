@@ -448,52 +448,52 @@ public class SteamServer {
             return; // already registered
         }
 
-        // Must run synchronously on the callbacks thread: if deferred to mc.execute(),
-        // the client's login packets arrive before the bridge is registered and get dropped,
-        // causing a 30s timeout on the MC server side.
-        net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+        // This runs on the SteamBridge-Callbacks thread; getIntegratedServer() and everything
+        // below it touches world/server state, which must only be read/mutated on the main thread.
+        net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getMinecraft();
+        mc.addScheduledTask(() -> {
+            if (mc.getIntegratedServer() != null) {
+                // Reconnect guard
+                Integer oldConn = connectionBySteamId.get(steamID);
+                if (oldConn != null && oldConn != connection) {
+                    if (SteamManager.getInstance().isLoopbackRegistered(oldConn)) {
+                        SteamBridgeMod.LOG.info(
+                            "[SteamServer] Proactively closing stale loopback bridge conn={} for reconnecting steamID={}",
+                            oldConn, steamID);
+                        SteamManager.getInstance().unregisterLoopback(oldConn);
+                    }
+                    SteamManager.getInstance().closeConnection(
+                        oldConn, SteamSocketsApi.APP_CLOSE_NORMAL, "Replaced by reconnect");
+                }
 
-        if (mc.getSingleplayerServer() == null) {
+                PlayerSession session = sessionsBySteamId.computeIfAbsent(
+                        steamID, key -> new PlayerSession(steamID, connection));
+                session.connectionHandle = connection;
+
+                boolean success = SteamTransport.createServerLoopbackBridge(
+                    connection, steamID, mcPort,
+                    localPort -> {
+                        session.localProxyPort = localPort;
+                        steamIdByProxyPort.put(localPort, steamID);
+                        proxyPortByConnection.put(connection, localPort);
+                    }
+                );
+
+                if (!success) {
+                    SteamBridgeMod.LOG.error("[SteamServer] Loopback bridge creation failed for conn={} - closing.", connection);
+                    closeAndCleanup(connection, steamID, "Loopback bridge creation failed");
+                    return;
+                }
+
+                rememberConnection(connection, steamID);
+                SteamBridgeMod.LOG.info("[SteamServer] Loopback bridge ready for conn={} steamID={}", connection, steamID);
+                return;
+            }
+
             SteamBridgeMod.LOG.error(
                 "[SteamServer] No integrated server for conn={} steamID={} - closing connection.", connection, steamID);
             closeAndCleanup(connection, steamID, "No integrated server");
-            return;
-        }
-
-        // Reconnect guard
-        Integer oldConn = connectionBySteamId.get(steamID);
-        if (oldConn != null && oldConn != connection) {
-            if (SteamManager.getInstance().isLoopbackRegistered(oldConn)) {
-                SteamBridgeMod.LOG.info(
-                    "[SteamServer] Proactively closing stale loopback bridge conn={} for reconnecting steamID={}",
-                    oldConn, steamID);
-                SteamManager.getInstance().unregisterLoopback(oldConn);
-            }
-            SteamManager.getInstance().closeConnection(
-                oldConn, SteamSocketsApi.APP_CLOSE_NORMAL, "Replaced by reconnect");
-        }
-
-        PlayerSession session = sessionsBySteamId.computeIfAbsent(
-                steamID, key -> new PlayerSession(steamID, connection));
-        session.connectionHandle = connection;
-
-        boolean success = SteamTransport.createServerLoopbackBridge(
-            connection, steamID, mcPort,
-            localPort -> {
-                session.localProxyPort = localPort;
-                steamIdByProxyPort.put(localPort, steamID);
-                proxyPortByConnection.put(connection, localPort);
-            }
-        );
-
-        if (!success) {
-            SteamBridgeMod.LOG.error("[SteamServer] Loopback bridge creation failed for conn={} - closing.", connection);
-            closeAndCleanup(connection, steamID, "Loopback bridge creation failed");
-            return;
-        }
-
-        rememberConnection(connection, steamID);
-        SteamBridgeMod.LOG.info("[SteamServer] Loopback bridge ready for conn={} steamID={}", connection, steamID);
+        });
     }
 
     private void rememberConnection(int connection, long steamID) {

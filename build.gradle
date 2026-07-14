@@ -1,31 +1,30 @@
-buildscript {
-    repositories {
-        maven { url = 'https://maven.minecraftforge.net' }
-        mavenCentral()
-    }
-    dependencies {
-        classpath group: 'net.minecraftforge.gradle', name: 'ForgeGradle', version: '3.+', changing: true
-    }
+plugins {
+    id 'java'
+    id 'net.neoforged.gradle.userdev' version '7.0.170'
 }
 
-apply plugin: 'net.minecraftforge.gradle'
-apply plugin: 'java'
+def buildDate    = new Date()
+version          = "1.${buildDate.format('yyMMdd')}"
+group            = project.mod_group
 
-def buildDate   = new Date()
-version         = "1.${buildDate.format('yyMMdd')}"
-group           = 'steambridge'
-archivesBaseName = 'steambridge'
+base {
+    archivesName = project.mod_id
+}
 
-sourceCompatibility = JavaVersion.VERSION_1_8
-targetCompatibility = JavaVersion.VERSION_1_8
+// Mojang ships Java 21 to end-users starting in 1.20.5; NeoForge 1.21.1 requires it.
+// foojay-resolver in settings.gradle auto-provisions JDK 21 for compilation.
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(21)
+}
 
-def generatedSrcDir = "$buildDir/generated/java"
+// -- Auto-generated BuildInfo (author/version stamped into bytecode) -----------
+def generatedSrcDir = layout.buildDirectory.dir('generated/java').get().asFile
 
 sourceSets {
     main { java { srcDir generatedSrcDir } }
 }
 
-task generateBuildInfo {
+tasks.register('generateBuildInfo') {
     outputs.dir(generatedSrcDir)
     doFirst {
         def f = new File("${generatedSrcDir}/steambridge/BuildInfo.java")
@@ -44,91 +43,91 @@ public final class BuildInfo {
     }
 }
 
-tasks.withType(JavaCompile) {
-    dependsOn generateBuildInfo
+tasks.withType(JavaCompile).configureEach {
+    dependsOn 'generateBuildInfo'
     options.encoding = 'UTF-8'
 }
 
-minecraft {
-    mappings channel: 'stable', version: '39-1.12'
-    accessTransformer = file('src/main/resources/META-INF/accesstransformer.cfg')
-    runs {
-        client {
-            workingDirectory project.file('run')
-            property 'forge.logging.markers', 'SCAN,REGISTRIES,REGISTRYDUMP'
-            property 'forge.logging.console.level', 'debug'
-            mods { steambridge { source sourceSets.main } }
-        }
+// -- NeoForge 1.21.1 toolchain -------------------------------------------------
+// NeoGradle 7.x (net.neoforged.gradle.userdev) for 1.21.1+. Unlike the legacyforge
+// preset used for 1.17-1.20.1, there is NO reobfuscation step - NeoForge 1.21+
+// ships with official Mojang names at runtime, so the compiled jar is shipped as-is.
+runs {
+    configureEach {
+        systemProperty 'forge.logging.markers', 'REGISTRIES'
+        systemProperty 'forge.logging.console.level', 'debug'
+        modSource project.sourceSets.main
     }
+    client {}
 }
 
 repositories {
     mavenCentral()
 }
 
+// Resolved (transitive-free) copy of the steamworks4j artifact, used only to pull its Java
+// API classes + win64 native DLLs into the mod jar (see the jar task).
 configurations {
-    shade
-    compile.extendsFrom shade
+    steamBundle { transitive = false }
 }
 
+// -- Steam bridge native deps ---------------------------------------------------------
+//
+// steamworks4j: its Java API classes are shaded FLAT into the mod jar (see the jar task).
+// `com.codedisaster.steamworks` is a package no other mod or the loader provides,
+// so there is no split-package/module clash.
+//
+// JNA: NOT bundled at all. NeoForge itself always ships JNA at runtime; compile against
+// the exact version the 1.21.1 loader provides (compileOnly) and let the game supply it.
+// (See the 1.20.1 build for the three failed bundling approaches.)
 dependencies {
-    minecraft 'net.minecraftforge:forge:1.12.2-14.23.5.2860'
-    shade('com.code-disaster.steamworks4j:steamworks4j:1.10.0') { transitive = false }
-    shade('net.java.dev.jna:jna:5.14.0')                        { transitive = false }
+    implementation "net.neoforged:neoforge:${project.neo_version}"
+
+    compileOnly "net.java.dev.jna:jna:${project.jna_version}"
+
+    implementation("com.code-disaster.steamworks4j:steamworks4j:${project.steamworks4j_version}") {
+        exclude group: 'net.java.dev.jna'
+    }
+
+    steamBundle "com.code-disaster.steamworks4j:steamworks4j:${project.steamworks4j_version}"
+}
+
+// -- Resource templating (neoforge.mods.toml version substitution) ------------
+tasks.withType(ProcessResources).configureEach {
+    var replaceProperties = [
+        mod_id                 : project.mod_id,
+        mod_name               : project.mod_name,
+        mod_version            : project.version,
+        minecraft_version      : project.minecraft_version,
+        minecraft_version_range: project.minecraft_version_range,
+        neo_version            : project.neo_version,
+        neo_version_range      : project.neo_version_range,
+        loader_version_range   : project.loader_version_range
+    ]
+    inputs.properties replaceProperties
+    filesMatching(['META-INF/neoforge.mods.toml', 'pack.mcmeta']) {
+        expand replaceProperties
+    }
 }
 
 jar {
-    from('third_party_licenses') { into 'META-INF/licenses' }
-    exclude 'module-info.class'
-    exclude 'META-INF/versions/**'
-
-    exclude 'com/sun/jna/darwin*/**'
-    exclude 'com/sun/jna/linux*/**'
-    exclude 'com/sun/jna/sunos*/**'
-    exclude 'com/sun/jna/freebsd*/**'
-    exclude 'com/sun/jna/openbsd*/**'
-    exclude 'com/sun/jna/aix*/**'
-    exclude 'com/sun/jna/win32-x86/**'
-    exclude 'com/sun/jna/win32-aarch64/**'
-
-    exclude 'libsteam_api.dylib'
-    exclude 'libsteamworks4j.dylib'
-    exclude 'libsteam_api.so'
-    exclude 'libsteamworks4j.so'
-    exclude 'steam_api.dll'
-    exclude 'steamworks4j.dll'
-
-    exclude 'com/codedisaster/steamworks/SteamController*'
-    exclude 'com/codedisaster/steamworks/SteamHTTP*'
-    exclude 'com/codedisaster/steamworks/SteamLeaderboard*'
-    exclude 'com/codedisaster/steamworks/SteamMatchmaking*'
-    exclude 'com/codedisaster/steamworks/SteamNetworking*'
-    exclude 'com/codedisaster/steamworks/SteamPublishedFile*'
-    exclude 'com/codedisaster/steamworks/SteamRemoteStorage*'
-    exclude 'com/codedisaster/steamworks/SteamScreenshot*'
-    exclude 'com/codedisaster/steamworks/SteamServer*'
-    exclude 'com/codedisaster/steamworks/SteamUGC*'
-    exclude 'com/codedisaster/steamworks/SteamUserStats*'
-    exclude 'com/codedisaster/steamworks/SteamApps*'
+    // Shade steamworks4j's Java API classes flat into the mod jar, and lay the win64 Steam
+    // native binaries FLAT at the jar root (steam_api64.dll / steamworks4j64.dll).
+    // Only win64 - 1.21.1 requires 64-bit Java, macOS/Linux natives stripped.
+    from({ project.configurations.steamBundle.collect { zipTree(it) } }) {
+        include 'com/codedisaster/**'
+        include 'steam_api64.dll', 'steamworks4j64.dll'
+    }
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 
     manifest {
         attributes([
-            "Specification-Title"   : "steambridge",
-            "Implementation-Title"  : "steambridge",
-            "Implementation-Version": version,
-            "Implementation-Vendor" : "Ragalikx",
-            "Implementation-URL"    : "https://github.com/Ragalikx/steam-bridge-mc",
-            "Built-By"              : "Ragalikx"
+            'Specification-Title'   : project.mod_id,
+            'Implementation-Title'  : project.mod_id,
+            'Implementation-Version': project.version,
+            'Implementation-Vendor' : 'Ragalikx',
+            'Implementation-URL'    : 'https://github.com/Ragalikx/steam-bridge-mc',
+            'Built-By'              : 'Ragalikx'
         ])
     }
-    from { configurations.shade.collect { it.isDirectory() ? it : zipTree(it) } }
-}
-
-processResources {
-    inputs.property 'version', project.version
-    from(sourceSets.main.resources.srcDirs) {
-        include 'mcmod.info'
-        expand 'version': project.version, 'mcversion': '1.12.2'
-    }
-    from(sourceSets.main.resources.srcDirs) { exclude 'mcmod.info' }
 }

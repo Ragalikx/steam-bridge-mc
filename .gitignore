@@ -9,9 +9,10 @@ tmp/
 out/
 bin/
 
-# Forge decompiled workspace
+# Forge/NeoForge decompiled workspace
 src/generated/
 run/
+runs/
 
 # Logs and debug artifacts
 *.log

@@ -751,8 +751,8 @@ public class SteamManager {
         signalReceiveWake();
 
         try {
-            net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
-            mc.execute(() -> {
+            net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getMinecraft();
+            mc.addScheduledTask(() -> {
                 try {
                     boolean wasClient = activeClient != null;
                     boolean wasHost   = activeServer != null && activeServer.isRunning();
@@ -763,21 +763,21 @@ public class SteamManager {
                     SteamServer server = activeServer;
                     if (server != null) server.stop();
 
-                    if (wasClient && mc.level != null) {
+                    if (wasClient && mc.world != null) {
                         // Was a client inside a Steam-hosted world - kick to main menu with a friendly screen.
-                        // clearLevel() removed in 1.21.1 - setScreen triggers the cleanup
-                        mc.setScreen(new net.minecraft.client.gui.screens.DisconnectedScreen(
-                            new net.minecraft.client.gui.screens.TitleScreen(),
-                            net.minecraft.network.chat.Component.translatable("disconnect.lost"),
-                            net.minecraft.network.chat.Component.translatable("steambridge.error.steam_shutdown")
+                        mc.loadWorld(null);
+                        mc.displayGuiScreen(new net.minecraft.client.gui.GuiDisconnected(
+                            new net.minecraft.client.gui.GuiMainMenu(),
+                            "disconnect.lost",
+                            new net.minecraft.util.text.TextComponentTranslation("steambridge.error.steam_shutdown")
                         ));
                     } else if (wasHost && mc.player != null) {
                         // Was the host - Steam bridge died but the local world keeps running.
                         // Just warn the host in chat; they are NOT kicked.
-                        mc.player.displayClientMessage(
-                            net.minecraft.network.chat.Component.translatable("steambridge.error.host_steam_shutdown")
-                                .withStyle(net.minecraft.ChatFormatting.RED),
-                            false
+                        mc.player.sendMessage(
+                            new net.minecraft.util.text.TextComponentTranslation("steambridge.error.host_steam_shutdown")
+                                .setStyle(new net.minecraft.util.text.Style()
+                                    .setColor(net.minecraft.util.text.TextFormatting.RED))
                         );
                     }
                 } catch (Exception e) {

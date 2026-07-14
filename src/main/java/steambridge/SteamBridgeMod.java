@@ -5,80 +5,66 @@
  */
 package steambridge;
 
-import steambridge.proxy.ClientProxy;
-import steambridge.proxy.CommonProxy;
-import steambridge.steam.SteamManager;
+import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.SidedProxy;
-import net.minecraftforge.fml.common.event.FMLInitializationEvent;
-import net.minecraftforge.fml.common.event.FMLPostInitializationEvent;
-import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.fml.ModContainer;
+import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.config.ModConfig;
+import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
+import net.neoforged.neoforge.common.NeoForge;
+import org.slf4j.Logger;
 
-@Mod(
-    modid   = SteamBridgeMod.MODID,
-    name    = SteamBridgeMod.NAME,
-    version = BuildInfo.VERSION,
-    clientSideOnly = true
-)
+import steambridge.event.SteamClientEvents;
+import steambridge.steam.SteamManager;
+
+/**
+ * Steam Bridge entry point (NeoForge 1.21.1).
+ *
+ * <p>Client-only mod: launches the Steam bridge during client setup and wires up the
+ * client-side event handlers. In NeoForge 1.21.1 the {@code @Mod} constructor receives
+ * {@link IEventBus} and {@link ModContainer} via injection - no static
+ * {@code FMLJavaModLoadingContext.get()} calls needed.</p>
+ */
+@Mod(SteamBridgeMod.MODID)
 public class SteamBridgeMod {
 
     public static final String MODID   = "steambridge";
     public static final String NAME    = "Steam Bridge";
     public static final String VERSION = BuildInfo.VERSION;
 
-    public static final Logger LOG = LogManager.getLogger(MODID);
+    public static final Logger LOG = LogUtils.getLogger();
+
+    public SteamBridgeMod(IEventBus modEventBus, ModContainer modContainer) {
+        LOG.info("=== Steam Bridge pre-init (NeoForge 1.21.1) v{} ===", VERSION);
+
+        modEventBus.addListener(this::onClientSetup);
+        modEventBus.addListener(SteamBridgeConfig::onLoad);
+        modEventBus.addListener(SteamBridgeConfig::onReload);
+
+        modContainer.registerConfig(ModConfig.Type.CLIENT, SteamBridgeConfig.SPEC);
+
+        // NeoForge game event bus: client-side gameplay/GUI hooks.
+        NeoForge.EVENT_BUS.register(new SteamClientEvents());
+    }
+
+    private void onClientSetup(FMLClientSetupEvent event) {
+        event.enqueueWork(() -> {
+            LOG.info("=== SteamBridge client setup - initializing Steam... ===");
+            SteamAppIdHelper.ensureAppId(Minecraft.getInstance().gameDirectory);
+            boolean ok = SteamManager.getInstance().init();
+            LOG.info("=== Steam init result: {} ===", ok ? "SUCCESS" : "FAILED");
+        });
+    }
 
     /**
      * Neutralises log4j message-lookup syntax in untrusted strings (Steam persona names,
      * Minecraft names, remote disconnect messages) before they reach the logger.
-     * <p>
-     * Minecraft 1.12.2 ships with a log4j version vulnerable to "Log4Shell"
-     * (CVE-2021-44228): a logged string containing {@code ${jndi:ldap://...}} can trigger
-     * remote class loading and code execution. A remote peer fully controls their Steam
-     * display name, so any such string MUST be defanged before logging. Inserts a
-     * zero-width space after every {@code $} that precedes a {@code {}, which breaks the
-     * lookup token while staying visually identical in the log.
      */
     public static String safeLog(String s) {
         if (s == null) {
             return "";
         }
-        // Break the "${" lookup token with a zero-width space (U+200B).
         return s.indexOf("${") < 0 ? s : s.replace("${", "$" + ((char) 0x200B) + "{");
-    }
-
-    @Mod.Instance
-    public static SteamBridgeMod instance;
-
-    @SidedProxy(
-        clientSide = "steambridge.proxy.ClientProxy",
-        serverSide = "steambridge.proxy.CommonProxy"
-    )
-    public static CommonProxy proxy;
-
-    @Mod.EventHandler
-    public void preInit(FMLPreInitializationEvent event) {
-        LOG.info("=== SteamBridge pre-init (v{}) ===", VERSION);
-        proxy.preInit(event);
-    }
-
-    @Mod.EventHandler
-    public void init(FMLInitializationEvent event) {
-        LOG.info("=== SteamBridge init ===");
-        proxy.init(event);
-    }
-
-    @Mod.EventHandler
-    public void postInit(FMLPostInitializationEvent event) {
-        LOG.info("=== SteamBridge postInit - initializing Steam... ===");
-
-        // Ensure steam_appid.txt exists in .minecraft before SteamAPI.init()
-        SteamAppIdHelper.ensureAppId(Minecraft.getMinecraft().gameDir);
-
-        boolean ok = SteamManager.getInstance().init();
-        LOG.info("=== Steam init result: {} ===", ok ? "SUCCESS" : "FAILED");
     }
 }

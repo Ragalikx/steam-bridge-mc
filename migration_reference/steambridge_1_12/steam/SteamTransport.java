@@ -6,32 +6,43 @@
 package steambridge.steam;
 
 import steambridge.SteamBridgeMod;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelInitializer;
-import io.netty.channel.ChannelOption;
+import io.netty.bootstrap.Bootstrap;
+import io.netty.bootstrap.ServerBootstrap;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
+import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
-
+import io.netty.util.ReferenceCountUtil;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.gui.screens.TitleScreen;
-import net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen;
-import net.minecraft.client.multiplayer.ClientHandshakePacketListenerImpl;
-import net.minecraft.network.Connection;
-import net.minecraft.network.protocol.PacketFlow;
-import net.minecraft.network.protocol.login.ServerboundHelloPacket;
+import net.minecraft.network.EnumPacketDirection;
+import net.minecraft.network.NettyPacketDecoder;
+import net.minecraft.network.NettyPacketEncoder;
+import net.minecraft.network.NetworkManager;
 
 import java.net.InetSocketAddress;
+import java.net.SocketAddress;
+import java.nio.channels.ClosedChannelException;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.IntConsumer;
 
 /**
- * Bridges Steam connections to Minecraft via a local TCP proxy (LoopbackBridge).
- * MC's Netty pipeline connects to the proxy; the proxy forwards bytes over Steam.
+ * Steam transport layer - Loopback Socket architecture.
+ * <p>
+ * Real Netty pipelines connect to a local TCP proxy (LoopbackBridge). The proxy
+ * forwards bytes directly to SteamNetworkingSockets native methods.
+ * <p>
+ * This provides 100% compatibility with Minecraft and forge mods expecting a raw
+ * TCP channel, without needing pipeline reflection injection.
  */
 public final class SteamTransport {
 
@@ -49,25 +60,58 @@ public final class SteamTransport {
 
     private SteamTransport() {}
 
+    private static volatile java.lang.reflect.Field CACHED_NM_CHANNEL_FIELD  = null;
+    private static volatile java.lang.reflect.Field CACHED_NM_SOCKET_FIELD   = null;
+
+    private static java.lang.reflect.Field findFieldByType(Class<?> clazz, Class<?> type) {
+        for (java.lang.reflect.Field f : clazz.getDeclaredFields()) {
+            if (f.getType().isAssignableFrom(type)) {
+                f.setAccessible(true);
+                return f;
+            }
+        }
+        throw new RuntimeException("Could not find field of type " + type.getName() + " in " + clazz.getName());
+    }
+
+    private static void setNmChannel(NetworkManager nm, Channel ch) {
+        try {
+            if (CACHED_NM_CHANNEL_FIELD == null)
+                CACHED_NM_CHANNEL_FIELD = findFieldByType(NetworkManager.class, Channel.class);
+            CACHED_NM_CHANNEL_FIELD.set(nm, ch);
+        } catch (IllegalAccessException e) {
+            throw new RuntimeException("Failed to set NetworkManager channel field", e);
+        }
+    }
+
+    private static void setNmSocketAddress(NetworkManager nm, java.net.SocketAddress addr) {
+        try {
+            if (CACHED_NM_SOCKET_FIELD == null)
+                CACHED_NM_SOCKET_FIELD = findFieldByType(NetworkManager.class, java.net.SocketAddress.class);
+            CACHED_NM_SOCKET_FIELD.set(nm, addr);
+        } catch (IllegalAccessException e) {
+            throw new RuntimeException("Failed to set NetworkManager socketAddress field", e);
+        }
+    }
+
     static boolean createServerLoopbackBridge(int conn, long steamID, int mcPort, IntConsumer onLocalPort) {
         LoopbackBridge bridge = new LoopbackBridge(conn);
         SteamManager.getInstance().registerLoopback(conn, bridge);
 
         io.netty.bootstrap.Bootstrap b = new io.netty.bootstrap.Bootstrap();
         b.group(NIO_GROUP)
-         .channel(NioSocketChannel.class)
-         .option(ChannelOption.TCP_NODELAY, true)
-         .handler(new ChannelInitializer<SocketChannel>() {
+         .channel(io.netty.channel.socket.nio.NioSocketChannel.class)
+         .option(io.netty.channel.ChannelOption.TCP_NODELAY, true)
+         .handler(new io.netty.channel.ChannelInitializer<io.netty.channel.socket.SocketChannel>() {
              @Override
-             protected void initChannel(SocketChannel ch) {
+             protected void initChannel(io.netty.channel.socket.SocketChannel ch) {
                  ch.pipeline().addLast("bridge", bridge);
              }
          });
 
         try {
-            ChannelFuture f = b.connect("127.0.0.1", mcPort).syncUninterruptibly();
+            io.netty.channel.ChannelFuture f = b.connect("127.0.0.1", mcPort).syncUninterruptibly();
             if (f.isSuccess()) {
-                InetSocketAddress local = (InetSocketAddress) f.channel().localAddress();
+                java.net.InetSocketAddress local = (java.net.InetSocketAddress) f.channel().localAddress();
                 if (onLocalPort != null) onLocalPort.accept(local.getPort());
                 SteamBridgeMod.LOG.info("[LoopbackBridge][Server] Bridge started: conn={} steamID={} localPort={}", conn, steamID, local.getPort());
                 return true;
@@ -85,20 +129,20 @@ public final class SteamTransport {
 
         io.netty.bootstrap.ServerBootstrap b = new io.netty.bootstrap.ServerBootstrap();
         b.group(NIO_GROUP)
-         .channel(NioServerSocketChannel.class)
-         .childOption(ChannelOption.TCP_NODELAY, true)
-         .childHandler(new ChannelInitializer<SocketChannel>() {
+         .channel(io.netty.channel.socket.nio.NioServerSocketChannel.class)
+         .childOption(io.netty.channel.ChannelOption.TCP_NODELAY, true)
+         .childHandler(new io.netty.channel.ChannelInitializer<io.netty.channel.socket.SocketChannel>() {
              @Override
-             protected void initChannel(SocketChannel ch) {
+             protected void initChannel(io.netty.channel.socket.SocketChannel ch) {
                  ch.parent().close(); // One client only
                  ch.pipeline().addLast("bridge", bridge);
              }
          });
 
         try {
-            ChannelFuture f = b.bind("127.0.0.1", 0).syncUninterruptibly();
+            io.netty.channel.ChannelFuture f = b.bind("127.0.0.1", 0).syncUninterruptibly();
             if (f.isSuccess()) {
-                int port = ((InetSocketAddress) f.channel().localAddress()).getPort();
+                int port = ((java.net.InetSocketAddress) f.channel().localAddress()).getPort();
                 SteamBridgeMod.LOG.info("[LoopbackBridge][Client] Proxy listening on port {}", port);
                 return port;
             }
@@ -112,52 +156,59 @@ public final class SteamTransport {
     static boolean connectClientToLoopback(
             int connectionHandle, long remoteSteamID,
             int proxyPort,
-            Screen currentScreen
+            net.minecraft.client.gui.GuiScreen currentScreen
     ) {
         try {
-            Minecraft mc = Minecraft.getInstance();
+            Minecraft mc = Minecraft.getMinecraft();
+            NetworkManager[] nmHolder = new NetworkManager[1];
 
-            // The screen we hand to the net handler becomes DisconnectedScreen's parent
+            // The screen we hand to the net handler becomes GuiDisconnected's parent
             // when the server later drops us. Re-showing the stale connect/add-server
             // screen the player launched from leaves its buttons unresponsive, so use a
             // fresh multiplayer list instead - the same fallback vanilla uses when it has
             // no origin screen. This is the "Back to server list" target after a kick.
-            final Screen returnScreen = new JoinMultiplayerScreen(new TitleScreen());
+            final net.minecraft.client.gui.GuiScreen returnScreen =
+                    new net.minecraft.client.gui.GuiMultiplayer(
+                            new net.minecraft.client.gui.GuiMainMenu());
 
-            // Connection.connect builds the full vanilla client pipeline (frame codecs,
-            // packet codecs, the Connection as packet handler) and connects the socket -
-            // no reflection into the channel/address fields required.
-            Connection connection = new Connection(PacketFlow.CLIENTBOUND);
-            InetSocketAddress addr = new InetSocketAddress("127.0.0.1", proxyPort);
-            ChannelFuture connectFuture = Connection.connect(addr, false, connection).syncUninterruptibly();
+            io.netty.bootstrap.Bootstrap bootstrap = new io.netty.bootstrap.Bootstrap()
+                .group(NIO_GROUP)
+                .channel(NioSocketChannel.class)
+                .option(ChannelOption.TCP_NODELAY, true)
+                .handler(new ChannelInitializer<NioSocketChannel>() {
+                    @Override
+                    protected void initChannel(NioSocketChannel ch) throws Exception {
+                        NetworkManager nm = new NetworkManager(EnumPacketDirection.CLIENTBOUND);
+                        setNmChannel(nm, ch);
+                        setNmSocketAddress(nm, new InetSocketAddress("SteamRelay", 25565));
+                        nmHolder[0] = nm;
+
+                        // Vanilla client pipeline - NO steam_valve
+                        ch.pipeline()
+                            .addLast("splitter",        new net.minecraft.network.NettyVarint21FrameDecoder())
+                            .addLast("decoder",         new NettyPacketDecoder(EnumPacketDirection.CLIENTBOUND))
+                            .addLast("prepender",       new net.minecraft.network.NettyVarint21FrameEncoder())
+                            .addLast("encoder",         new NettyPacketEncoder(EnumPacketDirection.SERVERBOUND))
+                            .addLast("packet_handler",  nm);
+
+                        nm.setNetHandler(
+                            new net.minecraft.client.network.NetHandlerLoginClient(nm, mc, returnScreen));
+                    }
+                });
+
+            io.netty.channel.ChannelFuture connectFuture = bootstrap.connect("127.0.0.1", proxyPort).syncUninterruptibly();
 
             if (!connectFuture.isSuccess()) {
                 SteamBridgeMod.LOG.error("[LoopbackBridge][Client] Connect to proxy {} failed.", proxyPort);
                 return false;
             }
 
-            // initiateServerboundPlayConnection sends only ClientIntentionPacket.
-            // ServerboundHelloPacket must follow immediately - without it the server
-            // waits indefinitely for the login hello and times out after 30s.
-            connection.initiateServerboundPlayConnection(
-                    "SteamRelay",
-                    25565,
-                    new ClientHandshakePacketListenerImpl(
-                            connection, mc, null, returnScreen, false, null, status -> {}, null
-                    )
-            );
-            connection.send(new ServerboundHelloPacket(mc.getUser().getName(), mc.getUser().getProfileId()));
-
-            // pendingConnection makes Minecraft.tick() call connection.tick() each game tick,
-            // which drives TickablePacketListeners during the login/config phase and fires
-            // handleDisconnection() if the channel closes. Field is private - use reflection.
-            try {
-                java.lang.reflect.Field f = Minecraft.class.getDeclaredField("pendingConnection");
-                f.setAccessible(true);
-                f.set(mc, connection);
-            } catch (Exception e) {
-                SteamBridgeMod.LOG.warn("[LoopbackBridge][Client] Could not set pendingConnection: {}", e.getMessage());
-            }
+            NetworkManager nm = nmHolder[0];
+            nm.sendPacket(new net.minecraft.network.handshake.client.C00Handshake(
+                    "SteamRelay\0FML\0", 25565,
+                    net.minecraft.network.EnumConnectionState.LOGIN));
+            nm.sendPacket(new net.minecraft.network.login.client.CPacketLoginStart(
+                    mc.getSession().getProfile()));
 
             SteamBridgeMod.LOG.info("[LoopbackBridge][Client] Connected to loopback proxy. proxyPort={} conn={} steamID={}",
                 proxyPort, connectionHandle, remoteSteamID);
@@ -313,3 +364,4 @@ final class LoopbackBridge extends io.netty.channel.ChannelInboundHandlerAdapter
         steamClosed("Manual close");
     }
 }
+

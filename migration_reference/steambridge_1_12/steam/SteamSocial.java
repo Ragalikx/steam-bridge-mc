@@ -11,12 +11,12 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import steambridge.SteamBridgeConfig;
 import steambridge.SteamBridgeMod;
-import com.mojang.blaze3d.platform.NativeImage;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.level.GameType;
+import net.minecraft.util.ResourceLocation;
+import net.minecraft.world.GameType;
 
+import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.Reader;
 import java.io.Writer;
@@ -101,7 +101,7 @@ public final class SteamSocial {
 
             com.codedisaster.steamworks.SteamFriends friends = SteamManager.getInstance().getFriends();
             SteamUtils utils = SteamManager.getInstance().getUtils();
-            Minecraft mc = Minecraft.getInstance();
+            Minecraft mc = Minecraft.getMinecraft();
             if (friends == null || utils == null || mc == null) return "";
 
             requestUserInfoIfNeeded(steamId);
@@ -130,23 +130,20 @@ public final class SteamSocial {
                 rgba.position(0);
                 rgba.get(data);
 
-                // NativeImage.setPixelRGBA expects ABGR-packed ints (0xAABBGGRR);
-                // Steam delivers straight RGBA bytes.
-                NativeImage nativeImage = new NativeImage(width, height, false);
+                BufferedImage imageBuffer = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
                 for (int y = 0; y < height; y++) {
                     for (int x = 0; x < width; x++) {
                         int i = (y * width + x) * 4;
-                        int r = data[i]     & 0xFF;
-                        int g = data[i + 1] & 0xFF;
-                        int b = data[i + 2] & 0xFF;
-                        int a = data[i + 3] & 0xFF;
-                        int abgr = (a << 24) | (b << 16) | (g << 8) | r;
-                        nativeImage.setPixelRGBA(x, y, abgr);
+                        int argb = ((data[i + 3] & 0xFF) << 24)
+                                | ((data[i]     & 0xFF) << 16)
+                                | ((data[i + 1] & 0xFF) << 8)
+                                |  (data[i + 2] & 0xFF);
+                        imageBuffer.setRGB(x, y, argb);
                     }
                 }
 
-                DynamicTexture texture  = new DynamicTexture(nativeImage);
-                ResourceLocation loc    = mc.getTextureManager().register(
+                DynamicTexture texture  = new DynamicTexture(imageBuffer);
+                ResourceLocation loc    = mc.getTextureManager().getDynamicTextureLocation(
                         "steambridge_avatar_" + steamId, texture);
                 String textureId = loc.toString();
                 avatarTextureBySteamId.put(steamId, textureId);
@@ -336,8 +333,8 @@ public final class SteamSocial {
 
         private static File resolveStorageFile() {
             try {
-                Minecraft mc = Minecraft.getInstance();
-                File gameDir = mc != null ? mc.gameDirectory : null;
+                Minecraft mc = Minecraft.getMinecraft();
+                File gameDir = mc != null ? mc.gameDir : null;
                 if (gameDir != null) return new File(gameDir, "steambridge/ban-cache.json");
             } catch (Exception ignored) {}
             return new File("steambridge-ban-cache.json");
@@ -453,9 +450,9 @@ public final class SteamSocial {
 
         private static File resolveFile() {
             try {
-                Minecraft mc = Minecraft.getInstance();
-                if (mc != null && mc.gameDirectory != null)
-                    return new File(mc.gameDirectory, "steambridge/world-settings.json");
+                Minecraft mc = Minecraft.getMinecraft();
+                if (mc != null && mc.gameDir != null)
+                    return new File(mc.gameDir, "steambridge/world-settings.json");
             } catch (Exception ignored) {}
             return new File("steambridge-world-settings.json");
         }
