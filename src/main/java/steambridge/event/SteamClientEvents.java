@@ -12,7 +12,7 @@ import steambridge.steam.SteamManager;
 import steambridge.steam.SteamServer;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.screens.ConnectScreen;
+
 import net.minecraft.client.gui.screens.DisconnectedScreen;
 import net.minecraft.client.gui.screens.ReceivingLevelScreen;
 import net.minecraft.client.gui.screens.Screen;
@@ -157,30 +157,9 @@ public class SteamClientEvents {
             return;
         }
 
-        // In MC 1.21.1 the `connection` field on ServerCommonPacketListenerImpl is protected.
-        // Access it via reflection to get the loopback port for Steam player matching.
-        try {
-            java.lang.reflect.Field connField = null;
-            Class<?> cls = player.connection.getClass();
-            while (cls != null && connField == null) {
-                try { connField = cls.getDeclaredField("connection"); }
-                catch (NoSuchFieldException ignored) { cls = cls.getSuperclass(); }
-            }
-            if (connField != null) {
-                connField.setAccessible(true);
-                net.minecraft.network.Connection conn =
-                        (net.minecraft.network.Connection) connField.get(player.connection);
-                if (conn != null) {
-                    SocketAddress remote = conn.getRemoteAddress();
-                    if (remote instanceof InetSocketAddress) {
-                        server.attachMinecraftPlayer(
-                                (InetSocketAddress) remote, player.getName().getString());
-                    }
-                }
-            }
-        } catch (Exception e) {
-            SteamBridgeMod.LOG.warn("[SteamBridge] Could not read remote address for {}: {}",
-                    player.getName().getString(), e.getMessage());
+        SocketAddress remote = player.connection.connection.getRemoteAddress();
+        if (remote instanceof InetSocketAddress) {
+            server.attachMinecraftPlayer((InetSocketAddress) remote, player.getName().getString());
         }
     }
 
@@ -212,10 +191,11 @@ public class SteamClientEvents {
                 deferredClientDisconnectTicks = -1;
                 SteamBridgeMod.LOG.info("[SteamBridge] Preserved Steam client across transient world reload.");
             } else if (--deferredClientDisconnectTicks <= 0) {
-                deferredClientDisconnectTicks = TRANSIENT_DISCONNECT_GRACE_TICKS;
+                deferredClientDisconnectTicks = -1;
                 SteamBridgeMod.LOG.info(
-                    "[SteamBridge] Still waiting on transient Steam client disconnect. screen={} channelOpen={}",
+                    "[SteamBridge] Transient disconnect grace window expired; tearing down Steam client. screen={} channelOpen={}",
                     screenName(mc.screen), client.isSteamChannelOpen());
+                client.disconnect();
             }
         }
 
@@ -233,10 +213,11 @@ public class SteamClientEvents {
                 deferredServerStopTicks = -1;
                 SteamBridgeMod.LOG.info("[SteamBridge] Preserved Steam host across transient world reload.");
             } else if (--deferredServerStopTicks <= 0) {
-                deferredServerStopTicks = TRANSIENT_DISCONNECT_GRACE_TICKS;
+                deferredServerStopTicks = -1;
                 SteamBridgeMod.LOG.info(
-                    "[SteamBridge] Still waiting on transient Steam host disconnect. screen={} integratedServer={}",
+                    "[SteamBridge] Transient host grace window expired; stopping Steam server. screen={} integratedServer={}",
                     screenName(mc.screen), mc.getSingleplayerServer() != null);
+                server.stop();
             }
         }
     }

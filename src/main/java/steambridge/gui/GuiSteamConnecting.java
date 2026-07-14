@@ -16,8 +16,9 @@ import net.minecraft.network.chat.Component;
 
 public class GuiSteamConnecting extends Screen {
 
-    private final Screen  previousGuiScreen;
+    private final Screen previousGuiScreen;
     private final SteamClient client;
+    private boolean failHandled = false;
 
     public GuiSteamConnecting(Screen parent, SteamClient client) {
         super(Component.empty());
@@ -37,6 +38,18 @@ public class GuiSteamConnecting extends Screen {
     }
 
     @Override
+    public void tick() {
+        super.tick();
+        if (!failHandled && client != null && client.getState() == SteamClient.State.FAILED) {
+            failHandled = true;
+            this.minecraft.setScreen(new DisconnectedScreen(
+                    buildServerListScreen(),
+                    Component.translatable("connect.failed"),
+                    Component.literal(client.getStatusMsg())));
+        }
+    }
+
+    @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         super.renderBackground(g, mouseX, mouseY, partialTick);
 
@@ -45,14 +58,6 @@ public class GuiSteamConnecting extends Screen {
                     client.getStatusMsg(),
                     this.width / 2, this.height / 2 - 50,
                     0xFFFFFF);
-
-            SteamClient.State state = client.getState();
-            if (state == SteamClient.State.FAILED) {
-                this.minecraft.setScreen(new DisconnectedScreen(
-                        buildServerListScreen(),
-                        Component.translatable("connect.failed"),
-                        Component.literal(client.getStatusMsg())));
-            }
         }
 
         super.render(g, mouseX, mouseY, partialTick);
