@@ -19,7 +19,7 @@ All active branches are listed below. Minecraft version links in the table point
 | Minecraft version | Platform | Loader version | Windows | Linux | macOS | Status |
 |---|---|---|---|---|---|---|
 | [1.21.1](https://github.com/Ragalikx/steam-bridge-mc/tree/NeoForge-1.21.1) | NeoForge | 21.1.234 | ✅ | ⏳ (Planned) | ❌ | Available |
-| [1.21.1](https://github.com/Ragalikx/steam-bridge-mc/tree/Fabric-1.21.1) | Fabric | ? | ? | ? | ❌ | In development |
+| [1.21.1](https://github.com/Ragalikx/steam-bridge-mc/tree/Fabric-1.21.1) | Fabric | 0.16.14 + API 0.116.13 | ✅ | ⏳ (Planned) | ❌ | Available |
 | [1.20.1](https://github.com/Ragalikx/steam-bridge-mc/tree/NeoForge-1.20.1) | NeoForge/Forge | 47.1.106 | ✅ | ⏳ (Planned) | ❌ | Available |
 | [1.20.1](https://github.com/Ragalikx/steam-bridge-mc/tree/Fabric-1.20.1) | Fabric | ? | ? | ? | ❌ | In development |
 | [1.16.5](https://github.com/Ragalikx/steam-bridge-mc/tree/Forge-1.16.5) | Forge | ? | ? | ? | ❌ | In development |
@@ -38,6 +38,7 @@ Versions used during development. Native libraries are bundled with the mod, no 
 | Minecraft version | Platform | Java version | Gradle version |
 |---|---|---|---|
 | 1.21.1 | NeoForge | Java 21 | 8.13 |
+| 1.21.1 | Fabric | Java 21 | 8.13 |
 | 1.20.1 | NeoForge/Forge | Java 17 | 8.13 |
 | 1.12.2 | Forge | Java 8 | 4.10.3 |
 
@@ -63,8 +64,9 @@ One thing worth knowing: the mod uses AppID 480 (Spacewar), a legacy Valve test 
 # Windows (PowerShell): quotes around -P are required
 .\gradlew.bat build "-PmodVersion=1.145"
 
-# Resulting version: 1.145+mc1.21.1  (jar / neoforge.mods.toml / BuildInfo)
+# Resulting version: 1.145+mc1.21.1  (jar / fabric.mod.json / BuildInfo)
 # Dev build without -P: 0.0.0-dev+mc1.21.1
+# Requires Java 21 for the Gradle JVM (Loom).
 ```
 
 ---

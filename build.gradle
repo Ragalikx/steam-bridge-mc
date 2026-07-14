@@ -1,6 +1,6 @@
 plugins {
+    id 'fabric-loom' version '1.10.5'
     id 'java'
-    id 'net.neoforged.gradle.userdev' version '7.0.170'
 }
 
 // Version: -PmodVersion=1.145 -> 1.145+mc1.21.1  |  no -P -> 0.0.0-dev+mc1.21.1
@@ -23,16 +23,16 @@ ext.modVersionOnly = rawModVersion
 version = "${rawModVersion}+mc${minecraft_version}"
 group   = project.mod_group
 
-logger.lifecycle("Steam Bridge version: {}  (modVersion={}, minecraft={})",
+logger.lifecycle("Steam Bridge (Fabric) version: {}  (modVersion={}, minecraft={})",
     version, rawModVersion, minecraft_version)
 
 base {
     archivesName = project.mod_id
 }
 
-// NeoForge 1.21.1 needs Java 21 (foojay may provision it if the daemon is on 17).
 java {
     toolchain.languageVersion = JavaLanguageVersion.of(21)
+    withSourcesJar()
 }
 
 def generatedSrcDir = layout.buildDirectory.dir('generated/java').get().asFile
@@ -70,40 +70,47 @@ public final class BuildInfo {
 tasks.withType(JavaCompile).configureEach {
     dependsOn 'generateBuildInfo'
     options.encoding = 'UTF-8'
+    options.release = 21
+    // Keep source file + line numbers for crash reports; drop local-variable tables (~class bloat).
+    options.debugOptions.debugLevel = 'source,lines'
 }
 
-// AT also listed in neoforge.mods.toml; this applies it at compile time.
-minecraft {
-    accessTransformers {
-        file 'src/main/resources/META-INF/accesstransformer.cfg'
-    }
+tasks.named('sourcesJar', Jar).configure {
+    dependsOn 'generateBuildInfo'
 }
 
-runs {
-    configureEach {
-        systemProperty 'forge.logging.markers', 'REGISTRIES'
-        systemProperty 'forge.logging.console.level', 'debug'
-        modSource project.sourceSets.main
+loom {
+    accessWidenerPath = file('src/main/resources/steambridge.accesswidener')
+
+    mods {
+        steambridge {
+            sourceSet sourceSets.main
+        }
     }
-    client {}
 }
 
 repositories {
     mavenCentral()
+    maven { url = 'https://maven.fabricmc.net/' }
 }
 
-// steamworks4j zip for shading into the jar (API classes + win64 DLLs only).
 configurations {
     steamBundle { transitive = false }
+    // Full upstream JNA (all OS natives). We slim it before nesting into the mod jar.
+    jnaFull { transitive = false }
 }
 
-// steamworks4j: shade selected classes/natives into the mod jar (see jar {}).
-// JNA: compileOnly only; NeoForge already ships it. Do not shade/relocate/jarJar a second copy.
 dependencies {
-    implementation "net.neoforged:neoforge:${project.neo_version}"
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    mappings loom.officialMojangMappings()
+    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
 
-    compileOnly "net.java.dev.jna:jna:${project.jna_version}"
+    // Compile against full JNA; only a trimmed copy is nested (see slimJnaJar).
+    implementation("net.java.dev.jna:jna:${project.jna_version}")
+    jnaFull "net.java.dev.jna:jna:${project.jna_version}"
 
+    // Compile against steamworks4j; selected classes + win64 DLLs are flattened into the jar.
     implementation("com.code-disaster.steamworks4j:steamworks4j:${project.steamworks4j_version}") {
         exclude group: 'net.java.dev.jna'
     }
@@ -111,27 +118,73 @@ dependencies {
     steamBundle "com.code-disaster.steamworks4j:steamworks4j:${project.steamworks4j_version}"
 }
 
-// ${...} expansion for neoforge.mods.toml / pack.mcmeta
-tasks.withType(ProcessResources).configureEach {
-    var replaceProperties = [
-        mod_id                 : project.mod_id,
-        mod_name               : project.mod_name,
-        mod_version            : project.version,
-        minecraft_version      : project.minecraft_version,
-        minecraft_version_range: project.minecraft_version_range,
-        neo_version            : project.neo_version,
-        neo_version_range      : project.neo_version_range,
-        loader_version_range   : project.loader_version_range
-    ]
-    inputs.properties replaceProperties
-    filesMatching(['META-INF/neoforge.mods.toml', 'pack.mcmeta']) {
-        expand replaceProperties
+// Slim JNA for packaging: win32-x86-64 jnidispatch only + Java classes.
+// Full jna-5.14.0 is ~1.88 MB; slim is ~0.3 MB (then flattened into the mod jar root).
+tasks.register('slimJnaJar', Zip) {
+    group = 'build'
+    description = 'JNA with only win32-x86-64 native + needed Java classes'
+    dependsOn configurations.jnaFull
+    archiveFileName = "jna-${project.jna_version}-win64.jar"
+    destinationDirectory = layout.buildDirectory.dir('generated/jna-slim')
+    from({
+        zipTree(configurations.jnaFull.singleFile)
+    }) {
+        // Other OS natives (biggest win).
+        exclude 'com/sun/jna/aix-*/**'
+        exclude 'com/sun/jna/darwin-*/**'
+        exclude 'com/sun/jna/freebsd-*/**'
+        exclude 'com/sun/jna/linux-*/**'
+        exclude 'com/sun/jna/openbsd-*/**'
+        exclude 'com/sun/jna/sunos-*/**'
+        exclude 'com/sun/jna/win32-aarch64/**'
+        exclude 'com/sun/jna/win32-x86/**'
+        // Linux-only ELF helper; unused on Windows steamworks path.
+        exclude '**/ELFAnalyser*'
+        // Licenses already copied under META-INF/licenses from third_party_licenses/.
+        exclude 'META-INF/AL2.0'
+        exclude 'META-INF/LGPL2.1'
+        exclude 'META-INF/MANIFEST.MF'
+    }
+    doLast {
+        def f = archiveFile.get().asFile
+        logger.lifecycle('slimJnaJar: {} ({} bytes)', f.name, f.length())
     }
 }
 
+processResources {
+    inputs.property 'version', project.version
+    inputs.property 'mod_id', project.mod_id
+    inputs.property 'mod_name', project.mod_name
+    inputs.property 'minecraft_version', project.minecraft_version
+    inputs.property 'loader_version', project.loader_version
+
+    filesMatching('fabric.mod.json') {
+        expand([
+            version           : project.version,
+            mod_id            : project.mod_id,
+            mod_name          : project.mod_name,
+            minecraft_version : project.minecraft_version,
+            loader_version    : project.loader_version
+        ])
+    }
+
+    // Compact lang JSON (drop whitespace). Saves a few KB after zip.
+    doLast {
+        def gson = new groovy.json.JsonSlurper()
+        fileTree(dir: destinationDir, include: 'assets/**/lang/*.json').each { f ->
+            def obj = gson.parse(f)
+            f.text = groovy.json.JsonOutput.toJson(obj)
+        }
+    }
+}
+
+// steamworks4j (trimmed) + win64 natives + flatten slim JNA into jar root
+// (no META-INF/jars nest: avoids zip-in-zip bloat; Fabric loads root classes fine).
 jar {
-    // Win64 natives at jar root (SteamManager loads /steam_api64.dll). Drop unused APIs.
-    from({ project.configurations.steamBundle.collect { zipTree(it) } }) {
+    dependsOn configurations.steamBundle, 'slimJnaJar'
+    from({
+        configurations.steamBundle.collect { zipTree(it) }
+    }) {
         include 'com/codedisaster/**'
         include 'steam_api64.dll', 'steamworks4j64.dll'
         exclude 'com/codedisaster/steamworks/SteamController*'
@@ -146,6 +199,15 @@ jar {
         exclude 'com/codedisaster/steamworks/SteamUGC*'
         exclude 'com/codedisaster/steamworks/SteamUserStats*'
         exclude 'com/codedisaster/steamworks/SteamApps*'
+        exclude '**/*.so', '**/*.dylib', 'steam_api.dll', 'steamworks4j.dll'
+        exclude 'libsteam_api.*', 'libsteamworks4j.*'
+        exclude 'META-INF/**'
+    }
+    from({
+        zipTree(tasks.named('slimJnaJar', Zip).get().archiveFile.get().asFile)
+    }) {
+        // Flatten into root so jnidispatch is not stored as a nested zip entry.
+        exclude 'META-INF/**'
     }
     from('third_party_licenses') {
         into 'META-INF/licenses'
@@ -162,4 +224,42 @@ jar {
             'Built-By'              : 'Ragalikx'
         ])
     }
+}
+
+// Re-pack the remapped jar at Deflate level 9 (Gradle Jar default is ~6).
+tasks.register('repackModJar') {
+    group = 'build'
+    description = 'Re-zip remapJar output at maximum Deflate level'
+    dependsOn 'remapJar'
+    def inputProvider = tasks.named('remapJar', net.fabricmc.loom.task.RemapJarTask).flatMap { it.archiveFile }
+    inputs.file(inputProvider)
+    outputs.file(inputProvider)
+    doLast {
+        def input = inputProvider.get().asFile
+        def before = input.length()
+        def tmp = file("${layout.buildDirectory.get().asFile}/tmp/repack-level9.jar")
+        tmp.parentFile.mkdirs()
+        if (tmp.exists()) tmp.delete()
+        ant.zip(destfile: tmp, compress: true, level: 9) {
+            zipfileset(src: input)
+        }
+        ant.move(file: tmp, tofile: input, overwrite: true)
+        logger.lifecycle('repackModJar: {} -> {} bytes (level 9)', before, input.length())
+    }
+}
+
+tasks.named('remapJar', net.fabricmc.loom.task.RemapJarTask).configure {
+    finalizedBy 'repackModJar'
+    doLast {
+        def out = archiveFile.get().asFile
+        if (!out.exists() || out.length() < 1024) {
+            throw new GradleException(
+                "remapJar produced an empty archive (${out.exists() ? out.length() : 0} bytes).")
+        }
+        logger.lifecycle('remapJar OK: {} ({} bytes, before repack)', out.name, out.length())
+    }
+}
+
+tasks.named('build') {
+    dependsOn 'repackModJar'
 }

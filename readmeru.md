@@ -19,7 +19,7 @@
 | Версия Minecraft | Платформа | Версия загрузчика | Windows | Linux | macOS | Статус |
 |---|---|---|---|---|---|---|
 | [1.21.1](https://github.com/Ragalikx/steam-bridge-mc/tree/NeoForge-1.21.1) | NeoForge | 21.1.234 | ✅ | ⏳ (В планах на будущее) | ❌ | Доступно |
-| [1.21.1](https://github.com/Ragalikx/steam-bridge-mc/tree/Fabric-1.21.1) | Fabric | ? | ? | ? | ❌ | В разработке |
+| [1.21.1](https://github.com/Ragalikx/steam-bridge-mc/tree/Fabric-1.21.1) | Fabric | 0.16.14 + API 0.116.13 | ✅ | ⏳ (В планах на будущее) | ❌ | Доступно |
 | [1.20.1](https://github.com/Ragalikx/steam-bridge-mc/tree/NeoForge-1.20.1) | NeoForge/Forge | 47.1.106 | ✅ | ⏳ (В планах на будущее) | ❌ | Доступно |
 | [1.20.1](https://github.com/Ragalikx/steam-bridge-mc/tree/Fabric-1.20.1) | Fabric | ? | ? | ? | ❌ | В разработке |
 | [1.16.5](https://github.com/Ragalikx/steam-bridge-mc/tree/Forge-1.16.5) | Forge | ? | ? | ? | ❌ | В разработке |
@@ -38,6 +38,7 @@
 | Версия Minecraft | Платформа | Версия Java | Версия Gradle |
 |---|---|---|---|
 | 1.21.1 | NeoForge | Java 21 | 8.13 |
+| 1.21.1 | Fabric | Java 21 | 8.13 |
 | 1.20.1 | NeoForge/Forge | Java 17 | 8.13 |
 | 1.12.2 | Forge | Java 8 | 4.10.3 |
 
@@ -63,8 +64,9 @@
 # Windows (PowerShell): кавычки вокруг -P обязательны
 .\gradlew.bat build "-PmodVersion=1.145"
 
-# Итоговая версия: 1.145+mc1.21.1  (jar / neoforge.mods.toml / BuildInfo)
+# Итоговая версия: 1.145+mc1.21.1  (jar / fabric.mod.json / BuildInfo)
 # Dev-сборка без -P: 0.0.0-dev+mc1.21.1
+# Для Gradle JVM нужен Java 21 (Loom).
 ```
 
 ---

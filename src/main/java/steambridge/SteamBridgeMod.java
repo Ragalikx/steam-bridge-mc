@@ -5,47 +5,38 @@
  */
 package steambridge;
 
-import com.mojang.logging.LogUtils;
+import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.minecraft.client.Minecraft;
-import net.neoforged.bus.api.IEventBus;
-import net.neoforged.fml.ModContainer;
-import net.neoforged.fml.common.Mod;
-import net.neoforged.fml.config.ModConfig;
-import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
-import net.neoforged.neoforge.common.NeoForge;
 import org.slf4j.Logger;
-
+import org.slf4j.LoggerFactory;
 import steambridge.event.SteamClientEvents;
+import steambridge.gui.VanillaGuiIntegration;
 import steambridge.steam.SteamManager;
 
-/** Steam Bridge entry (NeoForge 1.21.1, client-only). */
-@Mod(SteamBridgeMod.MODID)
-public class SteamBridgeMod {
+/** Steam Bridge entry (Fabric 1.21.1, client-only). */
+public class SteamBridgeMod implements ClientModInitializer {
 
     public static final String MODID   = "steambridge";
     public static final String NAME    = "Steam Bridge";
     public static final String VERSION = BuildInfo.VERSION;
 
-    public static final Logger LOG = LogUtils.getLogger();
+    public static final Logger LOG = LoggerFactory.getLogger(NAME);
 
-    public SteamBridgeMod(IEventBus modEventBus, ModContainer modContainer) {
-        LOG.info("=== Steam Bridge pre-init (NeoForge 1.21.1) v{} ===", VERSION);
+    @Override
+    public void onInitializeClient() {
+        LOG.info("=== Steam Bridge pre-init (Fabric 1.21.1) v{} ===", VERSION);
 
-        modEventBus.addListener(this::onClientSetup);
-        modEventBus.addListener(SteamBridgeConfig::onLoad);
-        modEventBus.addListener(SteamBridgeConfig::onReload);
+        SteamBridgeConfig.load();
+        SteamClientEvents.register();
+        VanillaGuiIntegration.register();
 
-        modContainer.registerConfig(ModConfig.Type.CLIENT, SteamBridgeConfig.SPEC);
-        NeoForge.EVENT_BUS.register(new SteamClientEvents());
-    }
-
-    private void onClientSetup(FMLClientSetupEvent event) {
-        event.enqueueWork(() -> {
+        ClientLifecycleEvents.CLIENT_STARTED.register(client -> {
             LOG.info("=== SteamBridge client setup: initializing Steam... ===");
             if (SteamBridgeConfig.interceptUdp) {
                 steambridge.proxy.UdpInterceptFactory.install();
             }
-            SteamAppIdHelper.ensureAppId(Minecraft.getInstance().gameDirectory);
+            SteamAppIdHelper.ensureAppId(client.gameDirectory);
             boolean ok = SteamManager.getInstance().init();
             LOG.info("=== Steam init result: {} ===", ok ? "SUCCESS" : "FAILED");
         });

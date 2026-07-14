@@ -5,14 +5,10 @@
  */
 package steambridge.event;
 
-import steambridge.SteamBridgeMod;
-import steambridge.gui.GuiSteamConnecting;
-import steambridge.steam.SteamClient;
-import steambridge.steam.SteamManager;
-import steambridge.steam.SteamServer;
-
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.client.Minecraft;
-
 import net.minecraft.client.gui.screens.DisconnectedScreen;
 import net.minecraft.client.gui.screens.ReceivingLevelScreen;
 import net.minecraft.client.gui.screens.Screen;
@@ -20,73 +16,83 @@ import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
-import net.neoforged.neoforge.client.event.ScreenEvent;
-import net.neoforged.neoforge.client.event.ClientTickEvent;
-import net.neoforged.neoforge.event.entity.player.PlayerEvent;
+import steambridge.SteamBridgeMod;
+import steambridge.gui.GuiSteamConnecting;
+import steambridge.steam.SteamClient;
+import steambridge.steam.SteamManager;
+import steambridge.steam.SteamServer;
 
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 
-/**
- * Client-side gameplay/GUI event handlers (NeoForge 1.21.1).
- *
- * <p>Registered on {@code NeoForge.EVENT_BUS} by {@link SteamBridgeMod}. Handles teardown of the
- * Steam client/host on disconnect (with a short grace window across transient world
- * reloads / dimension transfers), late binding of Minecraft identities to Steam peers on
- * the host, and a mod-mismatch hint when a modded login handshake fails.</p>
- */
-public class SteamClientEvents {
+/** Client-side gameplay/GUI event handlers (Fabric 1.21.1). */
+public final class SteamClientEvents {
 
     private static final int TRANSIENT_DISCONNECT_GRACE_TICKS = 160;
     private static final String MOD_MISMATCH_HINT_KEY = "steambridge.disconnect.mod_mismatch_hint";
 
-    private int deferredClientDisconnectTicks = -1;
-    private int deferredServerStopTicks = -1;
+    private static int deferredClientDisconnectTicks = -1;
+    private static int deferredServerStopTicks = -1;
 
-    // -- Screen open ----------------------------------------------------------
+    private SteamClientEvents() {}
 
-    @SubscribeEvent
-    public void onScreenOpening(ScreenEvent.Opening event) {
-        Screen next = event.getNewScreen();
+    public static void register() {
+        ClientTickEvents.END_CLIENT_TICK.register(SteamClientEvents::onClientTick);
+
+        ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
+            SteamClient steamClient = SteamManager.getInstance().getActiveClient();
+            if (steamClient != null) {
+                steamClient.onMinecraftHandshakeStarted("login");
+            }
+        });
+
+        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> onLoggingOut());
+
+        ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.getSingleplayerServer() != server) {
+                return;
+            }
+            ServerPlayer player = handler.getPlayer();
+            onPlayerLoggedIn(player);
+        });
+    }
+
+    /**
+     * Called from {@code Minecraft.setScreen} mixin.
+     * @return {@code null} to cancel opening, a different screen to replace, or the same screen to proceed.
+     */
+    public static Screen onSetScreen(Screen next) {
         SteamClient client = SteamManager.getInstance().getActiveClient();
 
         if (client != null && next instanceof DisconnectedScreen) {
             if (client.getState() == SteamClient.State.CONNECTING) {
-                SteamBridgeMod.LOG.info("[SteamBridge] Ignoring secondary DisconnectedScreen from vanilla background thread while Steam connection is negotiating.");
-                event.setCanceled(true);
-                return;
+                SteamBridgeMod.LOG.info(
+                    "[SteamBridge] Ignoring secondary DisconnectedScreen from vanilla background thread while Steam connection is negotiating.");
+                return null;
             }
 
             deferredClientDisconnectTicks = -1;
+            Screen result = next;
             if (isGenericDisconnectDuringLogin(client)) {
                 SteamBridgeMod.LOG.warn(
                     "[SteamBridge] Replacing generic login disconnect with mod mismatch hint. state={}",
                     client.getState());
-                event.setNewScreen(createModMismatchHintScreen());
+                result = createModMismatchHintScreen();
             }
             client.onMinecraftDisconnect("disconnect", "");
             client.disconnect();
+            return result;
         }
 
         if (client != null && next instanceof ReceivingLevelScreen) {
             client.onMinecraftWorldLoading();
         }
+
+        return next;
     }
 
-    // -- Network in/out -------------------------------------------------------
-
-    @SubscribeEvent
-    public void onLoggingIn(ClientPlayerNetworkEvent.LoggingIn event) {
-        SteamClient client = SteamManager.getInstance().getActiveClient();
-        if (client != null) {
-            client.onMinecraftHandshakeStarted("login");
-        }
-    }
-
-    @SubscribeEvent
-    public void onLoggingOut(ClientPlayerNetworkEvent.LoggingOut event) {
+    private static void onLoggingOut() {
         Minecraft mc = Minecraft.getInstance();
 
         SteamServer server = SteamManager.getInstance().getActiveServer();
@@ -119,12 +125,7 @@ public class SteamClientEvents {
         }
     }
 
-    // -- Tick -----------------------------------------------------------------
-
-    @SubscribeEvent
-    public void onClientTick(ClientTickEvent.Post event) {
-
-        Minecraft mc = Minecraft.getInstance();
+    private static void onClientTick(Minecraft mc) {
         processDeferredNetworkTeardown(mc);
 
         SteamClient client = SteamManager.getInstance().getActiveClient();
@@ -141,14 +142,7 @@ public class SteamClientEvents {
         }
     }
 
-    // -- Host: bind Minecraft identity to Steam peer --------------------------
-
-    @SubscribeEvent
-    public void onPlayerLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
-        if (!(event.getEntity() instanceof ServerPlayer player)) {
-            return;
-        }
-
+    private static void onPlayerLoggedIn(ServerPlayer player) {
         SteamServer server = SteamManager.getInstance().getActiveServer();
         if (server == null || !server.isRunning()) {
             return;
@@ -163,20 +157,7 @@ public class SteamClientEvents {
         }
     }
 
-    @SubscribeEvent
-    public void onPlayerChangedDimension(PlayerEvent.PlayerChangedDimensionEvent event) {
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.player != null && event.getEntity().getUUID().equals(mc.player.getUUID())) {
-            SteamClient client = SteamManager.getInstance().getActiveClient();
-            if (client != null) {
-                client.onMinecraftWorldJoined(event.getEntity().getName().getString(), 0);
-            }
-        }
-    }
-
-    // -- Deferred teardown ----------------------------------------------------
-
-    private void processDeferredNetworkTeardown(Minecraft mc) {
+    private static void processDeferredNetworkTeardown(Minecraft mc) {
         if (deferredClientDisconnectTicks >= 0) {
             SteamClient client = SteamManager.getInstance().getActiveClient();
             if (client == null || !client.isAlive()) {
@@ -222,19 +203,19 @@ public class SteamClientEvents {
         }
     }
 
-    private boolean shouldDeferSteamClientDisconnect(Minecraft mc, SteamClient client) {
+    private static boolean shouldDeferSteamClientDisconnect(Minecraft mc, SteamClient client) {
         return client != null
             && client.isAlive()
             && client.isSteamChannelOpen()
             && isLikelyTransientSteamDisconnectScreen(mc.screen);
     }
 
-    private boolean shouldDeferSteamServerStop(Minecraft mc) {
+    private static boolean shouldDeferSteamServerStop(Minecraft mc) {
         return mc.getSingleplayerServer() != null
             && isLikelyTransientSteamDisconnectScreen(mc.screen);
     }
 
-    private boolean shouldShowLoginMismatchHint(Minecraft mc, SteamClient client) {
+    private static boolean shouldShowLoginMismatchHint(Minecraft mc, SteamClient client) {
         if (client == null || mc.level != null || mc.player != null) {
             return false;
         }
@@ -250,9 +231,9 @@ public class SteamClientEvents {
             || screen instanceof DisconnectedScreen;
     }
 
-    private void showLoginMismatchHint(Minecraft mc, SteamClient client) {
+    private static void showLoginMismatchHint(Minecraft mc, SteamClient client) {
         SteamBridgeMod.LOG.warn(
-            "[SteamBridge] Minecraft connection closed during Steam/Forge login before a detailed disconnect screen appeared. screen={} state={}",
+            "[SteamBridge] Minecraft connection closed during Steam login before a detailed disconnect screen appeared. screen={} state={}",
             screenName(mc.screen), client.getState());
         client.closeAfterMinecraftFailure("connect.failed", modMismatchHintText());
         mc.execute(() -> {
@@ -263,24 +244,24 @@ public class SteamClientEvents {
         });
     }
 
-    private boolean shouldCloseDeferredClient(Minecraft mc, SteamClient client) {
+    private static boolean shouldCloseDeferredClient(Minecraft mc, SteamClient client) {
         if (client == null || !client.isSteamChannelOpen()) {
             return true;
         }
         return isFinalDisconnectScreen(mc.screen);
     }
 
-    private boolean shouldCloseDeferredServer(Minecraft mc) {
+    private static boolean shouldCloseDeferredServer(Minecraft mc) {
         return mc.getSingleplayerServer() == null || isFinalDisconnectScreen(mc.screen);
     }
 
-    private boolean isLikelyTransientSteamDisconnectScreen(Screen screen) {
+    private static boolean isLikelyTransientSteamDisconnectScreen(Screen screen) {
         return screen == null
             || screen instanceof ReceivingLevelScreen
             || isGalacticraftTravelScreen(screen);
     }
 
-    private boolean isGalacticraftTravelScreen(Screen screen) {
+    private static boolean isGalacticraftTravelScreen(Screen screen) {
         if (screen == null) {
             return false;
         }
@@ -291,13 +272,13 @@ public class SteamClientEvents {
             || name.contains("planet");
     }
 
-    private boolean isFinalDisconnectScreen(Screen screen) {
+    private static boolean isFinalDisconnectScreen(Screen screen) {
         return screen instanceof DisconnectedScreen
             || screen instanceof JoinMultiplayerScreen
             || screen instanceof TitleScreen;
     }
 
-    private boolean isGenericDisconnectDuringLogin(SteamClient client) {
+    private static boolean isGenericDisconnectDuringLogin(SteamClient client) {
         if (client == null) {
             return false;
         }
@@ -305,23 +286,23 @@ public class SteamClientEvents {
         return state == SteamClient.State.STEAM_READY || state == SteamClient.State.NEGOTIATING;
     }
 
-    private DisconnectedScreen createModMismatchHintScreen() {
+    private static DisconnectedScreen createModMismatchHintScreen() {
         return new DisconnectedScreen(
             new JoinMultiplayerScreen(new TitleScreen()),
             Component.translatable("connect.failed"),
             Component.translatable(MOD_MISMATCH_HINT_KEY));
     }
 
-    private String modMismatchHintText() {
+    private static String modMismatchHintText() {
         try {
             if (net.minecraft.client.resources.language.I18n.exists(MOD_MISMATCH_HINT_KEY)) {
                 return net.minecraft.client.resources.language.I18n.get(MOD_MISMATCH_HINT_KEY);
             }
         } catch (Exception ignored) {}
-        return "Connection closed during the NeoForge login handshake. Your mods probably do not match the host's mods.";
+        return "Connection closed during the login handshake. Your mods probably do not match the host's mods.";
     }
 
-    private String screenName(Screen screen) {
+    private static String screenName(Screen screen) {
         return screen != null ? screen.getClass().getName() : "<none>";
     }
 }

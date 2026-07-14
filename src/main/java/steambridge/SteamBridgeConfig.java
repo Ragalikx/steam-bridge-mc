@@ -5,10 +5,18 @@
  */
 package steambridge;
 
-import net.neoforged.fml.event.config.ModConfigEvent;
-import net.neoforged.neoforge.common.ModConfigSpec;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonObject;
+import net.fabricmc.loader.api.FabricLoader;
 
-/** Client config mirrors for NeoForge 1.21.1. */
+import java.io.IOException;
+import java.io.Reader;
+import java.io.Writer;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+/** Client config (JSON under config/steambridge.json). */
 public final class SteamBridgeConfig {
 
     private SteamBridgeConfig() {}
@@ -19,47 +27,39 @@ public final class SteamBridgeConfig {
     /** Voice UDP intercept (JVM DatagramSocket factory). Launch-only. */
     public static boolean interceptUdp    = true;
 
-    public static final ModConfigSpec SPEC;
-    private static final ModConfigSpec.BooleanValue ALLOW_WITHOUT_AUTH;
-    private static final ModConfigSpec.IntValue     VIRTUAL_PORT;
-    private static final ModConfigSpec.BooleanValue INTERCEPT_UDP;
+    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    private static final String FILE_NAME = "steambridge.json";
 
-    static {
-        ModConfigSpec.Builder b = new ModConfigSpec.Builder();
-
-        ALLOW_WITHOUT_AUTH = b
-            .comment("Allow connections without validating Steam Auth Ticket. "
-                   + "False is more secure but might affect some NAT types.")
-            .define("allowWithoutAuth", true);
-
-        VIRTUAL_PORT = b
-            .comment("Virtual port for Steam network. 0 is default. "
-                   + "Change only if conflicting with other mods.")
-            .defineInRange("virtualPort", 0, 0, 65535);
-
-        INTERCEPT_UDP = b
-            .comment("DatagramSocket factory for voice mods (SVC, Plasmo Voice). "
-                   + "Launch-only; cannot toggle at runtime.")
-            .define("interceptUdp", true);
-
-        SPEC = b.build();
-    }
-
-    public static void bake() {
-        allowWithoutAuth = ALLOW_WITHOUT_AUTH.get();
-        virtualPort      = VIRTUAL_PORT.get();
-        interceptUdp     = INTERCEPT_UDP.get();
-    }
-
-    public static void onLoad(ModConfigEvent.Loading event) {
-        if (event.getConfig().getSpec() == SPEC) {
-            bake();
+    public static void load() {
+        Path path = FabricLoader.getInstance().getConfigDir().resolve(FILE_NAME);
+        if (!Files.isRegularFile(path)) {
+            save();
+            return;
+        }
+        try (Reader r = Files.newBufferedReader(path)) {
+            JsonObject o = GSON.fromJson(r, JsonObject.class);
+            if (o == null) return;
+            if (o.has("allowWithoutAuth")) allowWithoutAuth = o.get("allowWithoutAuth").getAsBoolean();
+            if (o.has("virtualPort"))      virtualPort      = o.get("virtualPort").getAsInt();
+            if (o.has("interceptUdp"))     interceptUdp     = o.get("interceptUdp").getAsBoolean();
+        } catch (Exception e) {
+            SteamBridgeMod.LOG.warn("[SteamBridge] Failed to load config: {}", e.getMessage());
         }
     }
 
-    public static void onReload(ModConfigEvent.Reloading event) {
-        if (event.getConfig().getSpec() == SPEC) {
-            bake();
+    public static void save() {
+        Path path = FabricLoader.getInstance().getConfigDir().resolve(FILE_NAME);
+        JsonObject o = new JsonObject();
+        o.addProperty("allowWithoutAuth", allowWithoutAuth);
+        o.addProperty("virtualPort", virtualPort);
+        o.addProperty("interceptUdp", interceptUdp);
+        try {
+            Files.createDirectories(path.getParent());
+            try (Writer w = Files.newBufferedWriter(path)) {
+                GSON.toJson(o, w);
+            }
+        } catch (IOException e) {
+            SteamBridgeMod.LOG.warn("[SteamBridge] Failed to save config: {}", e.getMessage());
         }
     }
 }
