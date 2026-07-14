@@ -7,6 +7,7 @@ package steambridge.steam;
 
 import com.codedisaster.steamworks.SteamID;
 import com.codedisaster.steamworks.SteamNativeHandle;
+import steambridge.SteamBridgeConfig;
 import steambridge.SteamBridgeMod;
 
 import net.minecraft.client.Minecraft;
@@ -82,6 +83,7 @@ public class SteamClient {
             statusMsg = "Disconnected.";
         }
         connectLatch.countDown();
+        steambridge.proxy.SteamUdpProxy.getInstance().stopClient();
         SteamManager.getInstance().setActiveClient(null);
 
         if (connectionHandle != 0) {
@@ -131,6 +133,15 @@ public class SteamClient {
                     conn, state
                 );
                 return;
+            }
+
+            // Start UDP proxy here, not in the Steam callback thread.
+            // Calling connectP2P() from the callback thread blocked it long enough
+            // to delay the Forge handshake and cause a 30-second login timeout on
+            // the first connection attempt. Starting it here frees the callback
+            // thread while still running well before SVC receives its secret.
+            if (SteamBridgeConfig.interceptUdp) {
+                steambridge.proxy.SteamUdpProxy.getInstance().startClient(hostSteamID);
             }
 
             statusMsg = i18n("steambridge.status.path_ready", "Steam path ready - activating pipeline...");

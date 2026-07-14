@@ -8,14 +8,14 @@ modId="${mod_id}"
 version="${mod_version}"
 displayName="${mod_name}"
 authors="Ragalikx"
-credits="Ragalikx - author; Valve - Steam SDR; code-disaster - steamworks4j; java-native-access - JNA"
+credits="Ragalikx - author; Valve - Steam SDK (DatagramSockets relay); Daniel Ludwig (code-disaster) - steamworks4j; java-native-access - JNA"
 
 displayTest="IGNORE_ALL_VERSION"
 description='''
-Steam Bridge - play Minecraft with friends without exposing your IP.
+Steam Bridge - play Minecraft with friends without a public IP.
 
-Players connect via SteamID over P2P/SDR relay - no port-forwarding, works through NAT.
-Symmetric NAT automatically falls back to Valve SDR relay.
+Players connect via SteamID over P2P or Steam relay - no port-forwarding needed, works behind NAT.
+If a direct connection is not possible, traffic is automatically routed through Steam relay servers.
 
 Requires Steam (AppID 480 - Spacewar) to be running.'''
 

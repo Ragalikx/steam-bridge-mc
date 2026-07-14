@@ -37,6 +37,8 @@ public final class SteamSocketsApi {
     public static final int STATE_LINGER = -2;
     public static final int STATE_DEAD = -3;
 
+    public static final int SEND_UNRELIABLE = 0;
+    public static final int SEND_UNRELIABLE_NO_NAGLE = 1;
     public static final int SEND_RELIABLE = 8;
     public static final int SEND_RELIABLE_NO_NAGLE = 9;
 
@@ -374,6 +376,19 @@ public final class SteamSocketsApi {
      * Zero-copy send from a Netty ByteBuf - writes directly into the pre-allocated ThreadLocal
      * native Memory via NIO ByteBuffer, avoiding an intermediate {@code byte[]} allocation.
      */
+    public int sendBytes(int connection, byte[] data, int flags) {
+        if (connection == 0 || data == null || data.length == 0) return 0;
+        Memory payload = sendBuffer.get();
+        if (payload.size() < data.length) {
+            payload = new Memory(data.length);
+            sendBuffer.set(payload);
+        }
+        payload.write(0, data, 0, data.length);
+        return api.SteamAPI_ISteamNetworkingSockets_SendMessageToConnection(
+                sockets, connection, payload, data.length, flags, (LongByReference) null
+        );
+    }
+
     public int sendMessageFromByteBuf(int connection, io.netty.buffer.ByteBuf data, int len, int flags) {
         if (connection == 0 || data == null || len == 0) return 0;
 

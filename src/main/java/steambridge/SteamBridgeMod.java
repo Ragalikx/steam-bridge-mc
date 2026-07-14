@@ -52,6 +52,10 @@ public class SteamBridgeMod {
     private void onClientSetup(FMLClientSetupEvent event) {
         event.enqueueWork(() -> {
             LOG.info("=== SteamBridge client setup - initializing Steam... ===");
+            // Install UDP intercept factory before any voice mod creates DatagramSockets.
+            if (SteamBridgeConfig.interceptUdp) {
+                steambridge.proxy.UdpInterceptFactory.install();
+            }
             // Ensure steam_appid.txt exists in the game dir before SteamAPI.init()
             SteamAppIdHelper.ensureAppId(Minecraft.getInstance().gameDirectory);
             boolean ok = SteamManager.getInstance().init();

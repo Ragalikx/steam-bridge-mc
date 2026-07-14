@@ -371,6 +371,21 @@ public class SteamManager {
             return true;
         }
 
+        // UDP proxy connections: route to SteamUdpProxy without loopback overhead.
+        steambridge.proxy.SteamUdpProxy udpProxy = steambridge.proxy.SteamUdpProxy.getInstance();
+        if (udpProxy.ownsClientConn(connection)) {
+            for (SteamSocketsApi.ReceivedMessage m : batch) {
+                if (m != null && m.getData().length > 0) udpProxy.deliverFromSteamToClient(m.getData());
+            }
+            return true;
+        }
+        if (udpProxy.ownsServerConn(connection)) {
+            for (SteamSocketsApi.ReceivedMessage m : batch) {
+                if (m != null && m.getData().length > 0) udpProxy.deliverFromSteamToServer(connection, m.getData());
+            }
+            return true;
+        }
+
         // Fallback (non-loopback owners). remoteSteamID is fixed for a connection's lifetime,
         // so read it from the cached status rather than a live JNA snapshot on every batch.
         SteamConnectionStatus cached = statusByConnection.get(connection);
@@ -454,8 +469,22 @@ public class SteamManager {
             handled = true;
         }
 
+        // UDP proxy is checked BEFORE SteamClient to prevent steamID-based false match:
+        // SteamClient.ownsConnection() falls back to matching by remoteSteamID, which would
+        // incorrectly claim the UDP proxy connection (same steamID, different conn handle).
+        steambridge.proxy.SteamUdpProxy udpProxy = steambridge.proxy.SteamUdpProxy.getInstance();
+        if (!handled) {
+            if (udpProxy.ownsListenSocket(event.m_info.m_hListenSocket) || udpProxy.ownsServerConn(connection)) {
+                udpProxy.onServerConnectionStatusChanged(connection, remoteSteamID, status, event.m_eOldState);
+                handled = true;
+            } else if (udpProxy.ownsClientConn(connection)) {
+                udpProxy.onClientConnectionStatusChanged(connection, remoteSteamID, status, event.m_eOldState);
+                handled = true;
+            }
+        }
+
         SteamClient client = activeClient;
-        if (client != null && client.ownsConnection(connection, remoteSteamID)) {
+        if (!handled && client != null && client.ownsConnection(connection, remoteSteamID)) {
             client.onConnectionStatusChanged(connection, remoteSteamID, status, event.m_eOldState);
             handled = true;
         }
@@ -663,6 +692,13 @@ public class SteamManager {
             rememberStatus(SteamConnectionStatus.unavailable(remoteSteamID, connection));
         }
         return connection;
+    }
+
+    public void sendVoiceBytes(int connection, byte[] data) {
+        SteamSocketsApi api = socketsApi;
+        if (api != null) {
+            api.sendBytes(connection, data, SteamSocketsApi.SEND_UNRELIABLE_NO_NAGLE);
+        }
     }
 
     public boolean closeConnection(int connection, int reason, String debug) {

@@ -20,7 +20,7 @@ import java.io.IOException;
 public final class SteamAppIdHelper {
 
     /**
-     * Spacewar - Valve's free public test App ID. Hardcoded on purpose and NOT configurable:
+     * Spacewar is Valve's free public test App ID. Hardcoded on purpose and NOT configurable:
      * pointing the mod at a real game's App ID (especially one with VAC/EAC) would ban the
      * user's account. Being a numeric literal also removes any command-injection surface from
      * the steam://run/&lt;id&gt; launch path.
@@ -75,7 +75,7 @@ public final class SteamAppIdHelper {
 
     /**
      * Tries to launch Steam via {@code steam://run/<appId>}.
-     * Best-effort - silently ignores errors (Steam may already be running).
+     * Best-effort call that silently ignores errors (Steam may already be running).
      */
     public static void launchSteam() {
         // appId is guaranteed numeric by getAppId(); the launch path below also never goes

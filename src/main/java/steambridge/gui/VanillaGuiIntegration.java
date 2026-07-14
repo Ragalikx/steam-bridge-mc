@@ -144,7 +144,7 @@ public final class VanillaGuiIntegration {
 
     /**
      * Wraps a live {@link Button}'s {@code onPress} callback in place (found via type-based
-     * reflection - {@code Button} has exactly one field of type {@code Button.OnPress}). This
+     * reflection ({@code Button} has exactly one field of type {@code Button.OnPress}). This
      * lets us intercept a vanilla button's action without touching its position/active/visible
      * state, which vanilla continues to manage normally (e.g. "Join Server" being disabled
      * until a server-list entry is selected).
@@ -246,7 +246,7 @@ public final class VanillaGuiIntegration {
      * address opens {@link GuiSteamConnecting} instead of vanilla's normal TCP connect attempt.
      * <p>
      * {@code ConnectScreen} exposes no public accessor for the address it is about to dial, so
-     * interception has to happen here - one step earlier, at the button that triggers it -
+     * interception has to happen one step earlier, at the button that triggers it,
      * rather than in {@code onScreenOpening} for {@code ConnectScreen} itself.
      */
     private static void injectSteamConnectIntercept(ScreenEvent.Init.Post event, Screen gui) {
@@ -397,7 +397,7 @@ public final class VanillaGuiIntegration {
         // "Mods" button. Once a world is already shared, vanilla removes its "Open to LAN"
         // entry, so there is no shareToLan button to attach to; the always-present "Mods"
         // button is a stable anchor instead. We deliberately do NOT hide or repurpose any
-        // vanilla button (that would fight other mods that reorder the pause menu) - we only
+        // vanilla button (that would fight other mods that reorder the pause menu). We only
         // add our own widget and nudge the Mods button and the entries below it down one row.
         Button mods = findButtonByMessage(event, "fml.menu.mods");
         if (mods == null) return;
@@ -423,7 +423,7 @@ public final class VanillaGuiIntegration {
         if (srv == null) return;
 
         if (!SteamManager.getInstance().isInitialized()) {
-            // Try reinit first - covers the case where Steam was launched recently
+            // Try reinit first in case Steam was launched recently
             // but the mod hasn't detected it yet.
             if (!SteamManager.getInstance().reinit()) {
                 try {
@@ -436,7 +436,7 @@ public final class VanillaGuiIntegration {
                         Component.literal("§e" + I18n.get("steambridge.gui.host_steam_launching")), false);
                 return;
             }
-            // reinit succeeded - fall through and open the world
+            // reinit succeeded, fall through and open the world
         }
 
         GameType gameType = findByType(gui, GameType.class);

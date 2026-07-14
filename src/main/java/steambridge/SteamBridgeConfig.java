@@ -26,11 +26,23 @@ public final class SteamBridgeConfig {
     // especially one with an anti-cheat (VAC/EAC) - would get their account banned.
     public static boolean allowWithoutAuth = true;
     public static int     virtualPort      = 0;
+    /**
+     * Whether to install a JVM-wide {@link java.net.DatagramSocketImplFactory} that intercepts
+     * UDP sockets so voice-chat mods (Simple Voice Chat, Plasmo Voice, etc.) can be tunnelled
+     * through Steam alongside Minecraft traffic.
+     *
+     * <p>Setting this to {@code false} disables the interception - voice mods will stop working
+     * through Steam Bridge, but no DatagramSocket factory will be installed and no UDP port will
+     * be hijacked. The setting takes effect only at launch; changing it mid-session has no effect
+     * because the factory is a one-time JVM-lifetime operation.</p>
+     */
+    public static boolean interceptUdp    = true;
 
     // -- Spec definition -------------------------------------------------------
     public static final ForgeConfigSpec SPEC;
     private static final ForgeConfigSpec.BooleanValue ALLOW_WITHOUT_AUTH;
     private static final ForgeConfigSpec.IntValue     VIRTUAL_PORT;
+    private static final ForgeConfigSpec.BooleanValue INTERCEPT_UDP;
 
     static {
         ForgeConfigSpec.Builder b = new ForgeConfigSpec.Builder();
@@ -45,6 +57,13 @@ public final class SteamBridgeConfig {
                    + "Change only if conflicting with other mods.")
             .defineInRange("virtualPort", 0, 0, 65535);
 
+        INTERCEPT_UDP = b
+            .comment("Install a JVM-wide DatagramSocket factory so that voice-chat mods "
+                   + "(Simple Voice Chat, Plasmo Voice, etc.) work through Steam Bridge. "
+                   + "If disabled, voice chat will not be tunnelled but no UDP interception occurs. "
+                   + "Takes effect only on launch - cannot be toggled at runtime.")
+            .define("interceptUdp", true);
+
         SPEC = b.build();
     }
 
@@ -52,6 +71,7 @@ public final class SteamBridgeConfig {
     public static void bake() {
         allowWithoutAuth = ALLOW_WITHOUT_AUTH.get();
         virtualPort      = VIRTUAL_PORT.get();
+        interceptUdp     = INTERCEPT_UDP.get();
     }
 
     public static void onLoad(ModConfigEvent.Loading event) {
