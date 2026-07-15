@@ -48,7 +48,7 @@ What was used when building and testing each available branch. Natives ship insi
 
 Notes:
 
-- Builds/tests: Windows 11 (amd64). Linux run supported; macOS no.
+- Builds/tests: Windows 11 (amd64). Linux: in development; macOS no.
 - Steam AppID is fixed to **480 (Spacewar)**. Steam client must be running.
 - Release versioning on modern branches: `-PmodVersion=1.145` -> `1.145+mc<mc_version>`. Without `-P`: `0.0.0-dev+mc<mc_version>`.
 - NeoForge does not bundle JNA in the mod (module clash). Compile is pinned to the JNA version the loader already ships. Fabric and 1.12.2 shade a trimmed win64-only JNA.
