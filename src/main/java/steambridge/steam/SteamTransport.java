@@ -149,14 +149,9 @@ public final class SteamTransport {
                     mc.getUser().getName(),
                     Optional.ofNullable(mc.getUser().getProfileId())));
 
-            try {
-                java.lang.reflect.Field f = Minecraft.class.getDeclaredField("pendingConnection");
-                f.setAccessible(true);
-                f.set(mc, connection);
-            } catch (Exception e) {
-                SteamBridgeMod.LOG.warn(
-                        "[LoopbackBridge][Client] Could not set pendingConnection: {}", e.getMessage());
-            }
+            // Runtime uses intermediary names; named reflection fails in production.
+            // Mixin @Accessor is remapped by Loom/Mixin.
+            ((steambridge.mixin.MinecraftAccessor) (Object) mc).setPendingConnection(connection);
 
             SteamBridgeMod.LOG.info(
                     "[LoopbackBridge][Client] Connected to loopback proxy. proxyPort={} conn={} steamID={}",

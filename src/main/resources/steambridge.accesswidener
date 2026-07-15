@@ -3,3 +3,7 @@ accessWidener	v1	named
 # ServerGamePacketListenerImpl.connection is package/protected on some mappings;
 # needed to match MC peers to Steam IDs after login.
 accessible	field	net/minecraft/server/network/ServerGamePacketListenerImpl	connection	Lnet/minecraft/network/Connection;
+
+# Login path: Minecraft.tick drives Connection.tick via this field.
+accessible	field	net/minecraft/client/Minecraft	pendingConnection	Lnet/minecraft/network/Connection;
+mutable	field	net/minecraft/client/Minecraft	pendingConnection	Lnet/minecraft/network/Connection;
