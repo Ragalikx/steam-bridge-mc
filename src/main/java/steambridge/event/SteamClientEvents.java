@@ -59,10 +59,17 @@ public final class SteamClientEvents {
     }
 
     /**
-     * Called from {@code Minecraft.setScreen} mixin.
+     * Called from {@code Minecraft.setScreen} mixin for non-null screens only.
+     * {@code setScreen(null)} is allowed through by the mixin so the client can leave
+     * {@link ReceivingLevelScreen} and enter the world.
+     *
      * @return {@code null} to cancel opening, a different screen to replace, or the same screen to proceed.
      */
     public static Screen onSetScreen(Screen next) {
+        if (next == null) {
+            return null;
+        }
+
         SteamClient client = SteamManager.getInstance().getActiveClient();
 
         if (client != null && next instanceof DisconnectedScreen) {

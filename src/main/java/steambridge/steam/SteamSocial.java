@@ -130,7 +130,7 @@ public final class SteamSocial {
                 rgba.position(0);
                 rgba.get(data);
 
-                // NativeImage.setPixelRGBA expects ABGR-packed ints (0xAABBGGRR);
+                // NativeImage.setPixelRGBA is public on 1.21.1 and expects ABGR (0xAABBGGRR).
                 // Steam delivers straight RGBA bytes.
                 NativeImage nativeImage = new NativeImage(width, height, false);
                 for (int y = 0; y < height; y++) {

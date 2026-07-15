@@ -208,9 +208,12 @@ public class GuiSteamFriends extends Screen {
         if (texturePath == null || texturePath.isEmpty()) return;
 
         try {
+            // GuiGraphics.blit(ResourceLocation, x, y, u, v, w, h, texW, texH): 1.21.1 API
             ResourceLocation loc = ResourceLocation.parse(texturePath);
             g.blit(loc, x, y, 0.0F, 0.0F, AVATAR_SIZE, AVATAR_SIZE, AVATAR_SIZE, AVATAR_SIZE);
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+            // Missing/invalid dynamic texture: skip this avatar rather than crash the screen.
+        }
     }
 
     /** Bottom Y of the friend-list panel (leaves room for the Back button). */

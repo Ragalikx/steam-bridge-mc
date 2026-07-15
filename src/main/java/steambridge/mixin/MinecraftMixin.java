@@ -23,6 +23,13 @@ public class MinecraftMixin {
 
     @Inject(method = "setScreen", at = @At("HEAD"), cancellable = true)
     private void steambridge$onSetScreen(Screen screen, CallbackInfo ci) {
+        // Minecraft uses setScreen(null) to leave ReceivingLevelScreen / any GUI and enter
+        // the world. A null return from handlers means "cancel this open" for non-null screens
+        // only; never treat "close GUI" as cancel or the client sticks on Loading terrain.
+        if (screen == null) {
+            return;
+        }
+
         Screen next = SteamClientEvents.onSetScreen(screen);
         if (next == null) {
             ci.cancel();

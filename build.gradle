@@ -140,6 +140,19 @@ tasks.register('slimJnaJar', Zip) {
         exclude 'com/sun/jna/win32-x86/**'
         // Linux-only ELF helper; unused on Windows steamworks path.
         exclude '**/ELFAnalyser*'
+        // Win32 StdCall / W32API helpers: Steam FlatAPI is cdecl via Library, not used by us.
+        exclude 'com/sun/jna/win32/**'
+        // AWT helpers only used if Native.getWindowID is called (we never call it).
+        exclude '**/Native$AWT*'
+        // ByReference types we do not use (keep Long + Pointer + base ByReference).
+        exclude '**/ptr/ShortByReference*'
+        exclude '**/ptr/DoubleByReference*'
+        exclude '**/ptr/ByteByReference*'
+        exclude '**/ptr/FloatByReference*'
+        exclude '**/ptr/IntByReference*'
+        exclude '**/ptr/NativeLongByReference*'
+        exclude '**/NativeLong.class'
+        exclude '**/WString.class'
         // Licenses already copied under META-INF/licenses from third_party_licenses/.
         exclude 'META-INF/AL2.0'
         exclude 'META-INF/LGPL2.1'
