@@ -325,23 +325,25 @@ public final class VanillaGuiIntegration {
             }
         }
 
-        // Anchor below the Port field (found by type, not a hardcoded offset) so we never
-        // overlap vanilla's own "Port" label/edit box regardless of screen height.
+        // 1.19.2 ShareToLan has no Port EditBox (that arrived in 1.20). Prefer type lookup,
+        // fall back to a fixed row under the game-mode controls.
         EditBox portEdit = findByType(gui, EditBox.class);
-        int rowY = portEdit != null ? portEdit.getY() + portEdit.getHeight() + 20 : gui.height / 4 + 62;
+        int rowY = portEdit != null ? portEdit.y + portEdit.getHeight() + 20 : gui.height / 4 + 72;
 
-        Button access = Button.builder(Component.literal(accessPolicyLabel(pendingAccessPolicy)), b -> {
+        Button access = new Button(gui.width / 2 - 155, rowY, 150, 20,
+                Component.literal(accessPolicyLabel(pendingAccessPolicy)), b -> {
             pendingAccessPolicy = (pendingAccessPolicy == SteamServer.AccessPolicy.EVERYONE)
                     ? SteamServer.AccessPolicy.FRIENDS_ONLY : SteamServer.AccessPolicy.EVERYONE;
             b.setMessage(Component.literal(accessPolicyLabel(pendingAccessPolicy)));
             saveShareToLanSettings(gui);
-        }).bounds(gui.width / 2 - 155, rowY, 150, 20).build();
+        });
 
-        Button transport = Button.builder(Component.literal(transportLabel(pendingTransportMode)), b -> {
+        Button transport = new Button(gui.width / 2 + 5, rowY, 150, 20,
+                Component.literal(transportLabel(pendingTransportMode)), b -> {
             pendingTransportMode = nextTransportMode(pendingTransportMode);
             b.setMessage(Component.literal(transportLabel(pendingTransportMode)));
             saveShareToLanSettings(gui);
-        }).bounds(gui.width / 2 + 5, rowY, 150, 20).build();
+        });
 
         event.addListener(access);
         event.addListener(transport);
@@ -354,16 +356,17 @@ public final class VanillaGuiIntegration {
         int bottomY = gui.height - 28;
         if (startLan != null) {
             startLan.setWidth(96);
-            startLan.setX(gui.width / 2 - 152);
-            startLan.setY(bottomY);
+            startLan.x = gui.width / 2 - 152;
+            startLan.y = bottomY;
         }
         if (cancel != null) {
             cancel.setWidth(96);
-            cancel.setX(gui.width / 2 + 56);
-            cancel.setY(bottomY);
+            cancel.x = gui.width / 2 + 56;
+            cancel.y = bottomY;
         }
-        event.addListener(Button.builder(Component.translatable("steambridge.gui.open_steam"),
-                b -> startSteamHost(gui)).bounds(gui.width / 2 - 48, bottomY, 96, 20).build());
+        event.addListener(new Button(gui.width / 2 - 48, bottomY, 96, 20,
+                Component.translatable("steambridge.gui.open_steam"),
+                b -> startSteamHost(gui)));
     }
 
     private static void injectFriendsButton(ScreenEvent.Init.Post event, Screen gui) {
@@ -371,7 +374,8 @@ public final class VanillaGuiIntegration {
         EditBox ip = findIpEditBox(gui);
         if (ip == null) return;
 
-        Button friends = Button.builder(Component.translatable("steambridge.gui.friends_short"), b -> {
+        Button friends = new Button(ip.x + ip.getWidth() + 4, ip.y, 20, 20,
+                Component.translatable("steambridge.gui.friends_short"), b -> {
             Minecraft mc = Minecraft.getInstance();
             if (gui instanceof EditServerScreen) {
                 EditBox nameBox = findNameEditBox(gui);
@@ -384,7 +388,7 @@ public final class VanillaGuiIntegration {
             } else {
                 mc.setScreen(new GuiSteamResync(gui, steamId -> pendingSteamId = steamId));
             }
-        }).bounds(ip.getX() + ip.getWidth() + 4, ip.getY(), 20, 20).build();
+        });
         event.addListener(friends);
     }
 
@@ -393,26 +397,23 @@ public final class VanillaGuiIntegration {
         SteamServer server = SteamManager.getInstance().getActiveServer();
         if (server == null || !server.isRunning()) return;
 
-        // Anchor a standalone "Manage Steam session" button directly above the Forge/NeoForge
-        // "Mods" button. Once a world is already shared, vanilla removes its "Open to LAN"
-        // entry, so there is no shareToLan button to attach to; the always-present "Mods"
-        // button is a stable anchor instead. We deliberately do NOT hide or repurpose any
-        // vanilla button (that would fight other mods that reorder the pause menu). We only
-        // add our own widget and nudge the Mods button and the entries below it down one row.
+        // Anchor "Manage Steam session" above the Forge "Mods" button. Once a world is
+        // shared, vanilla removes "Open to LAN"; Mods is a stable anchor. We only add our
+        // widget and nudge Mods and entries below it down one row.
         Button mods = findButtonByMessage(event, "fml.menu.mods");
         if (mods == null) return;
 
-        int x = mods.getX(), y = mods.getY(), w = mods.getWidth();
+        int x = mods.x, y = mods.y, w = mods.getWidth();
         final int rowShift = 24;
         for (GuiEventListener l : event.getListenersList()) {
-            if (l instanceof Button b && b.getY() >= y) {
-                b.setY(b.getY() + rowShift);
+            if (l instanceof Button b && b.y >= y) {
+                b.y += rowShift;
             }
         }
 
-        event.addListener(Button.builder(Component.translatable("steambridge.gui.manage_session"),
-                b -> Minecraft.getInstance().setScreen(new GuiSteamHostManagement(gui)))
-                .bounds(x, y, w, 20).build());
+        event.addListener(new Button(x, y, w, 20,
+                Component.translatable("steambridge.gui.manage_session"),
+                b -> Minecraft.getInstance().setScreen(new GuiSteamHostManagement(gui))));
     }
 
     // -- Host start ------------------------------------------------------------

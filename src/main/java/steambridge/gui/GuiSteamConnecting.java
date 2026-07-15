@@ -6,7 +6,7 @@
 package steambridge.gui;
 
 import steambridge.steam.SteamClient;
-import net.minecraft.client.gui.GuiGraphics;
+import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.DisconnectedScreen;
 import net.minecraft.client.gui.screens.Screen;
@@ -28,10 +28,13 @@ public class GuiSteamConnecting extends Screen {
 
     @Override
     protected void init() {
-        this.addRenderableWidget(Button.builder(Component.translatable("gui.cancel"), b -> {
-            client.disconnect();
-            this.minecraft.setScreen(buildServerListScreen());
-        }).bounds(this.width / 2 - 100, this.height / 4 + 120 + 12, 200, 20).build());
+        this.addRenderableWidget(new Button(
+                this.width / 2 - 100, this.height / 4 + 120 + 12, 200, 20,
+                Component.translatable("gui.cancel"),
+                b -> {
+                    client.disconnect();
+                    this.minecraft.setScreen(buildServerListScreen());
+                }));
     }
 
     @Override
@@ -47,17 +50,17 @@ public class GuiSteamConnecting extends Screen {
     }
 
     @Override
-    public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-        this.renderBackground(g);
+    public void render(PoseStack poseStack, int mouseX, int mouseY, float partialTick) {
+        this.renderBackground(poseStack);
 
         if (client != null) {
-            g.drawCenteredString(this.font,
+            drawCenteredString(poseStack, this.font,
                     client.getStatusMsg(),
                     this.width / 2, this.height / 2 - 50,
                     0xFFFFFF);
         }
 
-        super.render(g, mouseX, mouseY, partialTick);
+        super.render(poseStack, mouseX, mouseY, partialTick);
     }
 
     /**

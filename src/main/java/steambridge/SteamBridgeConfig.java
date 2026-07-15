@@ -9,12 +9,11 @@ import net.minecraftforge.common.ForgeConfigSpec;
 import net.minecraftforge.fml.event.config.ModConfigEvent;
 
 /**
- * Client config (NeoForge 1.20.1, {@link ForgeConfigSpec}).
+ * Client config (Forge 1.19.2, {@link ForgeConfigSpec}).
  *
- * <p>The {@code virtualPort} / {@code allowWithoutAuth} static fields are kept as plain
- * mirrors of the spec values so the rest of the codebase can read them directly, exactly
- * as it did under the 1.12.2 {@code @Config} system. They are refreshed from the spec on
- * every config load/reload via {@link #onLoad}/{@link #onReload}.</p>
+ * <p>The {@code virtualPort} / {@code allowWithoutAuth} static fields are plain mirrors of
+ * the spec values so the rest of the codebase can read them directly. They are refreshed
+ * from the spec on every config load/reload via {@link #onLoad}/{@link #onReload}.</p>
  */
 public final class SteamBridgeConfig {
 

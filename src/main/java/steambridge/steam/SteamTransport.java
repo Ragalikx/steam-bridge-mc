@@ -22,7 +22,6 @@ import net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen;
 import net.minecraft.client.multiplayer.ClientHandshakePacketListenerImpl;
 import net.minecraft.network.Connection;
 import net.minecraft.network.ConnectionProtocol;
-import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.network.protocol.handshake.ClientIntentionPacket;
 import net.minecraft.network.protocol.login.ServerboundHelloPacket;
 import net.minecraftforge.network.NetworkConstants;
@@ -128,27 +127,20 @@ public final class SteamTransport {
             // no origin screen). This is the "Back to server list" target after a kick.
             final Screen returnScreen = new JoinMultiplayerScreen(new TitleScreen());
 
-            // Connection.connect builds the full vanilla client pipeline (frame codecs,
-            // packet codecs, the Connection as packet handler) and connects the socket.
-            // No reflection into the channel/address fields required.
-            Connection connection = new Connection(PacketFlow.CLIENTBOUND);
+            // 1.19.2: Connection.connectToServer builds the vanilla pipeline and connects.
             InetSocketAddress addr = new InetSocketAddress("127.0.0.1", proxyPort);
-            ChannelFuture connectFuture = Connection.connect(addr, false, connection).syncUninterruptibly();
-
-            if (!connectFuture.isSuccess()) {
-                SteamBridgeMod.LOG.error("[LoopbackBridge][Client] Connect to proxy {} failed.", proxyPort);
-                return false;
-            }
+            Connection connection = Connection.connectToServer(addr, false);
 
             connection.setListener(new ClientHandshakePacketListenerImpl(
-                    connection, mc, null, returnScreen, false, null, status -> {}));
+                    connection, mc, returnScreen, status -> {}));
 
-            // Intention hostname carries the Forge modded-connection marker ("...\0FML3\0"),
-            // so the host runs the Forge login handshake instead of treating us as vanilla.
+            // Intention hostname carries the Forge modded-connection marker so the host
+            // runs the Forge login handshake instead of treating us as vanilla.
             String hostName = "SteamRelay\0" + NetworkConstants.NETVERSION + "\0";
             connection.send(new ClientIntentionPacket(hostName, 25565, ConnectionProtocol.LOGIN));
             connection.send(new ServerboundHelloPacket(
                     mc.getUser().getName(),
+                    Optional.empty(),
                     Optional.ofNullable(mc.getUser().getProfileId())));
 
             SteamBridgeMod.LOG.info("[LoopbackBridge][Client] Connected to loopback proxy. proxyPort={} conn={} steamID={}",

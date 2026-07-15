@@ -20,11 +20,10 @@ import steambridge.event.SteamClientEvents;
 import steambridge.steam.SteamManager;
 
 /**
- * Steam Bridge entry point (NeoForge 1.20.1).
+ * Steam Bridge entry point (Forge 1.19.2).
  *
  * <p>Client-only mod: launches the Steam bridge during client setup and wires up the
- * client-side event handlers. Ported from the 1.12.2 {@code @Mod}/{@code @SidedProxy}
- * lifecycle.</p>
+ * client-side event handlers. Ported from the NeoForge 1.20.1 / 1.12.2 lifecycle.</p>
  */
 @Mod(SteamBridgeMod.MODID)
 public class SteamBridgeMod {
@@ -36,7 +35,7 @@ public class SteamBridgeMod {
     public static final Logger LOG = LogUtils.getLogger();
 
     public SteamBridgeMod() {
-        LOG.info("=== Steam Bridge pre-init (NeoForge 1.20.1) v{} ===", VERSION);
+        LOG.info("=== Steam Bridge pre-init (Forge 1.19.2) v{} ===", VERSION);
 
         IEventBus modBus = FMLJavaModLoadingContext.get().getModEventBus();
         modBus.addListener(this::onClientSetup);

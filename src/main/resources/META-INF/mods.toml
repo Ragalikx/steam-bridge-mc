@@ -1,5 +1,5 @@
 modLoader="javafml"
-loaderVersion="[47,)"
+loaderVersion="[43,)"
 license="MIT"
 issueTrackerURL="https://github.com/Ragalikx/steam-bridge-mc/issues"
 
@@ -22,13 +22,13 @@ Requires Steam (AppID 480 - Spacewar) to be running.'''
 [[dependencies.${mod_id}]]
     modId="forge"
     mandatory=true
-    versionRange="[47.1.106,)"
+    versionRange="[43.5.0,)"
     ordering="NONE"
     side="CLIENT"
 
 [[dependencies.${mod_id}]]
     modId="minecraft"
     mandatory=true
-    versionRange="[1.20.1,1.21)"
+    versionRange="[1.19.2,1.20)"
     ordering="NONE"
     side="CLIENT"

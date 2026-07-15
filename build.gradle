@@ -7,8 +7,8 @@ plugins {
 // Release (cmd):        gradlew build -PmodVersion=1.145
 // Release (PowerShell): .\gradlew.bat build "-PmodVersion=1.145"   // quotes required:
 //                       bare 1.145 is split so Gradle sees task ".145"
-// Result: project.version / jar / mods.toml / BuildInfo = "1.145+mc1.20.1"
-// Dev (no -P):          "0.0.0-dev+mc1.20.1"
+// Result: project.version / jar / mods.toml / BuildInfo = "1.145+mc1.19.2"
+// Dev (no -P):          "0.0.0-dev+mc1.19.2"
 // Optional leading "v" is stripped (CI: -PmodVersion=v1.145).
 // Do NOT use positional "gradlew build 1.145" - Gradle treats that as a task name.
 def rawModVersion = (findProperty('modVersion') ?: '0.0.0-dev').toString().trim()
@@ -18,7 +18,7 @@ if (rawModVersion.isEmpty()) {
 if (rawModVersion.startsWith('v') || rawModVersion.startsWith('V')) {
     rawModVersion = rawModVersion.substring(1)
 }
-// Reject accidental full strings that already contain +mc… (avoid 1.145+mc1.20.1+mc1.20.1).
+// Reject accidental full strings that already contain +mc (avoid double suffix).
 if (rawModVersion.contains('+mc')) {
     throw new GradleException(
         "modVersion must be the mod release only (e.g. 1.145), not '${rawModVersion}'. " +
@@ -30,7 +30,7 @@ ext.modVersionOnly = rawModVersion
 version = "${rawModVersion}+mc${minecraft_version}"
 group   = project.mod_group
 
-logger.lifecycle("Steam Bridge version: {}  (modVersion={}, minecraft={})",
+logger.lifecycle("Steam Bridge (Forge 1.19.2) version: {}  (modVersion={}, minecraft={})",
     version, rawModVersion, minecraft_version)
 
 base {
@@ -63,7 +63,7 @@ tasks.register('generateBuildInfo') {
 package steambridge;
 /** Auto-generated at build time. Do not edit or commit. */
 public final class BuildInfo {
-    /** Full release id, e.g. {@code 1.145+mc1.20.1}. */
+    /** Full release id, e.g. {@code 1.145+mc1.19.2}. */
     public static final String VERSION     = "${verFull}";
     /** Mod-only version from {@code -PmodVersion}, e.g. {@code 1.145}. */
     public static final String MOD_VERSION = "${verMod}";
@@ -83,17 +83,11 @@ tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }
 
-// -- NeoForge (legacy/Forge-compat) toolchain ----------------------------------
-// ModDevGradle's "legacyforge" preset targets MinecraftForge/NeoForge 1.17-1.20.1.
-// Unlike the old net.neoforged.gradle.userdev plugin, it automatically wires up
-// reobfuscation (official Mojang mappings -> the SRG names the shipped game runs
-// with) for the 'jar' task - obfuscateJar defaults to true, so no extra config needed.
+// -- MinecraftForge 1.19.2 via MDG legacyforge ---------------------------------
+// version= resolves net.minecraftforge:forge (MinecraftForge), not NeoForge.
+// Reobfuscation (official -> SRG) is wired for the jar task automatically.
 legacyForge {
-    // Use neoForgeVersion (net.neoforged:forge coordinate), NOT the version= shorthand,
-    // which resolves net.minecraftforge:forge (real MinecraftForge) instead of NeoForge.
-    enable {
-        neoForgeVersion = project.neoforge_version
-    }
+    version = project.forge_version
 
     runs {
         client {
@@ -148,16 +142,15 @@ configurations {
 //     jna-5.14.0 and the loader's own jna-5.12.1 both register as a module named
 //     "com.sun.jna" -> `ResolutionException: Module steambridge reads more than one
 //     module named com.sun.jna`.
-// NeoForge itself depends on and always ships JNA at runtime, so the fix is to not bundle
-// a second copy at all: compile against it (compileOnly, pinned to the exact version the
-// 1.20.1 loader provides) and let the game supply the real one.
+// Compile against JNA; do not bundle a second copy if the loader already ships one.
+// If client launch fails with ClassNotFound for com.sun.jna, switch to shade/slim later.
 dependencies {
     compileOnly "net.java.dev.jna:jna:${project.jna_version}"
 
     // Compile + dev-runtime classpath for the steamworks4j API. Not auto-bundled by the
-    // default `jar` task (only jarJar does that) - we copy its classes in ourselves.
+    // default `jar` task - we copy its classes in ourselves.
     implementation("com.code-disaster.steamworks4j:steamworks4j:${project.steamworks4j_version}") {
-        exclude group: 'net.java.dev.jna' // the loader provides JNA; never pull a second copy
+        exclude group: 'net.java.dev.jna'
     }
 
     steamBundle "com.code-disaster.steamworks4j:steamworks4j:${project.steamworks4j_version}"
@@ -170,7 +163,7 @@ tasks.named('processResources', ProcessResources).configure {
         mod_name         : project.mod_name,
         mod_version      : project.version,
         minecraft_version: project.minecraft_version,
-        neoforge_version : project.neoforge_version
+        forge_version    : project.forge_version
     ]
     inputs.properties replaceProperties
     filesMatching(['META-INF/mods.toml', 'pack.mcmeta']) {
@@ -184,7 +177,7 @@ jar {
     // SteamManager's loader reads the DLLs via getClass().getResourceAsStream("/steam_api64.dll")
     // - getClass() belongs to THIS mod jar, so the DLLs must be resolvable from the mod jar's
     // own classloader at its root. Everything else in the upstream artifact is dropped:
-    // the macOS/Linux natives (unsupported) and the 32-bit DLLs (1.20.1 requires 64-bit Java).
+    // the macOS/Linux natives (unsupported) and the 32-bit DLLs (1.19.2 requires 64-bit Java).
     from({ project.configurations.steamBundle.collect { zipTree(it) } }) {
         include 'com/codedisaster/**'                    // steamworks4j Java API
         include 'steam_api64.dll', 'steamworks4j64.dll'  // win64 natives only, at the jar root
