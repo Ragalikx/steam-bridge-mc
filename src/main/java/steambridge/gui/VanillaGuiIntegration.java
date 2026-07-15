@@ -457,7 +457,7 @@ public class VanillaGuiIntegration {
                             SteamAppIdHelper.ensureAppId(mc.gameDir);
                             SteamAppIdHelper.launchSteam();
                         } catch (Exception e) {
-                            SteamBridgeMod.logger.warn("[SteamHost] Failed to launch Steam: {}", e.getMessage());
+                            SteamBridgeMod.LOG.warn("[SteamHost] Failed to launch Steam: {}", e.getMessage());
                         }
                         mc.ingameGUI.getChatGUI().printChatMessage(new net.minecraft.util.text.TextComponentString(
                                 "\u00A7e" + net.minecraft.client.resources.I18n.format("steambridge.gui.host_steam_launching")));

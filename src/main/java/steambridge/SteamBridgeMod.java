@@ -73,7 +73,7 @@ public class SteamBridgeMod {
 
     @Mod.EventHandler
     public void postInit(FMLPostInitializationEvent event) {
-        LOG.info("=== SteamBridge postInit — initializing Steam... ===");
+        LOG.info("=== SteamBridge postInit - initializing Steam... ===");
 
         // Ensure steam_appid.txt exists in .minecraft before SteamAPI.init()
         SteamAppIdHelper.ensureAppId(Minecraft.getMinecraft().gameDir);
