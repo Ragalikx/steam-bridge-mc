@@ -57,6 +57,9 @@ public final class VanillaGuiIntegration {
 
         ScreenEvents.AFTER_INIT.register((client, screen, scaledWidth, scaledHeight) -> {
             onScreenInit(screen);
+            if (screen instanceof ShareToLanScreen) {
+                ScreenEvents.remove(screen).register(VanillaGuiIntegration::saveShareToLanSettings);
+            }
         });
     }
 
@@ -71,16 +74,6 @@ public final class VanillaGuiIntegration {
             SteamServer server = SteamManager.getInstance().getActiveServer();
             if (server != null && server.isRunning()) {
                 return new GuiSteamHostManagement(mc.screen);
-            }
-            if (mc.getSingleplayerServer() != null) {
-                try {
-                    String worldKey = worldKey(mc.getSingleplayerServer());
-                    SteamSocial.Worlds.Settings saved = SteamSocial.Worlds.get().load(worldKey);
-                    setByType(next, GameType.class, SteamSocial.Worlds.parseGameType(saved.gametype));
-                    setByType(next, boolean.class, saved.allowCommands);
-                } catch (Exception e) {
-                    SteamBridgeMod.LOG.warn("Failed to load ShareToLan defaults", e);
-                }
             }
         }
         return next;
@@ -120,21 +113,67 @@ public final class VanillaGuiIntegration {
         return null;
     }
 
-    private static boolean findPrimitiveBoolean(Object owner) {
-        for (Field f : owner.getClass().getDeclaredFields()) {
+    /**
+     * ShareToLanScreen.commands (single primitive boolean on this screen).
+     */
+    private static boolean getShareToLanCommands(Screen gui) {
+        for (Field f : gui.getClass().getDeclaredFields()) {
             if (f.getType() == boolean.class) {
-                try { f.setAccessible(true); return (boolean) f.get(owner); }
-                catch (Exception ignored) {}
+                try {
+                    f.setAccessible(true);
+                    return f.getBoolean(gui);
+                } catch (Exception ignored) {}
             }
         }
         return false;
     }
 
+    private static void setShareToLanCommands(Screen gui, boolean value) {
+        for (Field f : gui.getClass().getDeclaredFields()) {
+            if (f.getType() == boolean.class) {
+                try {
+                    f.setAccessible(true);
+                    f.setBoolean(gui, value);
+                    return;
+                } catch (Exception ignored) {}
+            }
+        }
+    }
+
+    private static GameType getShareToLanGameType(Screen gui) {
+        GameType gt = findByType(gui, GameType.class);
+        return gt != null ? gt : GameType.SURVIVAL;
+    }
+
+    private static void setShareToLanGameType(Screen gui, GameType value) {
+        if (value == null) return;
+        setByType(gui, GameType.class, value);
+    }
+
     private static void setByType(Object owner, Class<?> type, Object value) {
         for (Field f : owner.getClass().getDeclaredFields()) {
-            if (type.isAssignableFrom(f.getType())) {
+            if (type.isAssignableFrom(f.getType()) || (type == boolean.class && f.getType() == boolean.class)) {
                 try { f.setAccessible(true); f.set(owner, value); return; }
                 catch (Exception ignored) {}
+            }
+        }
+    }
+
+    /** After init(), force ShareToLan CycleButtons + fields to match saved host settings. */
+    @SuppressWarnings("unchecked")
+    private static void applySavedShareToLan(Screen gui, SteamSocial.Worlds.Settings saved) {
+        if (saved == null) return;
+        GameType gameType = SteamSocial.Worlds.parseGameType(saved.gametype);
+        setShareToLanGameType(gui, gameType);
+        setShareToLanCommands(gui, saved.allowCommands);
+
+        for (GuiEventListener l : gui.children()) {
+            if (!(l instanceof CycleButton<?> raw)) continue;
+            Object val = raw.getValue();
+            if (val instanceof Boolean) {
+                ((CycleButton<Boolean>) raw).setValue(saved.allowCommands);
+            } else if (val instanceof GameType) {
+                ((CycleButton<GameType>) raw).setValue(gameType);
             }
         }
     }
@@ -269,22 +308,12 @@ public final class VanillaGuiIntegration {
         if (!(gui instanceof ShareToLanScreen)) return;
 
         IntegratedServer srv = Minecraft.getInstance().getSingleplayerServer();
-        SteamSocial.Worlds.Settings saved = null;
         if (srv != null) {
-            saved = SteamSocial.Worlds.get().load(worldKey(srv));
+            SteamSocial.Worlds.Settings saved = SteamSocial.Worlds.get().load(worldKey(srv));
             pendingTransportMode = SteamSocial.Worlds.parseTransportMode(saved.transportMode);
             pendingAccessPolicy  = SteamSocial.Worlds.parseAccessPolicy(saved.accessPolicy);
-
-            if (saved.allowCommands != findPrimitiveBoolean(gui)) {
-                String commandsLabel = I18n.get("selectWorld.allowCommands.new");
-                for (GuiEventListener l : gui.children()) {
-                    if (l instanceof CycleButton<?> btn
-                            && btn.getMessage().getString().contains(commandsLabel)) {
-                        btn.onPress();
-                        break;
-                    }
-                }
-            }
+            // Restore after init() (it overwrites gameMode/commands from world data).
+            applySavedShareToLan(gui, saved);
         }
 
         EditBox portEdit = findByType(gui, EditBox.class);
@@ -406,9 +435,8 @@ public final class VanillaGuiIntegration {
             }
         }
 
-        GameType gameType = findByType(gui, GameType.class);
-        if (gameType == null) gameType = GameType.SURVIVAL;
-        boolean commands = findPrimitiveBoolean(gui);
+        GameType gameType = getShareToLanGameType(gui);
+        boolean commands = getShareToLanCommands(gui);
 
         String worldKey = worldKey(srv);
         SteamSocial.Worlds.get().save(worldKey, gameType, commands, pendingAccessPolicy, pendingTransportMode);
@@ -434,12 +462,12 @@ public final class VanillaGuiIntegration {
     }
 
     private static void saveShareToLanSettings(Screen gui) {
+        if (!(gui instanceof ShareToLanScreen)) return;
         Minecraft mc = Minecraft.getInstance();
         IntegratedServer srv = mc.getSingleplayerServer();
         if (srv == null) return;
-        GameType gameType = findByType(gui, GameType.class);
-        if (gameType == null) gameType = GameType.SURVIVAL;
-        boolean commands = findPrimitiveBoolean(gui);
+        GameType gameType = getShareToLanGameType(gui);
+        boolean commands = getShareToLanCommands(gui);
         SteamSocial.Worlds.get().save(worldKey(srv), gameType, commands, pendingAccessPolicy, pendingTransportMode);
     }
 
@@ -468,7 +496,7 @@ public final class VanillaGuiIntegration {
 
     private static String worldKey(IntegratedServer srv) {
         try {
-            return srv.getWorldPath(LevelResource.ROOT).getParent().getFileName().toString();
+            return srv.getWorldPath(LevelResource.ROOT).normalize().getFileName().toString();
         } catch (Exception e) {
             return "__default_world__";
         }
