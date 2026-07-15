@@ -176,10 +176,6 @@ public final class SteamUdpProxy {
         }
     }
 
-    public int getKnownVoiceServerPort() {
-        return knownVoiceServerPort.get();
-    }
-
     /** detected bind, else game port, else 24454. */
     public int resolveVoiceTargetPort() {
         int known = knownVoiceServerPort.get();

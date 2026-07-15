@@ -17,7 +17,6 @@ import steambridge.steam.SteamManager;
 /** Steam Bridge entry (Fabric 1.21.1, client-only). */
 public class SteamBridgeMod implements ClientModInitializer {
 
-    public static final String MODID   = "steambridge";
     public static final String NAME    = "Steam Bridge";
     public static final String VERSION = BuildInfo.VERSION;
 
