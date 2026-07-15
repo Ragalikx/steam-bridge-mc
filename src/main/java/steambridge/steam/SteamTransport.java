@@ -127,28 +127,40 @@ public final class SteamTransport {
             // no origin screen. This is the "Back to server list" target after a kick.
             final Screen returnScreen = new JoinMultiplayerScreen(new TitleScreen());
 
-            // Connection.connect builds the full vanilla client pipeline (frame codecs,
-            // packet codecs, the Connection as packet handler) and connects the socket;
-            // no reflection into the channel/address fields required.
+            // Match ConnectScreen: prepare multiplayer, native transport flag, login listener,
+            // intention + hello, then pendingConnection so Minecraft.tick drives Connection.tick.
+            mc.prepareForMultiplayer();
+
             Connection connection = new Connection(PacketFlow.CLIENTBOUND);
             InetSocketAddress addr = new InetSocketAddress("127.0.0.1", proxyPort);
-            ChannelFuture connectFuture = Connection.connect(addr, false, connection).syncUninterruptibly();
+            ChannelFuture connectFuture =
+                    Connection.connect(addr, mc.options.useNativeTransport(), connection).syncUninterruptibly();
 
             if (!connectFuture.isSuccess()) {
                 SteamBridgeMod.LOG.error("[LoopbackBridge][Client] Connect to proxy {} failed.", proxyPort);
                 return false;
             }
 
-            // 1.20.1: set login listener, then intention + hello (same order as vanilla join).
             connection.setListener(new ClientHandshakePacketListenerImpl(
                     connection, mc, null, returnScreen, false, null, status -> {}));
-            connection.send(new ClientIntentionPacket("SteamRelay", 25565, ConnectionProtocol.LOGIN));
+            connection.send(new ClientIntentionPacket(
+                    addr.getHostString(), proxyPort, ConnectionProtocol.LOGIN));
             connection.send(new ServerboundHelloPacket(
                     mc.getUser().getName(),
                     Optional.ofNullable(mc.getUser().getProfileId())));
 
-            SteamBridgeMod.LOG.info("[LoopbackBridge][Client] Connected to loopback proxy. proxyPort={} conn={} steamID={}",
-                proxyPort, connectionHandle, remoteSteamID);
+            try {
+                java.lang.reflect.Field f = Minecraft.class.getDeclaredField("pendingConnection");
+                f.setAccessible(true);
+                f.set(mc, connection);
+            } catch (Exception e) {
+                SteamBridgeMod.LOG.warn(
+                        "[LoopbackBridge][Client] Could not set pendingConnection: {}", e.getMessage());
+            }
+
+            SteamBridgeMod.LOG.info(
+                    "[LoopbackBridge][Client] Connected to loopback proxy. proxyPort={} conn={} steamID={}",
+                    proxyPort, connectionHandle, remoteSteamID);
             return true;
 
         } catch (Throwable t) {
