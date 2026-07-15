@@ -18,15 +18,15 @@ Minecraft version links open the matching branch.
 
 | Minecraft | Platform | Loader version | Windows | Linux | macOS | Status |
 |---|---|---|---|---|---|---|
-| [1.21.1](https://github.com/Ragalikx/steam-bridge-mc/tree/NeoForge-1.21.1) | NeoForge | 21.1.234 | ✅ | ✅ | ❌ | Available |
-| [1.21.1](https://github.com/Ragalikx/steam-bridge-mc/tree/Fabric-1.21.1) | Fabric | 0.16.14 + API 0.116.13 | ✅ | ✅ | ❌ | Available |
-| [1.20.1](https://github.com/Ragalikx/steam-bridge-mc/tree/NeoForge-1.20.1) | NeoForge/Forge | 47.1.106 | ✅ | ✅ | ❌ | Available |
-| [1.20.1](https://github.com/Ragalikx/steam-bridge-mc/tree/Fabric-1.20.1) | Fabric | 0.16.14 + API 0.92.2 | ✅ | ✅ | ❌ | Available |
+| [1.21.1](https://github.com/Ragalikx/steam-bridge-mc/tree/NeoForge-1.21.1) | NeoForge | 21.1.234 | ✅ | ⏳ (In development) | ❌ | Available |
+| [1.21.1](https://github.com/Ragalikx/steam-bridge-mc/tree/Fabric-1.21.1) | Fabric | 0.16.14 + API 0.116.13 | ✅ | ⏳ (In development) | ❌ | Available |
+| [1.20.1](https://github.com/Ragalikx/steam-bridge-mc/tree/NeoForge-1.20.1) | NeoForge/Forge | 47.1.106 | ✅ | ⏳ (In development) | ❌ | Available |
+| [1.20.1](https://github.com/Ragalikx/steam-bridge-mc/tree/Fabric-1.20.1) | Fabric | 0.16.14 + API 0.92.2 | ✅ | ⏳ (In development) | ❌ | Available |
 | [1.19.2](https://github.com/Ragalikx/steam-bridge-mc/tree/Forge-1.19.2) | Forge | ? | ? | ? | ❌ | In development |
 | [1.19.2](https://github.com/Ragalikx/steam-bridge-mc/tree/Fabric-1.19.2) | Fabric | ? | ? | ? | ❌ | In development |
 | [1.16.5](https://github.com/Ragalikx/steam-bridge-mc/tree/Forge-1.16.5) | Forge | ? | ? | ? | ❌ | In development |
 | [1.16.5](https://github.com/Ragalikx/steam-bridge-mc/tree/Fabric-1.16.5) | Fabric | ? | ? | ? | ❌ | In development |
-| [1.12.2](https://github.com/Ragalikx/steam-bridge-mc/tree/Forge-1.12.2) | Forge | 14.23.5.2860 | ✅ | ✅ | ❌ | Available |
+| [1.12.2](https://github.com/Ragalikx/steam-bridge-mc/tree/Forge-1.12.2) | Forge | 14.23.5.2860 | ✅ | ⏳ (In development) | ❌ | Available |
 | [1.8.9](https://github.com/Ragalikx/steam-bridge-mc/tree/Forge-1.8.9) | Forge | ? | ? | ? | ❌ | In development |
 | [1.7.10](https://github.com/Ragalikx/steam-bridge-mc/tree/Forge-1.7.10) | Forge | ? | ? | ? | ❌ | In development |
 
