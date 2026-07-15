@@ -761,7 +761,7 @@ public class SteamManager {
 
                     if (wasClient && mc.level != null) {
                         // Was a client inside a Steam-hosted world: kick to main menu with a friendly screen.
-                        // clearLevel() removed in 1.21.1; setScreen triggers the cleanup
+                        // setScreen(null/menu) tears down the client level
                         mc.setScreen(new net.minecraft.client.gui.screens.DisconnectedScreen(
                             new net.minecraft.client.gui.screens.TitleScreen(),
                             net.minecraft.network.chat.Component.translatable("disconnect.lost"),

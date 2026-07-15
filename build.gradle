@@ -23,7 +23,7 @@ ext.modVersionOnly = rawModVersion
 version = "${rawModVersion}+mc${minecraft_version}"
 group   = project.mod_group
 
-logger.lifecycle("Steam Bridge (Fabric) version: {}  (modVersion={}, minecraft={})",
+logger.lifecycle("Steam Bridge (Fabric 1.20.1) version: {}  (modVersion={}, minecraft={})",
     version, rawModVersion, minecraft_version)
 
 base {
@@ -31,7 +31,7 @@ base {
 }
 
 java {
-    toolchain.languageVersion = JavaLanguageVersion.of(21)
+    toolchain.languageVersion = JavaLanguageVersion.of(17)
     withSourcesJar()
 }
 
@@ -70,7 +70,7 @@ public final class BuildInfo {
 tasks.withType(JavaCompile).configureEach {
     dependsOn 'generateBuildInfo'
     options.encoding = 'UTF-8'
-    options.release = 21
+    options.release = 17
     // Keep source file + line numbers for crash reports; drop local-variable tables (~class bloat).
     options.debugOptions.debugLevel = 'source,lines'
 }

@@ -67,9 +67,6 @@ public class GuiSteamFriends extends Screen {
     }
 
     @Override
-    protected void renderBlurredBackground(float partialTick) {}
-
-    @Override
     protected void init() {
         this.addRenderableWidget(Button.builder(Component.translatable("gui.back"),
                 b -> this.minecraft.setScreen(parent))
@@ -114,10 +111,10 @@ public class GuiSteamFriends extends Screen {
     }
 
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+    public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
         int maxVisible = maxVisibleRows();
         int maxScroll  = Math.max(0, filteredFriends.size() - maxVisible);
-        scrollOffset  += (scrollY > 0) ? -1 : 1;
+        scrollOffset  += (delta > 0) ? -1 : 1;
         scrollOffset   = Math.max(0, Math.min(scrollOffset, maxScroll));
         return true;
     }
@@ -152,7 +149,7 @@ public class GuiSteamFriends extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTicks) {
-        super.renderBackground(g, mouseX, mouseY, partialTicks);
+        super.renderBackground(g);
         g.drawCenteredString(this.font,
                 I18n.get("steambridge.gui.select_friend"),
                 this.width / 2, 15, 0xFFFFFF);
@@ -208,8 +205,8 @@ public class GuiSteamFriends extends Screen {
         if (texturePath == null || texturePath.isEmpty()) return;
 
         try {
-            // GuiGraphics.blit(ResourceLocation, x, y, u, v, w, h, texW, texH): 1.21.1 API
-            ResourceLocation loc = ResourceLocation.parse(texturePath);
+            // GuiGraphics.blit(ResourceLocation, x, y, u, v, w, h, texW, texH): 1.20.1 API
+            ResourceLocation loc = new ResourceLocation(texturePath);
             g.blit(loc, x, y, 0.0F, 0.0F, AVATAR_SIZE, AVATAR_SIZE, AVATAR_SIZE, AVATAR_SIZE);
         } catch (Exception ignored) {
             // Missing/invalid dynamic texture: skip this avatar rather than crash the screen.

@@ -47,9 +47,6 @@ public class GuiSteamResync extends Screen {
     }
 
     @Override
-    protected void renderBlurredBackground(float partialTick) {}
-
-    @Override
     protected void init() {
         this.addRenderableWidget(Button.builder(Component.translatable("gui.cancel"),
                 b -> this.minecraft.setScreen(parent))
@@ -121,7 +118,7 @@ public class GuiSteamResync extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTicks) {
-        super.renderBackground(g, mouseX, mouseY, partialTicks);
+        super.renderBackground(g);
 
         String title = "§b" + I18n.get("steambridge.gui.resync_title");
         g.drawCenteredString(this.font, title, this.width / 2, this.height / 2 - 50, 0xFFFFFF);

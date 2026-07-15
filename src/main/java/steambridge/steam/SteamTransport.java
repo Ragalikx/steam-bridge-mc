@@ -21,10 +21,13 @@ import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen;
 import net.minecraft.client.multiplayer.ClientHandshakePacketListenerImpl;
 import net.minecraft.network.Connection;
+import net.minecraft.network.ConnectionProtocol;
 import net.minecraft.network.protocol.PacketFlow;
+import net.minecraft.network.protocol.handshake.ClientIntentionPacket;
 import net.minecraft.network.protocol.login.ServerboundHelloPacket;
 
 import java.net.InetSocketAddress;
+import java.util.Optional;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.IntConsumer;
@@ -136,28 +139,13 @@ public final class SteamTransport {
                 return false;
             }
 
-            // initiateServerboundPlayConnection sends only ClientIntentionPacket.
-            // ServerboundHelloPacket must follow immediately; without it the server
-            // waits indefinitely for the login hello and times out after 30s.
-            connection.initiateServerboundPlayConnection(
-                    "SteamRelay",
-                    25565,
-                    new ClientHandshakePacketListenerImpl(
-                            connection, mc, null, returnScreen, false, null, status -> {}, null
-                    )
-            );
-            connection.send(new ServerboundHelloPacket(mc.getUser().getName(), mc.getUser().getProfileId()));
-
-            // pendingConnection makes Minecraft.tick() call connection.tick() each game tick,
-            // which drives TickablePacketListeners during the login/config phase and fires
-            // handleDisconnection() if the channel closes. Field is private; use reflection.
-            try {
-                java.lang.reflect.Field f = Minecraft.class.getDeclaredField("pendingConnection");
-                f.setAccessible(true);
-                f.set(mc, connection);
-            } catch (Exception e) {
-                SteamBridgeMod.LOG.warn("[LoopbackBridge][Client] Could not set pendingConnection: {}", e.getMessage());
-            }
+            // 1.20.1: set login listener, then intention + hello (same order as vanilla join).
+            connection.setListener(new ClientHandshakePacketListenerImpl(
+                    connection, mc, null, returnScreen, false, null, status -> {}));
+            connection.send(new ClientIntentionPacket("SteamRelay", 25565, ConnectionProtocol.LOGIN));
+            connection.send(new ServerboundHelloPacket(
+                    mc.getUser().getName(),
+                    Optional.ofNullable(mc.getUser().getProfileId())));
 
             SteamBridgeMod.LOG.info("[LoopbackBridge][Client] Connected to loopback proxy. proxyPort={} conn={} steamID={}",
                 proxyPort, connectionHandle, remoteSteamID);

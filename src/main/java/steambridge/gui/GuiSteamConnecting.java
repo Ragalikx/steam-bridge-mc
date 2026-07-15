@@ -27,9 +27,6 @@ public class GuiSteamConnecting extends Screen {
     }
 
     @Override
-    protected void renderBlurredBackground(float partialTick) {}
-
-    @Override
     protected void init() {
         this.addRenderableWidget(Button.builder(Component.translatable("gui.cancel"), b -> {
             client.disconnect();
@@ -51,7 +48,7 @@ public class GuiSteamConnecting extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-        super.renderBackground(g, mouseX, mouseY, partialTick);
+        super.renderBackground(g);
 
         if (client != null) {
             g.drawCenteredString(this.font,

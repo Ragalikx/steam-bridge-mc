@@ -53,9 +53,6 @@ public class GuiSteamHostManagement extends Screen {
     }
 
     @Override
-    protected void renderBlurredBackground(float partialTick) {}
-
-    @Override
     public boolean isPauseScreen() {
         return false;
     }
@@ -102,7 +99,7 @@ public class GuiSteamHostManagement extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTicks) {
-        super.renderBackground(g, mouseX, mouseY, partialTicks);
+        super.renderBackground(g);
         g.drawCenteredString(this.font, I18n.get("steambridge.gui.management"), this.width / 2, 10, 16777215);
 
         if (server != null && server.isRunning()) {
@@ -118,7 +115,7 @@ public class GuiSteamHostManagement extends Screen {
 
                     String avatar = SteamSocial.ProfileCache.get().getAvatarTexture(snap.getSteamId());
                     if (avatar != null && !avatar.isEmpty()) {
-                        g.blit(ResourceLocation.parse(avatar), this.width / 2 - 170, y + 2, 0.0F, 0.0F, 16, 16, 16, 16);
+                        g.blit(new ResourceLocation(avatar), this.width / 2 - 170, y + 2, 0.0F, 0.0F, 16, 16, 16, 16);
                     }
 
                     SteamConnectionStatus status = snap.getConnectionStatus();

@@ -14,7 +14,7 @@ import steambridge.event.SteamClientEvents;
 import steambridge.gui.VanillaGuiIntegration;
 import steambridge.steam.SteamManager;
 
-/** Steam Bridge entry (Fabric 1.21.1, client-only). */
+/** Steam Bridge entry (Fabric 1.20.1, client-only). */
 public class SteamBridgeMod implements ClientModInitializer {
 
     public static final String NAME    = "Steam Bridge";
@@ -24,7 +24,7 @@ public class SteamBridgeMod implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
-        LOG.info("=== Steam Bridge pre-init (Fabric 1.21.1) v{} ===", VERSION);
+        LOG.info("=== Steam Bridge pre-init (Fabric 1.20.1) v{} ===", VERSION);
 
         SteamBridgeConfig.load();
         SteamClientEvents.register();

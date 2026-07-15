@@ -25,7 +25,7 @@ import steambridge.steam.SteamServer;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 
-/** Client-side gameplay/GUI event handlers (Fabric 1.21.1). */
+/** Client-side gameplay/GUI event handlers (Fabric 1.20.1). */
 public final class SteamClientEvents {
 
     private static final int TRANSIENT_DISCONNECT_GRACE_TICKS = 160;

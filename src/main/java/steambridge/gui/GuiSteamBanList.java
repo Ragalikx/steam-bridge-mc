@@ -28,9 +28,6 @@ public class GuiSteamBanList extends Screen {
     }
 
     @Override
-    protected void renderBlurredBackground(float partialTick) {}
-
-    @Override
     public boolean isPauseScreen() {
         return false;
     }
@@ -72,7 +69,7 @@ public class GuiSteamBanList extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTicks) {
-        super.renderBackground(g, mouseX, mouseY, partialTicks);
+        super.renderBackground(g);
         g.drawCenteredString(this.font, I18n.get("steambridge.gui.banned"), this.width / 2, 10, 16777215);
 
         if (server != null) {
@@ -88,7 +85,7 @@ public class GuiSteamBanList extends Screen {
 
                     String avatar = SteamSocial.ProfileCache.get().getAvatarTexture(ban.getSteamId());
                     if (avatar != null && !avatar.isEmpty()) {
-                        g.blit(ResourceLocation.parse(avatar), this.width / 2 - 170, y + 2, 0.0F, 0.0F, 16, 16, 16, 16);
+                        g.blit(new ResourceLocation(avatar), this.width / 2 - 170, y + 2, 0.0F, 0.0F, 16, 16, 16, 16);
                     }
 
                     g.drawString(this.font, ban.getSteamName() + " (" + ban.getMinecraftName() + ")", this.width / 2 - 150, y + 6, 16777215);
