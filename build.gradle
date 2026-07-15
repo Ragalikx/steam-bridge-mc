@@ -188,6 +188,25 @@ jar {
     from({ project.configurations.steamBundle.collect { zipTree(it) } }) {
         include 'com/codedisaster/**'                    // steamworks4j Java API
         include 'steam_api64.dll', 'steamworks4j64.dll'  // win64 natives only, at the jar root
+        exclude 'com/codedisaster/steamworks/SteamController*'
+        exclude 'com/codedisaster/steamworks/SteamHTTP*'
+        exclude 'com/codedisaster/steamworks/SteamLeaderboard*'
+        exclude 'com/codedisaster/steamworks/SteamMatchmaking*'
+        exclude 'com/codedisaster/steamworks/SteamNetworking*'
+        exclude 'com/codedisaster/steamworks/SteamPublishedFile*'
+        exclude 'com/codedisaster/steamworks/SteamRemoteStorage*'
+        exclude 'com/codedisaster/steamworks/SteamScreenshot*'
+        exclude 'com/codedisaster/steamworks/SteamServer*'
+        exclude 'com/codedisaster/steamworks/SteamUGC*'
+        exclude 'com/codedisaster/steamworks/SteamUserStats*'
+        exclude 'com/codedisaster/steamworks/SteamApps*'
+    }
+    from('third_party_licenses') {
+        into 'META-INF/licenses'
+    }
+    from('LICENSE') {
+        into 'META-INF/licenses'
+        rename { 'STEAMBRIDGE_MIT.txt' }
     }
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 
