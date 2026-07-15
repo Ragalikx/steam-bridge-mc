@@ -350,15 +350,39 @@ public final class VanillaGuiIntegration {
         SteamServer server = SteamManager.getInstance().getActiveServer();
         if (server == null || !server.isRunning()) return;
 
-        // Fabric has no loader "Mods" button; place above Options.
+        // Own full-width row under "Back to Game". Shift every widget on/after that Y
+        // down so Feedback / Report / Options / Disconnect keep their own slots.
+        final int rowStep = 24; // 20px button + 4px gap
+        Button returnToGame = findButtonByMessage(gui, "menu.returnToGame");
         Button options = findButtonByMessage(gui, "menu.options");
-        int x = options != null ? options.getX() : gui.width / 2 - 102;
-        int y = options != null ? options.getY() - 24 : gui.height / 4 + 48;
-        int w = options != null ? options.getWidth() : 204;
+
+        int x;
+        int w;
+        int insertY;
+        if (returnToGame != null) {
+            x = returnToGame.getX();
+            w = returnToGame.getWidth();
+            insertY = returnToGame.getY() + returnToGame.getHeight() + 4;
+        } else if (options != null) {
+            w = 204;
+            x = gui.width / 2 - 102;
+            insertY = options.getY();
+        } else {
+            x = gui.width / 2 - 102;
+            w = 204;
+            insertY = gui.height / 4 + 48;
+        }
+
+        for (GuiEventListener listener : List.copyOf(gui.children())) {
+            if (listener instanceof net.minecraft.client.gui.components.AbstractWidget widget
+                    && widget.getY() >= insertY) {
+                widget.setY(widget.getY() + rowStep);
+            }
+        }
 
         addButton(gui, Button.builder(Component.translatable("steambridge.gui.manage_session"),
                 b -> Minecraft.getInstance().setScreen(new GuiSteamHostManagement(gui)))
-                .bounds(x, y, w, 20).build());
+                .bounds(x, insertY, w, 20).build());
     }
 
     private static void startSteamHost(Screen gui) {
