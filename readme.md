@@ -16,7 +16,7 @@ It routes game traffic through the Steam Networking Sockets API (SDR / P2P). Lat
 
 Minecraft version links open the matching branch.
 
-| Minecraft | Platform | Loader | Windows | Linux | macOS | Status |
+| Minecraft | Platform | Loader version | Windows | Linux | macOS | Status |
 |---|---|---|---|---|---|---|
 | [1.21.1](https://github.com/Ragalikx/steam-bridge-mc/tree/NeoForge-1.21.1) | NeoForge | 21.1.234 | ✅ | ✅ | ❌ | Available |
 | [1.21.1](https://github.com/Ragalikx/steam-bridge-mc/tree/Fabric-1.21.1) | Fabric | 0.16.14 + API 0.116.13+1.21.1 | ✅ | ✅ | ❌ | Available |
@@ -33,21 +33,32 @@ Minecraft version links open the matching branch.
 
 ## Developer info
 
-What was used when building and testing each available branch. Natives ship inside the mod jar.
+What was used when building and testing each available branch. Natives ship inside the mod jar (or come from the loader - see JNA notes).
 
-| Minecraft | Platform | Java (game / compile) | Gradle | Build plugin | Loader / API | steamworks4j | JNA |
-|---|---|---|---|---|---|---|---|
-| 1.21.1 | NeoForge | 21 | 8.13 | NeoGradle userdev 7.0.170 | NeoForge 21.1.234 | 1.10.0 | 5.14.0 (compileOnly, loader-provided) |
-| 1.21.1 | Fabric | 21 | 8.13 | Fabric Loom 1.10.5 | Loader 0.16.14, API 0.116.13+1.21.1 | 1.10.0 | 5.14.0 (bundled slim win64) |
-| 1.20.1 | NeoForge/Forge | 17 | 8.13 | NeoForge moddev legacyforge 2.0.141 | 1.20.1-47.1.106 | 1.10.0 | 5.12.1 (compileOnly, loader-provided) |
-| 1.20.1 | Fabric | 17 | 8.13 | Fabric Loom 1.10.5 | Loader 0.16.14, API 0.92.2+1.20.1 | 1.10.0 | 5.14.0 (bundled slim win64) |
-| 1.12.2 | Forge | 8 | 4.10.3 | ForgeGradle 3.x | Forge 14.23.5.2860 | 1.10.0 | (as packaged with the 1.12.2 build) |
+| Minecraft | Platform | Java | Gradle | steamworks4j | JNA |
+|---|---|---|---|---|---|
+| 1.21.1 | NeoForge | 21 | 8.13 | 1.10.0 | 5.14.0 (from NeoForge, not in mod jar) |
+| 1.21.1 | Fabric | 21 | 8.13 | 1.10.0 | 5.14.0 (slim win64 in mod jar) |
+| 1.20.1 | NeoForge/Forge | 17 | 8.13 | 1.10.0 | 5.12.1 (from NeoForge/FML, not in mod jar) |
+| 1.20.1 | Fabric | 17 | 8.13 | 1.10.0 | 5.14.0 (slim win64 in mod jar) |
+| 1.12.2 | Forge | 8 | 4.10.3 | 1.10.0 | 5.14.0 (slim win64 in mod jar) |
 
 Notes:
 
-- OS used for builds/tests: Windows 11 (amd64). Linux is supported for running the mod; macOS is not.
+- Builds/tests: Windows 11 (amd64). Linux run supported; macOS no.
 - Steam AppID is fixed to **480 (Spacewar)**. Steam client must be running.
 - Release versioning on modern branches: `-PmodVersion=1.145` -> `1.145+mc<mc_version>`. Without `-P`: `0.0.0-dev+mc<mc_version>`.
+- NeoForge does not bundle JNA in the mod (module clash). Compile is pinned to the JNA version the loader already ships. Fabric and 1.12.2 shade a trimmed win64-only JNA.
+
+### Building a release jar
+
+```text
+# Windows (PowerShell): quotes around -P are required
+.\gradlew.bat build "-PmodVersion=1.145"
+
+# Example: 1.145+mc1.20.1 or 1.145+mc1.21.1 (depends on branch)
+# Dev without -P: 0.0.0-dev+mc...
+```
 
 ---
 
@@ -64,17 +75,6 @@ AppID 480 (Spacewar) is intentional. Do not swap it for a real game AppID (VAC/E
 - **Port 25565:** keep free when hosting via Steam Bridge. For a normal LAN server, pick another virtual port in config.
 - **allowWithoutAuth:** `true` (default) skips Steam Session Ticket checks (helps with bad NAT, weaker security). `false` = strict checks.
 - **interceptUdp:** installs a JVM-wide `DatagramSocket` factory so voice mods (Simple Voice Chat, Plasmo Voice, etc.) can use Steam next to game traffic. Only at launch, not at runtime.
-
-## Building a release jar
-
-```text
-# Windows (PowerShell): quotes around -P are required
-.\gradlew.bat build "-PmodVersion=1.145"
-
-# Example result on this branch style: 1.145+mc1.20.1 or 1.145+mc1.21.1
-# Dev build without -P: 0.0.0-dev+mc...
-# Use the Java version from the table for that branch (8 / 17 / 21).
-```
 
 ---
 
