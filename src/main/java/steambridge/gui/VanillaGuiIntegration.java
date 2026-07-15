@@ -433,7 +433,7 @@ public final class VanillaGuiIntegration {
         int port = HttpUtil.getAvailablePort();
         boolean published = srv.publishServer(gameType, commands, port);
 
-        SteamServer server = new SteamServer(pendingAccessPolicy, worldKey, "World");
+        SteamServer server = new SteamServer(pendingAccessPolicy, worldKey);
         server.setTransportMode(pendingTransportMode);
         if (published) server.setMcPort(srv.getPort());
         server.start();

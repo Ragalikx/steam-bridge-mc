@@ -8,7 +8,6 @@ package steambridge.steam;
 import steambridge.SteamBridgeMod;
 import steambridge.SteamBridgeConfig;
 import steambridge.proxy.SteamUdpProxy;
-// SteamSocial and SteamStorage are in same package; no import needed
 
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
@@ -36,29 +35,17 @@ public class SteamServer {
         private final long steamId;
         private final String steamName;
         private final String minecraftName;
-        private final int connectionHandle;
-        private final int localProxyPort;
-        private final long connectedAtMs;
-        private final long kickRemainingMs;
         private final SteamConnectionStatus connectionStatus;
 
         private PlayerSnapshot(
             long steamId,
             String steamName,
             String minecraftName,
-            int connectionHandle,
-            int localProxyPort,
-            long connectedAtMs,
-            long kickRemainingMs,
             SteamConnectionStatus connectionStatus
         ) {
             this.steamId = steamId;
             this.steamName = steamName;
             this.minecraftName = minecraftName;
-            this.connectionHandle = connectionHandle;
-            this.localProxyPort = localProxyPort;
-            this.connectedAtMs = connectedAtMs;
-            this.kickRemainingMs = kickRemainingMs;
             this.connectionStatus = connectionStatus;
         }
 
@@ -72,22 +59,6 @@ public class SteamServer {
 
         public String getMinecraftName() {
             return minecraftName;
-        }
-
-        public int getConnectionHandle() {
-            return connectionHandle;
-        }
-
-        public int getLocalProxyPort() {
-            return localProxyPort;
-        }
-
-        public long getConnectedAtMs() {
-            return connectedAtMs;
-        }
-
-        public long getKickRemainingMs() {
-            return kickRemainingMs;
         }
 
         public SteamConnectionStatus getConnectionStatus() {
@@ -128,7 +99,6 @@ public class SteamServer {
     private volatile AccessPolicy accessPolicy = AccessPolicy.EVERYONE;
     private volatile TransportMode transportMode = TransportMode.AUTO;
     private volatile String worldKey = "__default_world__";
-    private volatile String worldDisplayName = "World";
 
     private final ConcurrentMap<Integer, Long> steamIdByConnection = new ConcurrentHashMap<>();
     private final ConcurrentMap<Long, Integer> connectionBySteamId = new ConcurrentHashMap<>();
@@ -138,11 +108,9 @@ public class SteamServer {
     private final ConcurrentMap<Long, Long> kickBlockedUntilBySteamId = new ConcurrentHashMap<>();
     private final Set<Integer> acceptedConnections = ConcurrentHashMap.newKeySet();
 
-    public SteamServer() {}
-
-    public SteamServer(AccessPolicy accessPolicy, String worldKey, String worldDisplayName) {
+    public SteamServer(AccessPolicy accessPolicy, String worldKey) {
         this.accessPolicy = accessPolicy != null ? accessPolicy : AccessPolicy.EVERYONE;
-        setWorldIdentity(worldKey, worldDisplayName);
+        this.worldKey = sanitizeWorldValue(worldKey, "__default_world__");
     }
 
     public void setMcPort(int port) {
@@ -151,37 +119,8 @@ public class SteamServer {
         SteamUdpProxy.getInstance().setHostGamePort(port);
     }
 
-    public int getMcPort() {
-        return mcPort;
-    }
-
-    public void setAccessPolicy(AccessPolicy accessPolicy) {
-        this.accessPolicy = accessPolicy != null ? accessPolicy : AccessPolicy.EVERYONE;
-    }
-
-    public AccessPolicy getAccessPolicy() {
-        return accessPolicy;
-    }
-
     public void setTransportMode(TransportMode mode) {
         this.transportMode = mode != null ? mode : TransportMode.AUTO;
-    }
-
-    public TransportMode getTransportMode() {
-        return transportMode;
-    }
-
-    public void setWorldIdentity(String worldKey, String worldDisplayName) {
-        this.worldKey = sanitizeWorldValue(worldKey, "__default_world__");
-        this.worldDisplayName = sanitizeWorldValue(worldDisplayName, "World");
-    }
-
-    public String getWorldKey() {
-        return worldKey;
-    }
-
-    public String getWorldDisplayName() {
-        return worldDisplayName;
     }
 
     public void start() {
@@ -314,37 +253,8 @@ public class SteamServer {
         }
     }
 
-    public void onMessageReceived(int connection, long steamID, byte[] data) {
-        if (!running) {
-            return;
-        }
-
-        if (isKickBlocked(steamID)) {
-            return;
-        }
-
-        // Messages for SteamChannel connections are delivered directly by SteamManager.
-        // This path is only reached if data arrives before the channel is registered.
-        SteamBridgeMod.LOG.warn(
-            "[SteamServer] Received {} byte(s) for conn={} steamID={} but no channel is registered.",
-            data.length, connection, steamID
-        );
-    }
-
     public boolean isRunning() {
         return running;
-    }
-
-    public int getPlayerCount() {
-        return sessionsBySteamId.size();
-    }
-
-    public List<Long> getConnectedSteamIDs() {
-        return new ArrayList<>(connectionBySteamId.keySet());
-    }
-
-    public SteamConnectionStatus getConnectionStatus(long steamID) {
-        return SteamManager.getInstance().getConnectionStatus(steamID);
     }
 
     public List<PlayerSnapshot> getPlayerSnapshots() {
@@ -352,16 +262,11 @@ public class SteamServer {
 
         List<PlayerSnapshot> snapshots = new ArrayList<>();
         for (PlayerSession session : sessionsBySteamId.values()) {
-            SteamConnectionStatus status = getConnectionStatus(session.steamId);
-            long kickRemaining = getKickRemainingMs(session.steamId);
+            SteamConnectionStatus status = SteamManager.getInstance().getConnectionStatus(session.steamId);
             snapshots.add(new PlayerSnapshot(
                 session.steamId,
                 SteamSocial.ProfileCache.get().getDisplayName(session.steamId),
                 session.minecraftName,
-                session.connectionHandle,
-                session.localProxyPort,
-                session.connectedAtMs,
-                kickRemaining,
                 status
             ));
         }
@@ -418,10 +323,6 @@ public class SteamServer {
 
     public boolean ownsConnection(int connection) {
         return steamIdByConnection.containsKey(connection);
-    }
-
-    public int getListenSocket() {
-        return listenSocket;
     }
 
     public boolean attachMinecraftPlayer(InetSocketAddress remoteAddress, String minecraftName) {

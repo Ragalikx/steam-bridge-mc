@@ -23,7 +23,6 @@ import steambridge.steam.SteamManager;
 public class SteamBridgeMod {
 
     public static final String MODID   = "steambridge";
-    public static final String NAME    = "Steam Bridge";
     public static final String VERSION = BuildInfo.VERSION;
 
     public static final Logger LOG = LogUtils.getLogger();

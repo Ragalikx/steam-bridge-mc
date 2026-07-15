@@ -38,10 +38,6 @@ public class SteamClient {
 
     private volatile CountDownLatch connectLatch = new CountDownLatch(1);
 
-    public void connect(SteamID host) {
-        connect(host, null);
-    }
-
     public void connect(SteamID host, Screen currentScreen) {
         // Atomic claim: two racing connect() calls must not both proceed.
         if (!alive.compareAndSet(false, true)) {
@@ -212,24 +208,9 @@ public class SteamClient {
         }
     }
 
-    public void onMessageReceived(int connection, byte[] data) {
-        if (connection != connectionHandle) return;
-
-        // Messages are delivered directly to loopback by SteamManager.
-        SteamBridgeMod.LOG.warn("[SteamClient] DATA arrived for conn={} but no handler active.", connection);
-    }
-
     /** Returns true if the underlying loopback connection is still open. */
     public boolean isSteamChannelOpen() {
         return connectionHandle != 0;
-    }
-
-    public boolean isConnected() {
-        return state == State.STEAM_READY || state == State.IN_WORLD;
-    }
-
-    public boolean isConnectingOrConnected() {
-        return state == State.CONNECTING || state == State.STEAM_READY || state == State.IN_WORLD;
     }
 
     public State getState() {
@@ -238,10 +219,6 @@ public class SteamClient {
 
     public String getStatusMsg() {
         return statusMsg;
-    }
-
-    public SteamID getHostSteamID() {
-        return hostSteamID;
     }
 
     public boolean isAlive() {
@@ -316,12 +293,6 @@ public class SteamClient {
             statusMsg = TextColors.RED + cleanReason
                 + (cleanDetails.isEmpty() ? "" : " - " + cleanDetails);
         }
-    }
-
-    public SteamConnectionStatus getConnectionStatus() {
-        return connectionHandle != 0
-            ? SteamManager.getInstance().getConnectionStatusByHandle(connectionHandle)
-            : SteamManager.getInstance().getConnectionStatus(hostSteamID);
     }
 
     public boolean ownsConnection(int connection, long remoteSteamID) {

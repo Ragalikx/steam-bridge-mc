@@ -381,37 +381,11 @@ public class SteamManager {
             return true;
         }
 
-        // Non-loopback fallback.
-        // so read it from the cached status rather than a live JNA snapshot on every batch.
-        SteamConnectionStatus cached = statusByConnection.get(connection);
-        long remoteSteamID = cached != null ? cached.getSteamID() : 0L;
-        for (SteamSocketsApi.ReceivedMessage message : batch) {
-            if (message != null) {
-                dispatch(connection, remoteSteamID, message.getData());
-            }
-        }
-        return true;
-    }
-
-    private void dispatch(int connection, long remoteSteamID, byte[] data) {
-        // Loopback connections are delivered in batch by drainConnection() before reaching
-        // here, so this path only handles non-loopback owners (legacy / safety net).
-        SteamServer server = activeServer;
-        if (server != null && server.ownsConnection(connection)) {
-            server.onMessageReceived(connection, remoteSteamID, data);
-            return;
-        }
-
-        SteamClient client = activeClient;
-        if (client != null && client.ownsConnection(connection, remoteSteamID)) {
-            client.onMessageReceived(connection, data);
-            return;
-        }
-
         SteamBridgeMod.LOG.warn(
-                "[SteamManager] Received {} byte(s) for conn={} steamID={} but no owner was found.",
-                data.length, connection, remoteSteamID
+                "[SteamManager] Dropped {} message(s) for conn={} - no loopback or UDP owner.",
+                batch.length, connection
         );
+        return true;
     }
 
     private void onConnectionStatusChanged(SteamNetConnectionStatusChangedCallback event) {
@@ -600,13 +574,6 @@ public class SteamManager {
         } catch (Exception e) {
             // Ignored
         }
-    }
-
-    public SteamConnectionStatus getConnectionStatus(SteamID remote) {
-        if (remote == null) {
-            return SteamConnectionStatus.unavailable(0L, 0);
-        }
-        return getConnectionStatus(SteamNativeHandle.getNativeHandle(remote));
     }
 
     public SteamConnectionStatus getConnectionStatus(long remoteSteamID) {

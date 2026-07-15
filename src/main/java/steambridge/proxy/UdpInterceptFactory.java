@@ -30,8 +30,6 @@ public final class UdpInterceptFactory implements DatagramSocketImplFactory {
         }
     }
 
-    public static boolean isInstalled() { return installed; }
-
     @Override
     public DatagramSocketImpl createDatagramSocketImpl() {
         return new SteamAwareDatagramImpl();

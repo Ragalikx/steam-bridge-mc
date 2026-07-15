@@ -69,20 +69,10 @@ public final class SteamConnectionStatus {
     public int     getConnectionHandle()     { return connectionHandle; }
     public boolean hasSessionState()         { return sessionKnown; }
     public boolean isConnectionActive()      { return connectionActive; }
-    public boolean isConnecting()            { return connecting; }
     public boolean isUsingRelay()            { return usingRelay; }
     public int     getState()                { return state; }
-    public int     getEndReason()            { return endReason; }
     public String  getLastError()            { return lastError; }
-    public int     getBytesQueuedForSend()   { return bytesQueuedForSend; }
-    public int     getPacketsQueuedForSend() { return packetsQueuedForSend; }
     public int     getPingMs()               { return pingMs; }
-    public int     getRemotePopId()          { return remotePopId; }
-    public int     getRelayPopId()           { return relayPopId; }
-    public float   getInBytesPerSecond()     { return inBytesPerSecond; }
-    public float   getOutBytesPerSecond()    { return outBytesPerSecond; }
-    public long    getQueueTimeMicros()      { return queueTimeMicros; }
-    public String  getDescription()          { return description; }
 
     public boolean isTerminal() {
         return SteamSocketsApi.isTerminalState(state);

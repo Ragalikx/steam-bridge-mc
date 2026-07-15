@@ -37,10 +37,8 @@ public final class SteamSocketsApi {
     public static final int STATE_LINGER = -2;
     public static final int STATE_DEAD = -3;
 
-    public static final int SEND_UNRELIABLE = 0;
     public static final int SEND_UNRELIABLE_NO_NAGLE = 1;
     public static final int SEND_RELIABLE = 8;
-    public static final int SEND_RELIABLE_NO_NAGLE = 9;
 
     public static final int INFO_FLAG_RELAYED = 16;
 
@@ -269,7 +267,7 @@ public final class SteamSocketsApi {
             );
 
             // 6. Nagle at Steam level: explicitly set to 0 us (disabled).
-            //    SEND_RELIABLE_NO_NAGLE affects only individual sendMessage calls;
+            //    SEND_RELIABLE / NO_NAGLE flags affect individual sendMessage calls;
             //    the global NagleTime can still delay packets at the connection level.
             val32.setInt(0, 0);
             boolean nagleOk = api.SteamAPI_ISteamNetworkingUtils_SetConfigValue(

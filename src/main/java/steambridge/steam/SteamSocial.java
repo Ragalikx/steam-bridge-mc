@@ -224,7 +224,6 @@ public final class SteamSocial {
             public long   getSteamId()       { return steamId; }
             public String getSteamName()     { return steamName; }
             public String getMinecraftName() { return minecraftName; }
-            public long   getBannedAt()      { return bannedAt; }
         }
 
         private static final class BanStore {
