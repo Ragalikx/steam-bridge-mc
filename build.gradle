@@ -150,6 +150,10 @@ jar {
     from('third_party_licenses') {
         into 'META-INF/licenses'
     }
+    from('LICENSE') {
+        into 'META-INF/licenses'
+        rename { 'STEAMBRIDGE_MIT.txt' }
+    }
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 
     manifest {
