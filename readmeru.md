@@ -16,7 +16,7 @@
 
 Ссылки на версии Minecraft ведут на нужную ветку с кодом.
 
-| Minecraft | Платформа | Загрузчик | Windows | Linux | macOS | Статус |
+| Minecraft | Платформа | Версия загрузчика | Windows | Linux | macOS | Статус |
 |---|---|---|---|---|---|---|
 | [1.21.1](https://github.com/Ragalikx/steam-bridge-mc/tree/NeoForge-1.21.1) | NeoForge | 21.1.234 | ✅ | ✅ | ❌ | Доступно |
 | [1.21.1](https://github.com/Ragalikx/steam-bridge-mc/tree/Fabric-1.21.1) | Fabric | 0.16.14 + API 0.116.13+1.21.1 | ✅ | ✅ | ❌ | Доступно |
@@ -33,21 +33,32 @@
 
 ## Инфо для разработчиков
 
-Окружения, в которых собирались и тестировались доступные ветки. Нативки лежат в jar мода.
+Окружения, в которых собирались и тестировались доступные ветки. Нативки в jar мода (или от загрузчика - см. JNA).
 
-| Minecraft | Платформа | Java (игра / compile) | Gradle | Плагин сборки | Загрузчик / API | steamworks4j | JNA |
-|---|---|---|---|---|---|---|---|
-| 1.21.1 | NeoForge | 21 | 8.13 | NeoGradle userdev 7.0.170 | NeoForge 21.1.234 | 1.10.0 | 5.14.0 (compileOnly, от загрузчика) |
-| 1.21.1 | Fabric | 21 | 8.13 | Fabric Loom 1.10.5 | Loader 0.16.14, API 0.116.13+1.21.1 | 1.10.0 | 5.14.0 (slim win64 в jar) |
-| 1.20.1 | NeoForge/Forge | 17 | 8.13 | NeoForge moddev legacyforge 2.0.141 | 1.20.1-47.1.106 | 1.10.0 | 5.12.1 (compileOnly, от загрузчика) |
-| 1.20.1 | Fabric | 17 | 8.13 | Fabric Loom 1.10.5 | Loader 0.16.14, API 0.92.2+1.20.1 | 1.10.0 | 5.14.0 (slim win64 в jar) |
-| 1.12.2 | Forge | 8 | 4.10.3 | ForgeGradle 3.x | Forge 14.23.5.2860 | 1.10.0 | (как в 1.12.2 сборке) |
+| Minecraft | Платформа | Java | Gradle | steamworks4j | JNA |
+|---|---|---|---|---|---|
+| 1.21.1 | NeoForge | 21 | 8.13 | 1.10.0 | 5.14.0 (от NeoForge, не в jar мода) |
+| 1.21.1 | Fabric | 21 | 8.13 | 1.10.0 | 5.14.0 (slim win64 в jar) |
+| 1.20.1 | NeoForge/Forge | 17 | 8.13 | 1.10.0 | 5.12.1 (от NeoForge/FML, не в jar мода) |
+| 1.20.1 | Fabric | 17 | 8.13 | 1.10.0 | 5.14.0 (slim win64 в jar) |
+| 1.12.2 | Forge | 8 | 4.10.3 | 1.10.0 | 5.14.0 (slim win64 в jar) |
 
 Заметки:
 
-- Сборка и тесты: Windows 11 (amd64). Linux для запуска поддерживается, macOS - нет.
-- AppID Steam зафиксирован: **480 (Spacewar)**. Клиент Steam должен быть запущен.
-- Версии релиза на новых ветках: `-PmodVersion=1.145` -> `1.145+mc<mc_version>`. Без `-P`: `0.0.0-dev+mc<mc_version>`.
+- Сборка и тесты: Windows 11 (amd64). Linux для запуска ок, macOS - нет.
+- AppID Steam: **480 (Spacewar)**. Клиент Steam должен быть запущен.
+- Релиз на новых ветках: `-PmodVersion=1.145` -> `1.145+mc<mc_version>`. Без `-P`: `0.0.0-dev+mc<mc_version>`.
+- На NeoForge JNA в мод не кладётся (конфликт модулей). CompileOnly пин на ту версию, что уже есть у загрузчика. Fabric и 1.12.2 кладут урезанный win64-only JNA.
+
+### Сборка релизного jar
+
+```text
+# Windows (PowerShell): кавычки вокруг -P обязательны
+.\gradlew.bat build "-PmodVersion=1.145"
+
+# Пример: 1.145+mc1.20.1 или 1.145+mc1.21.1 (зависит от ветки)
+# Dev без -P: 0.0.0-dev+mc...
+```
 
 ---
 
@@ -64,17 +75,6 @@ AppID 480 (Spacewar) выбран специально. Не подставля�
 - **Порт 25565:** при хосте через Steam Bridge держите свободным. Для обычного LAN укажите другой виртуальный порт в конфиге.
 - **allowWithoutAuth:** `true` (по умолчанию) - без проверки Steam Session Ticket (проще через плохой NAT, слабее безопасность). `false` - строгая проверка.
 - **interceptUdp:** ставит JVM-wide фабрику `DatagramSocket`, чтобы войс-моды (Simple Voice Chat, Plasmo Voice и т.п.) шли через Steam рядом с игровым трафиком. Только при запуске, в runtime не переключается.
-
-## Сборка релизного jar
-
-```text
-# Windows (PowerShell): кавычки вокруг -P обязательны
-.\gradlew.bat build "-PmodVersion=1.145"
-
-# Пример: 1.145+mc1.20.1 или 1.145+mc1.21.1 (зависит от ветки)
-# Dev без -P: 0.0.0-dev+mc...
-# Java берите из таблицы для этой ветки (8 / 17 / 21).
-```
 
 ---
 
