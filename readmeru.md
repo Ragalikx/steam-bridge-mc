@@ -48,7 +48,7 @@
 
 Заметки:
 
-- Сборка и тесты: Windows 11 (amd64). Linux для запуска ок, macOS - нет.
+- Сборка и тесты: Windows 11 (amd64). Linux: в разработке; macOS - нет.
 - AppID Steam: **480 (Spacewar)**. Клиент Steam должен быть запущен.
 - Релиз на новых ветках: `-PmodVersion=1.145` -> `1.145+mc<mc_version>`. Без `-P`: `0.0.0-dev+mc<mc_version>`.
 - На NeoForge JNA в мод не кладётся (конфликт модулей). CompileOnly пин на ту версию, что уже есть у загрузчика. Fabric и 1.12.2 кладут урезанный win64-only JNA.
