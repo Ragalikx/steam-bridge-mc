@@ -192,24 +192,34 @@ public final class VanillaGuiIntegration {
      * {@link ConnectScreen#startConnecting} always calls {@code connect()} after
      * {@code setScreen}, even if Opening replaces the screen. Setting {@code aborted}
      * stops the DNS/TCP thread from racing in a "Unknown host" disconnect.
+     * <p>
+     * Field is found by type (not name) so this works on production SRG runtime where
+     * the field is not called {@code aborted}.
      */
     private static void abortVanillaConnect(ConnectScreen screen) {
-        try {
-            Field f = ConnectScreen.class.getDeclaredField("aborted");
-            f.setAccessible(true);
-            f.setBoolean(screen, true);
-        } catch (Exception e) {
-            SteamBridgeMod.LOG.warn("Could not abort ConnectScreen", e);
+        boolean set = false;
+        for (Field f : ConnectScreen.class.getDeclaredFields()) {
+            if (f.getType() != boolean.class && f.getType() != Boolean.class) continue;
+            try {
+                f.setAccessible(true);
+                f.setBoolean(screen, true);
+                set = true;
+            } catch (Exception ignored) {}
+        }
+        if (!set) {
+            SteamBridgeMod.LOG.warn("Could not abort ConnectScreen (no boolean field found)");
         }
     }
 
     private static Screen connectScreenParent(ConnectScreen screen) {
-        try {
-            Field f = ConnectScreen.class.getDeclaredField("parent");
-            f.setAccessible(true);
-            Object p = f.get(screen);
-            if (p instanceof Screen s) return s;
-        } catch (Exception ignored) {}
+        for (Field f : ConnectScreen.class.getDeclaredFields()) {
+            if (!Screen.class.isAssignableFrom(f.getType())) continue;
+            try {
+                f.setAccessible(true);
+                Object p = f.get(screen);
+                if (p instanceof Screen s) return s;
+            } catch (Exception ignored) {}
+        }
         return Minecraft.getInstance().screen;
     }
 
