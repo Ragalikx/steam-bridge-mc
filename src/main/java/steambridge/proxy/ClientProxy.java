@@ -6,6 +6,7 @@
 package steambridge.proxy;
 
 import steambridge.ClientTasks;
+import steambridge.JnaBootstrap;
 import steambridge.SteamAppIdHelper;
 import steambridge.SteamBridgeMod;
 import steambridge.gui.GuiSteamConnecting;
@@ -48,7 +49,8 @@ public class ClientProxy extends CommonProxy {
 
     @Override
     public void preInit(FMLPreInitializationEvent event) {
-        // No keys to register
+        // Must run before any Steam/JNA class is loaded (postInit SteamManager.init).
+        JnaBootstrap.prepare();
     }
 
     @Override
@@ -61,10 +63,18 @@ public class ClientProxy extends CommonProxy {
     @Override
     public void postInit(FMLPostInitializationEvent event) {
         SteamBridgeMod.LOG.info("=== SteamBridge client postInit - initializing Steam... ===");
+        // Re-run bootstrap in case another mod interfered; cheap if already done.
+        JnaBootstrap.prepare();
         // No DatagramSocket intercept / voice tunnel on 1.7.10.
         SteamAppIdHelper.ensureAppId(Minecraft.getMinecraft().mcDataDir);
-        boolean ok = SteamManager.getInstance().init();
-        SteamBridgeMod.LOG.info("=== Steam init result: {} ===", ok ? "SUCCESS" : "FAILED");
+        ClassLoader prev = Thread.currentThread().getContextClassLoader();
+        try {
+            Thread.currentThread().setContextClassLoader(getClass().getClassLoader());
+            boolean ok = SteamManager.getInstance().init();
+            SteamBridgeMod.LOG.info("=== Steam init result: {} ===", ok ? "SUCCESS" : "FAILED");
+        } finally {
+            Thread.currentThread().setContextClassLoader(prev);
+        }
     }
 
     @SubscribeEvent
@@ -155,17 +165,57 @@ public class ClientProxy extends CommonProxy {
             Minecraft mc = Minecraft.getMinecraft();
             processDeferredNetworkTeardown(mc);
             SteamClient client = SteamManager.getInstance().getActiveClient();
+            // 1.7.10: always pump Steam loopback NetworkManager (login + play).
+            if (client != null && client.isAlive()) {
+                client.tickNetwork();
+            }
             if (client != null && client.isAlive() && mc.theWorld != null && mc.thePlayer != null && !client.isInWorld()) {
                 client.onMinecraftWorldJoined(mc.thePlayer.getCommandSenderName(), mc.thePlayer.dimension);
             }
 
             SteamServer server = SteamManager.getInstance().getActiveServer();
             if (server != null && server.isRunning()) {
-                if (mc.theWorld == null && mc.getIntegratedServer() == null && !(mc.currentScreen instanceof GuiDownloadTerrain)) {
+                if (mc.theWorld == null && mc.getIntegratedServer() == null
+                        && !(mc.currentScreen instanceof GuiDownloadTerrain)) {
                     SteamBridgeMod.LOG.info("[SteamBridge] World closed, stopping Steam server...");
+                    deferredServerStopTicks = -1;
+                    server.stop();
+                } else if (shouldStopHostForWorldChange(mc, server)) {
+                    SteamBridgeMod.LOG.info(
+                        "[SteamBridge] Integrated world changed (was '{}'), stopping leftover Steam host.",
+                        server.getWorldKey()
+                    );
+                    deferredServerStopTicks = -1;
                     server.stop();
                 }
             }
+        }
+    }
+
+    /**
+     * Host opened world A via Steam, left to menu, then loaded world B in the same
+     * client session. Deferred-stop logic used to treat that as a "transient reload"
+     * and keep the old host alive, leaving "Manage Steam Session" on the pause menu.
+     */
+    private boolean shouldStopHostForWorldChange(Minecraft mc, SteamServer server) {
+        if (server == null || !server.isRunning()) {
+            return false;
+        }
+        net.minecraft.server.integrated.IntegratedServer integrated = mc.getIntegratedServer();
+        if (integrated == null) {
+            return false;
+        }
+        try {
+            String folder = integrated.getFolderName();
+            if (folder == null || folder.isEmpty()) {
+                return false;
+            }
+            String hosted = server.getWorldKey();
+            return hosted != null && !hosted.isEmpty()
+                    && !hosted.equals("__default_world__")
+                    && !folder.equals(hosted);
+        } catch (Throwable t) {
+            return false;
         }
     }
 
@@ -359,21 +409,43 @@ public class ClientProxy extends CommonProxy {
             SteamServer server = SteamManager.getInstance().getActiveServer();
             if (server == null || !server.isRunning()) {
                 deferredServerStopTicks = -1;
+            } else if (shouldStopHostForWorldChange(mc, server)) {
+                deferredServerStopTicks = -1;
+                SteamBridgeMod.LOG.info(
+                    "[SteamBridge] Deferred host stop: world changed to a different save, stopping Steam.");
+                server.stop();
             } else if (shouldCloseDeferredServer(mc)) {
                 deferredServerStopTicks = -1;
                 SteamBridgeMod.LOG.info(
                     "[SteamBridge] Deferred Steam host shutdown resolved as real disconnect. screen={}",
                     screenName(mc.currentScreen));
                 server.stop();
-            } else if (mc.getIntegratedServer() != null && mc.theWorld != null) {
+            } else if (mc.getIntegratedServer() != null && mc.theWorld != null
+                    && isSameHostedWorld(mc, server)) {
+                // Same world came back (dimension / terrain screen) — keep hosting.
                 deferredServerStopTicks = -1;
                 SteamBridgeMod.LOG.info("[SteamBridge] Preserved Steam host across transient world reload.");
             } else if (--deferredServerStopTicks <= 0) {
-                deferredServerStopTicks = TRANSIENT_DISCONNECT_GRACE_TICKS;
+                // Grace period expired without a clear "still same host world" signal.
+                deferredServerStopTicks = -1;
                 SteamBridgeMod.LOG.info(
-                    "[SteamBridge] Still waiting on transient Steam host disconnect. screen={} integratedServer={}",
+                    "[SteamBridge] Deferred Steam host shutdown timed out. screen={} integratedServer={}",
                     screenName(mc.currentScreen), mc.getIntegratedServer() != null);
+                server.stop();
             }
+        }
+    }
+
+    private boolean isSameHostedWorld(Minecraft mc, SteamServer server) {
+        if (server == null || mc.getIntegratedServer() == null) {
+            return false;
+        }
+        try {
+            String folder = mc.getIntegratedServer().getFolderName();
+            String hosted = server.getWorldKey();
+            return folder != null && hosted != null && folder.equals(hosted);
+        } catch (Throwable t) {
+            return false;
         }
     }
 

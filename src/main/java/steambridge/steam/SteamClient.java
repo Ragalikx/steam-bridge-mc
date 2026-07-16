@@ -28,6 +28,13 @@ public class SteamClient {
     /** Screen shown when connection was initiated - passed to NetHandlerLoginClient. */
     private volatile net.minecraft.client.gui.GuiScreen connectingScreen;
 
+    /**
+     * Client NetworkManager bound to the loopback proxy.
+     * On 1.7.10 it must be pumped via {@link net.minecraft.network.NetworkManager#processReceivedPackets()}
+     * every client tick (vanilla does this from GuiConnecting.updateScreen).
+     */
+    private volatile net.minecraft.network.NetworkManager networkManager;
+
     private volatile CountDownLatch connectLatch = new CountDownLatch(1);
 
     public void connect(SteamID host) {
@@ -76,6 +83,8 @@ public class SteamClient {
         connectLatch.countDown();
         SteamManager.getInstance().setActiveClient(null);
 
+        networkManager = null;
+
         if (connectionHandle != 0) {
             SteamManager.getInstance().unregisterLoopback(connectionHandle);
             SteamManager.getInstance().closeConnection(
@@ -85,6 +94,34 @@ public class SteamClient {
 
         connectionHandle = 0;
         SteamBridgeMod.LOG.info("[SteamClient] Steam transport closed.");
+    }
+
+    /**
+     * Must be called every client tick while connecting/in-game over Steam (1.7.10).
+     * Drains the NetworkManager inbound queue; without this, login packets never run.
+     */
+    public void tickNetwork() {
+        net.minecraft.network.NetworkManager nm = networkManager;
+        if (nm == null) {
+            return;
+        }
+        try {
+            if (nm.isChannelOpen()) {
+                nm.processReceivedPackets();
+            } else if (nm.getExitMessage() != null && alive.get()) {
+                // Mirror GuiConnecting: surface a clean disconnect if Netty closed under us.
+                SteamBridgeMod.LOG.warn(
+                    "[SteamClient] NetworkManager closed: {}",
+                    nm.getExitMessage().getUnformattedText()
+                );
+            }
+        } catch (Throwable t) {
+            SteamBridgeMod.LOG.warn("[SteamClient] tickNetwork error: {}", t.toString());
+        }
+    }
+
+    public net.minecraft.network.NetworkManager getNetworkManager() {
+        return networkManager;
     }
 
     private void doConnect(SteamID host) {
@@ -139,9 +176,10 @@ public class SteamClient {
             net.minecraft.client.Minecraft mc2 = net.minecraft.client.Minecraft.getMinecraft();
             steambridge.ClientTasks.run(() -> {
                 try {
-                    boolean ok2 = SteamTransport.connectClientToLoopback(
+                    net.minecraft.network.NetworkManager nm = SteamTransport.connectClientToLoopback(
                             conn, remoteSteamID, finalProxyPort, screen);
-                    if (ok2) {
+                    if (nm != null) {
+                        networkManager = nm;
                         state = State.STEAM_READY;
                         statusMsg = i18n("steambridge.status.steam_ready", "Steam path ready - waiting for Minecraft login...");
                         SteamBridgeMod.LOG.info("[SteamClient] Loopback mode active - Steam transport is ready.");

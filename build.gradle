@@ -121,6 +121,8 @@ jar {
     exclude 'module-info.class'
     exclude 'META-INF/versions/**'
 
+    // JNA: keep ALL Java classes (Native.initIDs needs WString, DLLCallback, ptr/*, …).
+    // Only drop non-Windows / unused-arch native binaries to slim the jar.
     exclude 'com/sun/jna/darwin*/**'
     exclude 'com/sun/jna/linux*/**'
     exclude 'com/sun/jna/sunos*/**'
@@ -129,17 +131,6 @@ jar {
     exclude 'com/sun/jna/aix*/**'
     exclude 'com/sun/jna/win32-x86/**'
     exclude 'com/sun/jna/win32-aarch64/**'
-    exclude '**/ELFAnalyser*'
-    exclude 'com/sun/jna/win32/**'
-    exclude '**/Native$AWT*'
-    exclude '**/ptr/ShortByReference*'
-    exclude '**/ptr/DoubleByReference*'
-    exclude '**/ptr/ByteByReference*'
-    exclude '**/ptr/FloatByReference*'
-    exclude '**/ptr/IntByReference*'
-    exclude '**/ptr/NativeLongByReference*'
-    exclude '**/NativeLong.class'
-    exclude '**/WString.class'
     exclude 'META-INF/AL2.0'
     exclude 'META-INF/LGPL2.1'
 

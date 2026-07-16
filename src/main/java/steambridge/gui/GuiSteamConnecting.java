@@ -41,11 +41,26 @@ public class GuiSteamConnecting extends GuiScreen {
         }
     }
 
+    /**
+     * Vanilla GuiConnecting pumps NetworkManager here every frame.
+     * 1.7.10 will never process login replies without this.
+     */
+    @Override
+    public void updateScreen() {
+        if (client != null) {
+            client.tickNetwork();
+        }
+    }
+
     @Override
     public void drawScreen(int mouseX, int mouseY, float partialTicks) {
         this.drawDefaultBackground();
 
         if (client != null) {
+            // Keep pumping while the connecting GUI is drawn (updateScreen may be skipped
+            // on some forks; draw is always called while this screen is open).
+            client.tickNetwork();
+
             this.drawCenteredString(this.fontRendererObj,
                     client.getStatusMsg(),
                     this.width / 2, this.height / 2 - 50,

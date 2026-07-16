@@ -158,27 +158,26 @@ public final class SteamTransport {
         return -1;
     }
 
-    static boolean connectClientToLoopback(
+    /**
+     * Connects Minecraft's client NetworkManager to the local loopback proxy.
+     * @return the NetworkManager (caller must pump {@code processReceivedPackets} every client tick
+     *         on 1.7.10), or {@code null} on failure
+     */
+    static NetworkManager connectClientToLoopback(
             int connectionHandle, long remoteSteamID,
             int proxyPort,
             net.minecraft.client.gui.GuiScreen currentScreen
     ) {
         try {
             Minecraft mc = Minecraft.getMinecraft();
-            NetworkManager[] nmHolder = new NetworkManager[1];
 
-            // The screen we hand to the net handler becomes GuiDisconnected's parent
-            // when the server later drops us. Re-showing the stale connect/add-server
-            // screen the player launched from leaves its buttons unresponsive, so use a
-            // fresh multiplayer list instead - the same fallback vanilla uses when it has
-            // no origin screen. This is the "Back to server list" target after a kick.
+            // Parent for GuiDisconnected after a kick/drop.
             final net.minecraft.client.gui.GuiScreen returnScreen =
                     new net.minecraft.client.gui.GuiMultiplayer(
                             new net.minecraft.client.gui.GuiMainMenu());
 
-            // Mirror NetworkManager.provideLanClient pipeline (1.7.10), but target our loopback proxy.
+            // Mirror NetworkManager.provideLanClient pipeline (1.7.10), target our loopback proxy.
             final NetworkManager nm = new NetworkManager(true);
-            nmHolder[0] = nm;
 
             io.netty.bootstrap.Bootstrap bootstrap = new io.netty.bootstrap.Bootstrap()
                 .group(NIO_GROUP)
@@ -187,8 +186,10 @@ public final class SteamTransport {
                 .handler(new ChannelInitializer<NioSocketChannel>() {
                     @Override
                     protected void initChannel(NioSocketChannel ch) throws Exception {
+                        // Match vanilla GuiConnecting timeout (FML default read timeout is 30s;
+                        // 20s was killing slow Steam+login handshakes).
                         ch.pipeline()
-                            .addLast("timeout",  new ReadTimeoutHandler(20))
+                            .addLast("timeout",  new ReadTimeoutHandler(30))
                             .addLast("splitter", new MessageDeserializer2())
                             .addLast("decoder",  new MessageDeserializer(NetworkManager.field_152462_h))
                             .addLast("prepender", new MessageSerializer2())
@@ -201,25 +202,27 @@ public final class SteamTransport {
 
             if (!connectFuture.isSuccess()) {
                 SteamBridgeMod.LOG.error("[LoopbackBridge][Client] Connect to proxy {} failed.", proxyPort);
-                return false;
+                return null;
             }
 
             // Fake remote for logs / disconnect UI; channelActive already bound the Netty channel.
             setNmSocketAddress(nm, new InetSocketAddress("SteamRelay", 25565));
             nm.setNetHandler(new net.minecraft.client.network.NetHandlerLoginClient(nm, mc, returnScreen));
 
-            // Protocol 5 = Minecraft 1.7.10. "\0FML\0" marks a Forge client for the FML handshake.
+            // Protocol 5 = Minecraft 1.7.10. "\0FML\0" marks a Forge client for the server.
+            // FML client handshake (NetworkDispatcher) is started by Forge-patched
+            // NetHandlerLoginClient after S02LoginSuccess — do not inject twice.
             nm.scheduleOutboundPacket(new C00Handshake(
                     5, "SteamRelay\0FML\0", 25565, EnumConnectionState.LOGIN));
             nm.scheduleOutboundPacket(new C00PacketLoginStart(mc.getSession().func_148256_e()));
 
             SteamBridgeMod.LOG.info("[LoopbackBridge][Client] Connected to loopback proxy. proxyPort={} conn={} steamID={}",
                 proxyPort, connectionHandle, remoteSteamID);
-            return true;
+            return nm;
 
         } catch (Throwable t) {
             SteamBridgeMod.LOG.error("[LoopbackBridge][Client] connectClientToLoopback failed: {}", t.getMessage(), t);
-            return false;
+            return null;
         }
     }
 }
