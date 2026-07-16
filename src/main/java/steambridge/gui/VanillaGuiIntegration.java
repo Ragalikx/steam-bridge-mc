@@ -261,8 +261,7 @@ public class VanillaGuiIntegration {
         Minecraft mc   = Minecraft.getMinecraft();
 
         if (next instanceof GuiShareToLan) {
-            SteamServer server = SteamManager.getInstance().getActiveServer();
-            if (server != null && server.isRunning()) {
+            if (isSteamHostSessionActive(mc)) {
                 event.setCanceled(true);
                 mc.displayGuiScreen(new GuiSteamHostManagement(mc.currentScreen));
                 return;
@@ -432,14 +431,14 @@ public class VanillaGuiIntegration {
         // -- In-game menu: update "Open to LAN" button for Steam host ----------
         if (gui instanceof GuiIngameMenu) {
             Minecraft mc = Minecraft.getMinecraft();
-            SteamServer server = SteamManager.getInstance().getActiveServer();
-            boolean isSteam = server != null && server.isRunning();
+            boolean isSteam = isSteamHostSessionActive(mc);
             boolean isLan   = mc.getIntegratedServer() != null && mc.getIntegratedServer().getPublic();
             for (GuiButton btn : event.buttonList) {
                 if (btn.id == 7) {
+                    // Always start from vanilla label so a previous session cannot stick.
+                    btn.displayString = net.minecraft.client.resources.I18n.format("menu.shareToLan");
                     if (isSteam) {
                         btn.enabled = true;
-                        // Keep vanilla dual-column slot width; only refresh the label.
                         btn.displayString = net.minecraft.client.resources.I18n.format("steambridge.gui.manage_session");
                     } else if (isLan) {
                         btn.displayString += net.minecraft.client.resources.I18n.format("steambridge.gui.lan_suffix");
@@ -450,11 +449,34 @@ public class VanillaGuiIntegration {
         }
     }
 
+    /**
+     * True only while this integrated world is actually open via Steam.
+     * A leftover {@link SteamServer} from a previous world in the same JVM session
+     * must not keep the pause-menu button on "Manage Steam Session".
+     */
+    private static boolean isSteamHostSessionActive(Minecraft mc) {
+        SteamServer server = SteamManager.getInstance().getActiveServer();
+        if (server == null || !server.isRunning()) {
+            return false;
+        }
+        net.minecraft.server.integrated.IntegratedServer integrated = mc.getIntegratedServer();
+        if (integrated == null || !integrated.getPublic()) {
+            return false;
+        }
+        try {
+            String folder = integrated.getFolderName();
+            if (folder != null && !folder.isEmpty()
+                    && !folder.equals(server.getWorldKey())) {
+                return false;
+            }
+        } catch (Throwable ignored) {}
+        return true;
+    }
+
     @SubscribeEvent
     public void onActionPerformedPre(GuiScreenEvent.ActionPerformedEvent.Pre event) {
         if (event.gui instanceof GuiIngameMenu && event.button.id == 7) {
-            SteamServer server = SteamManager.getInstance().getActiveServer();
-            if (server != null && server.isRunning()) {
+            if (isSteamHostSessionActive(Minecraft.getMinecraft())) {
                 event.setCanceled(true);
                 Minecraft.getMinecraft().displayGuiScreen(new GuiSteamHostManagement(event.gui));
             }

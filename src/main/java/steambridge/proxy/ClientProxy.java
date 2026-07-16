@@ -151,11 +151,47 @@ public class ClientProxy extends CommonProxy {
 
             SteamServer server = SteamManager.getInstance().getActiveServer();
             if (server != null && server.isRunning()) {
-                if (mc.theWorld == null && mc.getIntegratedServer() == null && !(mc.currentScreen instanceof GuiDownloadTerrain)) {
+                if (mc.theWorld == null && mc.getIntegratedServer() == null
+                        && !(mc.currentScreen instanceof GuiDownloadTerrain)) {
                     SteamBridgeMod.LOG.info("[SteamBridge] World closed, stopping Steam server...");
+                    deferredServerStopTicks = -1;
+                    server.stop();
+                } else if (shouldStopHostForWorldChange(mc, server)) {
+                    SteamBridgeMod.LOG.info(
+                        "[SteamBridge] Integrated world changed (was '{}'), stopping leftover Steam host.",
+                        server.getWorldKey()
+                    );
+                    deferredServerStopTicks = -1;
                     server.stop();
                 }
             }
+        }
+    }
+
+    /**
+     * Host opened world A via Steam, left to menu, then loaded world B in the same
+     * client session. Deferred-stop logic used to treat that as a "transient reload"
+     * and keep the old host alive, leaving "Manage Steam Session" on the pause menu.
+     */
+    private boolean shouldStopHostForWorldChange(Minecraft mc, SteamServer server) {
+        if (server == null || !server.isRunning()) {
+            return false;
+        }
+        net.minecraft.server.integrated.IntegratedServer integrated = mc.getIntegratedServer();
+        if (integrated == null) {
+            return false;
+        }
+        try {
+            String folder = integrated.getFolderName();
+            if (folder == null || folder.isEmpty()) {
+                return false;
+            }
+            String hosted = server.getWorldKey();
+            return hosted != null && !hosted.isEmpty()
+                    && !hosted.equals("__default_world__")
+                    && !folder.equals(hosted);
+        } catch (Throwable t) {
+            return false;
         }
     }
 
@@ -348,21 +384,41 @@ public class ClientProxy extends CommonProxy {
             SteamServer server = SteamManager.getInstance().getActiveServer();
             if (server == null || !server.isRunning()) {
                 deferredServerStopTicks = -1;
+            } else if (shouldStopHostForWorldChange(mc, server)) {
+                deferredServerStopTicks = -1;
+                SteamBridgeMod.LOG.info(
+                    "[SteamBridge] Deferred host stop: world changed to a different save, stopping Steam.");
+                server.stop();
             } else if (shouldCloseDeferredServer(mc)) {
                 deferredServerStopTicks = -1;
                 SteamBridgeMod.LOG.info(
                     "[SteamBridge] Deferred Steam host shutdown resolved as real disconnect. screen={}",
                     screenName(mc.currentScreen));
                 server.stop();
-            } else if (mc.getIntegratedServer() != null && mc.theWorld != null) {
+            } else if (mc.getIntegratedServer() != null && mc.theWorld != null
+                    && isSameHostedWorld(mc, server)) {
                 deferredServerStopTicks = -1;
                 SteamBridgeMod.LOG.info("[SteamBridge] Preserved Steam host across transient world reload.");
             } else if (--deferredServerStopTicks <= 0) {
-                deferredServerStopTicks = TRANSIENT_DISCONNECT_GRACE_TICKS;
+                deferredServerStopTicks = -1;
                 SteamBridgeMod.LOG.info(
-                    "[SteamBridge] Still waiting on transient Steam host disconnect. screen={} integratedServer={}",
+                    "[SteamBridge] Deferred Steam host shutdown timed out. screen={} integratedServer={}",
                     screenName(mc.currentScreen), mc.getIntegratedServer() != null);
+                server.stop();
             }
+        }
+    }
+
+    private boolean isSameHostedWorld(Minecraft mc, SteamServer server) {
+        if (server == null || mc.getIntegratedServer() == null) {
+            return false;
+        }
+        try {
+            String folder = mc.getIntegratedServer().getFolderName();
+            String hosted = server.getWorldKey();
+            return folder != null && hosted != null && folder.equals(hosted);
+        } catch (Throwable t) {
+            return false;
         }
     }
 
