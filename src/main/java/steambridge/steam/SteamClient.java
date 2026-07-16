@@ -280,7 +280,8 @@ public class SteamClient {
         statusMsg = i18n("steambridge.status.in_world", "Connected as ") + safeText(playerName, "?") + " (dim " + dimension + ")";
         SteamBridgeMod.LOG.info(
             "[SteamClient] Minecraft world joined successfully. player={} dimension={} conn={}",
-            safeText(playerName, "?"),
+            
+            SteamBridgeMod.safeLog(safeText(playerName, "?")),
             dimension,
             connectionHandle
         );
@@ -326,7 +327,8 @@ public class SteamClient {
     }
 
     private void fail(String msg) {
-        SteamBridgeMod.LOG.error("[SteamClient] FAIL: {}", msg);
+        // Peer-influenced close/debug text can carry log4j lookup tokens on old MC loggers.
+        SteamBridgeMod.LOG.error("[SteamClient] FAIL: {}", SteamBridgeMod.safeLog(msg));
         state = State.FAILED;
         statusMsg = TextColors.RED + msg;
         alive.set(false);
