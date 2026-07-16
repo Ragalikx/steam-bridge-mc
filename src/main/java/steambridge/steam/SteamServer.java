@@ -309,6 +309,8 @@ public class SteamServer {
             String err = status.getLastError();
             SteamBridgeMod.LOG.info("Disconnected: {} (steamID={}){}", SteamBridgeMod.safeLog(name), steamID,
                     err.isEmpty() ? "" : " - " + SteamBridgeMod.safeLog(err));
+            // Tear down local MC loopback so login does not hang until multiplayer.disconnect.slow_login.
+            SteamManager.getInstance().closeLoopback(connection, "Steam peer closed");
             cleanupConnection(connection, steamID);
         }
     }

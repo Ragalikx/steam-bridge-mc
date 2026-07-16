@@ -40,6 +40,10 @@ public class GuiSteamConnecting extends Screen {
     @Override
     public void tick() {
         super.tick();
+        // Same as vanilla ConnectScreen: tick the live ClientConnection every frame.
+        if (steamClient != null) {
+            steamClient.tickPendingConnection();
+        }
         if (!failHandled && steamClient != null && steamClient.getState() == SteamClient.State.FAILED) {
             failHandled = true;
             this.client.openScreen(new DisconnectedScreen(

@@ -19,6 +19,7 @@ import net.minecraft.client.gui.screen.TitleScreen;
 import net.minecraft.client.gui.screen.multiplayer.MultiplayerScreen;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.network.ClientLoginNetworkHandler;
+import net.minecraft.client.network.ServerInfo;
 import net.minecraft.network.ClientConnection;
 import net.minecraft.network.NetworkState;
 import net.minecraft.network.packet.c2s.handshake.HandshakeC2SPacket;
@@ -112,7 +113,8 @@ public final class SteamTransport {
     static boolean connectClientToLoopback(
             int connectionHandle, long remoteSteamID,
             int proxyPort,
-            Screen currentScreen
+            Screen currentScreen,
+            SteamClient steamClient
     ) {
         try {
             MinecraftClient mc = MinecraftClient.getInstance();
@@ -120,13 +122,28 @@ public final class SteamTransport {
             // Fresh multiplayer list as the disconnect "Back" target.
             final Screen returnScreen = new MultiplayerScreen(new TitleScreen());
 
+            // Mark as LAN so offline/invalid Mojang sessions soft-fail joinServer
+            // (same path as "Direct connect" to a local world), not hard-disconnect.
+            ServerInfo lanEntry = new ServerInfo("Steam Bridge", "127.0.0.1", true);
+            mc.setCurrentServerEntry(lanEntry);
+
             ClientConnection connection = ClientConnection.connect(
                     java.net.InetAddress.getByName("127.0.0.1"),
                     proxyPort,
                     mc.options.shouldUseNativeTransport());
 
+            // ConnectScreen holds the connection and ticks it every client tick.
+            // Without that, handleDisconnection never runs and login can stall.
+            if (steamClient != null) {
+                steamClient.setPendingConnection(connection);
+            }
+
             connection.setPacketListener(new ClientLoginNetworkHandler(
-                    connection, mc, returnScreen, status -> {}));
+                    connection, mc, returnScreen, status -> {
+                        if (status != null && steamClient != null) {
+                            steamClient.setStatusMsg(status.getString());
+                        }
+                    }));
 
             connection.send(new HandshakeC2SPacket("127.0.0.1", proxyPort, NetworkState.LOGIN));
             connection.send(new LoginHelloC2SPacket(mc.getSession().getProfile()));
@@ -265,6 +282,18 @@ final class LoopbackBridge extends io.netty.channel.ChannelInboundHandlerAdapter
         }
         SteamManager.getInstance().unregisterLoopback(connectionHandle);
         SteamManager.getInstance().closeConnection(connectionHandle, SteamSocketsApi.APP_CLOSE_NORMAL, reason);
+    }
+
+    /** Close only the local Netty TCP leg (Steam peer already gone). */
+    void closeLocalOnly(String reason) {
+        if (closed) return;
+        closed = true;
+        SteamBridgeMod.LOG.info("[LoopbackBridge] Closing local TCP conn={}, reason={}", connectionHandle, reason);
+        io.netty.channel.ChannelHandlerContext c = ctx;
+        if (c != null && c.channel().isOpen()) {
+            c.close();
+        }
+        SteamManager.getInstance().unregisterLoopback(connectionHandle);
     }
 
     void close() {

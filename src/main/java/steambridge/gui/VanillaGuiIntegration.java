@@ -600,6 +600,11 @@ public final class VanillaGuiIntegration {
 
         int port = NetworkUtils.findLocalPort();
         boolean published = srv.openToLan(gameType, commands, port);
+        // Steam friends often join offline/cracked; keep LAN offline even if the
+        // integrated server started with online-mode=true (1.16 openToLan does not flip it).
+        if (published) {
+            srv.setOnlineMode(false);
+        }
 
         SteamServer server = new SteamServer(pendingAccessPolicy, worldKey, "World");
         server.setTransportMode(pendingTransportMode);

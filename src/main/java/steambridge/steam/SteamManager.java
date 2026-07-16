@@ -657,6 +657,20 @@ public class SteamManager {
         }
     }
 
+    /**
+     * Close the TCP side of a loopback bridge without re-entering Steam close if already terminal.
+     * Prevents ServerLoginNetworkHandler from hanging until slow_login after the peer drops.
+     */
+    public void closeLoopback(int connection, String reason) {
+        if (connection == 0) {
+            return;
+        }
+        LoopbackBridge bridge = loopbackByConnection.remove(connection);
+        if (bridge != null) {
+            bridge.closeLocalOnly(reason);
+        }
+    }
+
     public SteamConnectionStatus getConnectionStatusByHandle(int connection) {
         SteamSocketsApi api = socketsApi;
         if (!initialized || api == null || connection == 0) {

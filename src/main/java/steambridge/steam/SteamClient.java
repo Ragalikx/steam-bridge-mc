@@ -16,6 +16,7 @@ import net.minecraft.client.gui.screen.DisconnectedScreen;
 import net.minecraft.client.gui.screen.DownloadingTerrainScreen;
 import net.minecraft.client.gui.screen.TitleScreen;
 import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.network.ClientConnection;
 import net.minecraft.text.LiteralText;
 import net.minecraft.text.TranslatableText;
 
@@ -37,6 +38,12 @@ public class SteamClient {
 
     /** Screen shown when connection was initiated - passed to the login net handler. */
     private volatile Screen connectingScreen;
+
+    /**
+     * Minecraft login connection created by {@link SteamTransport#connectClientToLoopback}.
+     * Must be ticked like ConnectScreen.connection or handleDisconnection never runs.
+     */
+    private volatile ClientConnection pendingConnection;
 
     private volatile CountDownLatch connectLatch = new CountDownLatch(1);
 
@@ -87,6 +94,8 @@ public class SteamClient {
         steambridge.proxy.SteamUdpProxy.getInstance().stopClient();
         SteamManager.getInstance().setActiveClient(null);
 
+        pendingConnection = null;
+
         if (connectionHandle != 0) {
             SteamManager.getInstance().unregisterLoopback(connectionHandle);
             SteamManager.getInstance().closeConnection(
@@ -96,6 +105,36 @@ public class SteamClient {
 
         connectionHandle = 0;
         SteamBridgeMod.LOG.info("[SteamClient] Steam transport closed.");
+    }
+
+    public void setPendingConnection(ClientConnection connection) {
+        this.pendingConnection = connection;
+    }
+
+    public ClientConnection getPendingConnection() {
+        return pendingConnection;
+    }
+
+    public void setStatusMsg(String msg) {
+        if (msg != null && !msg.isEmpty()) {
+            this.statusMsg = msg;
+        }
+    }
+
+    /**
+     * Mirrors {@link ConnectScreen#tick}: drive the login connection each client tick.
+     */
+    public void tickPendingConnection() {
+        ClientConnection connection = pendingConnection;
+        if (connection == null) {
+            return;
+        }
+        if (connection.isOpen()) {
+            connection.tick();
+        } else {
+            connection.handleDisconnection();
+            pendingConnection = null;
+        }
     }
 
     private void doConnect(SteamID host) {
@@ -160,7 +199,7 @@ public class SteamClient {
             mc2.execute(() -> {
                 try {
                     boolean ok2 = SteamTransport.connectClientToLoopback(
-                            conn, remoteSteamID, finalProxyPort, screen);
+                            conn, remoteSteamID, finalProxyPort, screen, SteamClient.this);
                     if (ok2) {
                         state = State.STEAM_READY;
                         statusMsg = i18n("steambridge.status.steam_ready", "Steam path ready - waiting for Minecraft login...");

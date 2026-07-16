@@ -41,7 +41,15 @@ public final class SteamClientEvents {
     private SteamClientEvents() {}
 
     public static void register() {
-        ClientTickEvents.END_CLIENT_TICK.register(client -> onClientTick());
+        ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            // Keep ticking the Steam login ClientConnection even if GuiSteamConnecting
+            // was replaced mid-handshake (mirrors ConnectScreen ownership).
+            SteamClient active = SteamManager.getInstance().getActiveClient();
+            if (active != null) {
+                active.tickPendingConnection();
+            }
+            onClientTick();
+        });
 
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
             SteamClient steamClient = SteamManager.getInstance().getActiveClient();
