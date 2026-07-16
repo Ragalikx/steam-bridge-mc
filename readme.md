@@ -107,7 +107,7 @@ Minecraft version links open the matching branch.
 <td><a href="https://github.com/Ragalikx/steam-bridge-mc/tree/Fabric-1.16.5">1.16.5</a></td>
 <td>Fabric</td>
 <td></td>
-<td>✅</td>
+<td>⏳</td>
 <td>❌</td>
 <td>⏳</td>
 <td>❌</td>
