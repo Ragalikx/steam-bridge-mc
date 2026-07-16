@@ -167,10 +167,48 @@ public class VanillaGuiIntegration {
     }
 
     /** Iterates the saved server list of {@code gui} and marks all Steam entries. */
+    
+    /**
+     * Steam multiplayer-list polish throttle.
+     * Immediate when the SteamID set changes; otherwise at most every 5s (avatars).
+     */
+    private static final long STEAM_LIST_MARK_INTERVAL_MS = 5000L;
+    private static long lastSteamListMarkMs = 0L;
+    private static String lastSteamListFingerprint = "";
+
+    private static String steamListFingerprint(ServerList list) {
+        if (list == null) return "";
+        StringBuilder sb = new StringBuilder(64);
+        try {
+            for (int i = 0; i < list.countServers(); i++) {
+                ServerData data = list.getServerData(i);
+                if (data == null || !isSteamServerId(data.serverIP)) continue;
+                sb.append(extractSteamId(data.serverIP)).append('\n');
+            }
+        } catch (Exception ignored) {}
+        return sb.toString();
+    }
+
+/** Marks Steam entries; force skips the 5s throttle (screen open). */
     private static void markAllSteamServers(GuiScreen gui) {
+        markAllSteamServers(gui, false);
+    }
+
+    private static void markAllSteamServers(GuiScreen gui, boolean force) {
         try {
             ServerList list = getSavedServerList(gui);
             if (list == null) return;
+
+            String fingerprint = steamListFingerprint(list);
+            long now = System.currentTimeMillis();
+            boolean steamSetChanged = !fingerprint.equals(lastSteamListFingerprint);
+            if (!force && !steamSetChanged
+                    && (now - lastSteamListMarkMs) < STEAM_LIST_MARK_INTERVAL_MS) {
+                return;
+            }
+            lastSteamListFingerprint = fingerprint;
+            lastSteamListMarkMs = now;
+
             int steamIndex = 0;
             for (int i = 0; i < list.countServers(); i++) {
                 ServerData data = list.getServerData(i);
@@ -198,11 +236,6 @@ public class VanillaGuiIntegration {
     @SubscribeEvent
     public void onDrawScreenPre(GuiScreenEvent.DrawScreenEvent.Pre event) {
         GuiScreen gui = event.gui;
-
-        // Suppress Steam-server ping on the multiplayer list.
-        if (gui instanceof GuiMultiplayer) {
-            markAllSteamServers(gui);
-        }
 
         /*
          * Vanilla updateScreen() resets the button enabled-state every tick.
@@ -421,10 +454,10 @@ public class VanillaGuiIntegration {
 
         // -- Pre-mark Steam servers + schedule a second pass before first render -
         if (gui instanceof GuiMultiplayer) {
-            markAllSteamServers(gui);
+            markAllSteamServers(gui, true);
             // addScheduledTask runs before the very next render loop -> belt-and-suspenders
             Minecraft.getMinecraft().addScheduledTask(() -> {
-                if (Minecraft.getMinecraft().currentScreen == gui) markAllSteamServers(gui);
+                if (Minecraft.getMinecraft().currentScreen == gui) markAllSteamServers(gui, true);
             });
         }
 
