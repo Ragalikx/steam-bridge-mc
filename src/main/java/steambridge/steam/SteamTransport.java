@@ -6,9 +6,14 @@
 package steambridge.steam;
 
 import steambridge.SteamBridgeMod;
+import io.netty.bootstrap.Bootstrap;
+import io.netty.bootstrap.ServerBootstrap;
+import io.netty.buffer.Unpooled;
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
+import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
@@ -27,6 +32,7 @@ import net.minecraft.network.packet.c2s.login.LoginHelloC2SPacket;
 
 import java.net.InetSocketAddress;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.IntConsumer;
 
@@ -48,16 +54,27 @@ public final class SteamTransport {
         }
     );
 
+    /** Boss group only accepts; workers handle bridge traffic (avoids parent-close races). */
+    private static final EventLoopGroup CLIENT_BOSS_GROUP = new NioEventLoopGroup(
+        1,
+        r -> {
+            Thread t = new Thread(r, "SteamBridge-Loopback-Boss");
+            t.setDaemon(true);
+            return t;
+        }
+    );
+
     private SteamTransport() {}
 
     static boolean createServerLoopbackBridge(int conn, long steamID, int mcPort, IntConsumer onLocalPort) {
         LoopbackBridge bridge = new LoopbackBridge(conn);
         SteamManager.getInstance().registerLoopback(conn, bridge);
 
-        io.netty.bootstrap.Bootstrap b = new io.netty.bootstrap.Bootstrap();
+        Bootstrap b = new Bootstrap();
         b.group(NIO_GROUP)
          .channel(NioSocketChannel.class)
          .option(ChannelOption.TCP_NODELAY, true)
+         .option(ChannelOption.SO_KEEPALIVE, true)
          .handler(new ChannelInitializer<SocketChannel>() {
              @Override
              protected void initChannel(SocketChannel ch) {
@@ -80,26 +97,36 @@ public final class SteamTransport {
         return false;
     }
 
+    /**
+     * Bind a localhost TCP proxy for the client. Returns the bound port, or -1 on failure.
+     * The listen socket is kept open until the Steam connection ends (do not close parent
+     * from initChannel - that was racing and killing the accepted child on some setups).
+     */
     static int allocateClientLoopbackPort(int conn) {
         LoopbackBridge bridge = new LoopbackBridge(conn);
         SteamManager.getInstance().registerLoopback(conn, bridge);
 
-        io.netty.bootstrap.ServerBootstrap b = new io.netty.bootstrap.ServerBootstrap();
-        b.group(NIO_GROUP)
+        ServerBootstrap b = new ServerBootstrap();
+        b.group(CLIENT_BOSS_GROUP, NIO_GROUP)
          .channel(NioServerSocketChannel.class)
          .childOption(ChannelOption.TCP_NODELAY, true)
+         .childOption(ChannelOption.SO_KEEPALIVE, true)
          .childHandler(new ChannelInitializer<SocketChannel>() {
              @Override
              protected void initChannel(SocketChannel ch) {
-                 ch.parent().close(); // One client only
+                 SteamBridgeMod.LOG.info(
+                     "[LoopbackBridge][Client] Accepted MC connection: local={} remote={}",
+                     ch.localAddress(), ch.remoteAddress());
                  ch.pipeline().addLast("bridge", bridge);
              }
          });
 
         try {
-            ChannelFuture f = b.bind("127.0.0.1", 0).syncUninterruptibly();
+            ChannelFuture f = b.bind(new InetSocketAddress("127.0.0.1", 0)).syncUninterruptibly();
             if (f.isSuccess()) {
-                int port = ((InetSocketAddress) f.channel().localAddress()).getPort();
+                Channel serverChannel = f.channel();
+                bridge.setServerChannel(serverChannel);
+                int port = ((InetSocketAddress) serverChannel.localAddress()).getPort();
                 SteamBridgeMod.LOG.info("[LoopbackBridge][Client] Proxy listening on port {}", port);
                 return port;
             }
@@ -127,13 +154,13 @@ public final class SteamTransport {
             ServerInfo lanEntry = new ServerInfo("Steam Bridge", "127.0.0.1", true);
             mc.setCurrentServerEntry(lanEntry);
 
+            // Always NIO for the Steam proxy. Epoll/native has been a source of flaky
+            // localhost loops on some Windows + Fabric setups; Fabric 1.19.2 also forces false.
             ClientConnection connection = ClientConnection.connect(
                     java.net.InetAddress.getByName("127.0.0.1"),
                     proxyPort,
-                    mc.options.shouldUseNativeTransport());
+                    false);
 
-            // ConnectScreen holds the connection and ticks it every client tick.
-            // Without that, handleDisconnection never runs and login can stall.
             if (steamClient != null) {
                 steamClient.setPendingConnection(connection);
             }
@@ -148,8 +175,12 @@ public final class SteamTransport {
             connection.send(new HandshakeC2SPacket("127.0.0.1", proxyPort, NetworkState.LOGIN));
             connection.send(new LoginHelloC2SPacket(mc.getSession().getProfile()));
 
-            SteamBridgeMod.LOG.info("[LoopbackBridge][Client] Connected to loopback proxy. proxyPort={} conn={} steamID={}",
-                proxyPort, connectionHandle, remoteSteamID);
+            // Kick the send queue once immediately (ConnectScreen relies on its own tick).
+            connection.tick();
+
+            SteamBridgeMod.LOG.info(
+                "[LoopbackBridge][Client] Connected to loopback proxy. proxyPort={} conn={} steamID={} open={}",
+                proxyPort, connectionHandle, remoteSteamID, connection.isOpen());
             return true;
 
         } catch (Throwable t) {
@@ -165,6 +196,7 @@ final class LoopbackBridge extends io.netty.channel.ChannelInboundHandlerAdapter
 
     private final int connectionHandle;
     private volatile io.netty.channel.ChannelHandlerContext ctx;
+    private volatile Channel serverChannel;
     private final java.util.concurrent.ConcurrentLinkedQueue<byte[]> preActivateQueue = new java.util.concurrent.ConcurrentLinkedQueue<>();
     private volatile boolean closed = false;
 
@@ -175,12 +207,18 @@ final class LoopbackBridge extends io.netty.channel.ChannelInboundHandlerAdapter
         this.connectionHandle = connectionHandle;
     }
 
+    void setServerChannel(Channel serverChannel) {
+        this.serverChannel = serverChannel;
+    }
+
     @Override
     public void channelActive(io.netty.channel.ChannelHandlerContext ctx) {
         this.ctx = ctx;
+        SteamBridgeMod.LOG.info("[LoopbackBridge] channelActive conn={} remote={}", connectionHandle, ctx.channel().remoteAddress());
         byte[] queued;
         while ((queued = preActivateQueue.poll()) != null) {
-            ctx.write(io.netty.buffer.Unpooled.wrappedBuffer(queued));
+            // Defensive copy: Steam payload arrays must not be mutated later.
+            ctx.write(Unpooled.copiedBuffer(queued));
         }
         ctx.flush();
     }
@@ -188,7 +226,9 @@ final class LoopbackBridge extends io.netty.channel.ChannelInboundHandlerAdapter
     @Override
     public void channelInactive(io.netty.channel.ChannelHandlerContext ctx) {
         if (!closed) {
-            SteamBridgeMod.LOG.info("[LoopbackBridge] Local socket closed conn={}", connectionHandle);
+            SteamBridgeMod.LOG.info(
+                "[LoopbackBridge] Local socket closed conn={} active={} open={}",
+                connectionHandle, ctx.channel().isActive(), ctx.channel().isOpen());
             steamClosed("Local TCP disconnected");
         }
     }
@@ -228,7 +268,7 @@ final class LoopbackBridge extends io.netty.channel.ChannelInboundHandlerAdapter
                     ctx.channel().config().setAutoRead(false);
                     flowConfigured = true;
                 }
-                ctx.executor().schedule(() -> drainOutbound(ctx), 5, java.util.concurrent.TimeUnit.MILLISECONDS);
+                ctx.executor().schedule(() -> drainOutbound(ctx), 5, TimeUnit.MILLISECONDS);
                 return;
             } else {
                 SteamBridgeMod.LOG.warn("[LoopbackBridge] Steam send failed conn={} result={}", connectionHandle, r);
@@ -245,9 +285,9 @@ final class LoopbackBridge extends io.netty.channel.ChannelInboundHandlerAdapter
 
     @Override
     public void exceptionCaught(io.netty.channel.ChannelHandlerContext ctx, Throwable cause) {
-        if (!(cause instanceof java.io.IOException)) {
-            SteamBridgeMod.LOG.warn("[LoopbackBridge] Netty error conn={}: {}", connectionHandle, cause.toString());
-        }
+        SteamBridgeMod.LOG.warn(
+            "[LoopbackBridge] Netty error conn={}: {}",
+            connectionHandle, cause.toString());
         close();
     }
 
@@ -256,9 +296,11 @@ final class LoopbackBridge extends io.netty.channel.ChannelInboundHandlerAdapter
         io.netty.channel.ChannelHandlerContext c = ctx;
         if (c != null && c.channel().isActive()) {
             c.channel().eventLoop().execute(() -> {
+                if (closed) return;
                 for (SteamSocketsApi.ReceivedMessage m : batch) {
                     if (m != null && m.getData().length > 0) {
-                        c.write(io.netty.buffer.Unpooled.wrappedBuffer(m.getData()));
+                        // Copy: receive buffers may be reused after this callback returns.
+                        c.write(Unpooled.copiedBuffer(m.getData()));
                     }
                 }
                 c.flush();
@@ -266,7 +308,9 @@ final class LoopbackBridge extends io.netty.channel.ChannelInboundHandlerAdapter
         } else {
             for (SteamSocketsApi.ReceivedMessage m : batch) {
                 if (m != null && m.getData().length > 0) {
-                    preActivateQueue.add(m.getData());
+                    byte[] copy = new byte[m.getData().length];
+                    System.arraycopy(m.getData(), 0, copy, 0, copy.length);
+                    preActivateQueue.add(copy);
                 }
             }
         }
@@ -280,6 +324,11 @@ final class LoopbackBridge extends io.netty.channel.ChannelInboundHandlerAdapter
         if (c != null && c.channel().isOpen()) {
             c.close();
         }
+        Channel sc = serverChannel;
+        serverChannel = null;
+        if (sc != null && sc.isOpen()) {
+            sc.close();
+        }
         SteamManager.getInstance().unregisterLoopback(connectionHandle);
         SteamManager.getInstance().closeConnection(connectionHandle, SteamSocketsApi.APP_CLOSE_NORMAL, reason);
     }
@@ -292,6 +341,11 @@ final class LoopbackBridge extends io.netty.channel.ChannelInboundHandlerAdapter
         io.netty.channel.ChannelHandlerContext c = ctx;
         if (c != null && c.channel().isOpen()) {
             c.close();
+        }
+        Channel sc = serverChannel;
+        serverChannel = null;
+        if (sc != null && sc.isOpen()) {
+            sc.close();
         }
         SteamManager.getInstance().unregisterLoopback(connectionHandle);
     }

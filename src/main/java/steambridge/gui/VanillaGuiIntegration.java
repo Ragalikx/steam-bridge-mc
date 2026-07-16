@@ -30,6 +30,7 @@ import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.client.gui.widget.ClickableWidget;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.network.ServerInfo;
+import net.minecraft.network.ClientConnection;
 import net.minecraft.client.option.ServerList;
 import net.minecraft.client.resource.language.I18n;
 import net.minecraft.server.integrated.IntegratedServer;
@@ -258,17 +259,29 @@ public final class VanillaGuiIntegration {
     }
 
     /**
-     * {@link ConnectScreen} starts a DNS/TCP thread even if GuiOpenEvent replaces the screen.
-     * Setting every boolean field true aborts that race ("Unknown host" disconnect).
+     * {@link ConnectScreen} starts a DNS/TCP thread even if the screen is replaced.
+     * Cancel the flag and tear down any ClientConnection it already created so it cannot
+     * race with our Steam loopback ClientConnection.
      */
     private static void abortVanillaConnect(ConnectScreen screen) {
         boolean set = false;
         for (Field f : ConnectScreen.class.getDeclaredFields()) {
-            if (f.getType() != boolean.class && f.getType() != Boolean.class) continue;
             try {
                 f.setAccessible(true);
-                f.setBoolean(screen, true);
-                set = true;
+                if (f.getType() == boolean.class || f.getType() == Boolean.class) {
+                    f.setBoolean(screen, true);
+                    set = true;
+                } else if (ClientConnection.class.isAssignableFrom(f.getType())) {
+                    Object v = f.get(screen);
+                    if (v instanceof ClientConnection) {
+                        ClientConnection cc = (ClientConnection) v;
+                        if (cc.isOpen()) {
+                            cc.disconnect(new LiteralText("Steam Bridge: aborted vanilla connect"));
+                        }
+                        f.set(screen, null);
+                        SteamBridgeMod.LOG.info("[SteamBridge] Aborted ConnectScreen ClientConnection");
+                    }
+                }
             } catch (Exception ignored) {}
         }
         if (!set) {
