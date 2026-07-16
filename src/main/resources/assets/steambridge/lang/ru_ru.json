@@ -6,7 +6,7 @@
   "steambridge.gui.unban": "Разбан",
   "steambridge.gui.banned": "Список заблокированных",
   "steambridge.gui.management": "Управление Steam-сессией",
-  "steambridge.gui.manage_session": "Управление Steam-сессией",
+  "steambridge.gui.manage_session": "Управление сессией",
   "steambridge.gui.not_running": "Сессия Steam не активна",
   "steambridge.gui.no_players": "Никто пока не подключился через Steam...",
   "steambridge.gui.route_auto": "Маршрут: Авто",

@@ -543,10 +543,8 @@ public final class VanillaGuiIntegration {
 
         Button shareToLan = findButtonByMessage(event, "menu.shareToLan");
         if (shareToLan != null) {
+            // Keep the vanilla 98px dual-column slot - do not grow past neighbors.
             shareToLan.active = true;
-            int maxW = Math.max(shareToLan.getWidth(), gui.width - shareToLan.x - 8);
-            int w = GuiButtons.fitWidth(font, manageMsg, shareToLan.getWidth(), maxW);
-            shareToLan.setWidth(w);
             shareToLan.setMessage(manageMsg);
             wrapOnPress(shareToLan, original -> b ->
                     Minecraft.getInstance().setScreen(new GuiSteamHostManagement(gui)));

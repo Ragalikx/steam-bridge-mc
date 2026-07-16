@@ -6,7 +6,7 @@
   "steambridge.gui.unban": "Розблокувати",
   "steambridge.gui.banned": "Заблоковані гравці",
   "steambridge.gui.management": "Steam-сесія",
-  "steambridge.gui.manage_session": "Керування Steam-сесією",
+  "steambridge.gui.manage_session": "Керування сесією",
   "steambridge.gui.not_running": "Steam-сесія не активна",
   "steambridge.gui.no_players": "Ніхто ще не підключився через Steam...",
   "steambridge.gui.route_auto": "Маршрут: Авто",

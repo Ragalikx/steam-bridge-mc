@@ -6,7 +6,7 @@
   "steambridge.gui.unban": "Unban",
   "steambridge.gui.banned": "Blocked Players",
   "steambridge.gui.management": "Steam Session",
-  "steambridge.gui.manage_session": "Manage Steam Session",
+  "steambridge.gui.manage_session": "Manage Session",
   "steambridge.gui.not_running": "Steam session is not active",
   "steambridge.gui.no_players": "Nobody has joined via Steam yet...",
   "steambridge.gui.route_auto": "Route: Auto",
