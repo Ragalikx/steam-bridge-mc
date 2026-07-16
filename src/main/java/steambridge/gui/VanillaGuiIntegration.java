@@ -12,7 +12,9 @@ import steambridge.steam.SteamManager;
 import steambridge.steam.SteamServer;
 import steambridge.steam.SteamSocial;
 
+import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.components.EditBox;
@@ -314,7 +316,8 @@ public final class VanillaGuiIntegration {
             // ShareToLanScreen.init() overwrites commands from level.dat, discarding
             // what onScreenOpening set. If our saved value differs, press the CycleButton once.
             if (saved.allowCommands != findPrimitiveBoolean(gui)) {
-                String commandsLabel = I18n.get("selectWorld.allowCommands.new");
+                // 1.19.2 uses selectWorld.allowCommands (no ".new" suffix).
+                String commandsLabel = I18n.get("selectWorld.allowCommands");
                 for (GuiEventListener l : event.getListenersList()) {
                     if (l instanceof CycleButton<?> btn
                             && btn.getMessage().getString().contains(commandsLabel)) {
@@ -325,40 +328,91 @@ public final class VanillaGuiIntegration {
             }
         }
 
-        // 1.19.2 ShareToLan: leave vanilla Start LAN / Cancel alone (full 150px).
-        // Steam rows: fit-to-text buttons so long locales never clip.
-        var font = Minecraft.getInstance().font;
-        int steamOptsY = 128;
-        int halfMax = Math.max(80, gui.width / 2 - 15);
+        // Layout (same idea as 1.12.2 / NeoForge-1.20.1):
+        //   y~100 vanilla game mode + commands
+        //   section title "Steam session settings" (drawn in onShareToLanRender)
+        //   access + route row under that title
+        //   bottom row: [Start LAN] [Open via Steam] [Cancel]
+        Font font = Minecraft.getInstance().font;
+        // Game mode sits at y=100 on 1.19.2 ShareToLan; steam opts under the section title.
+        int steamOptsY = 140;
 
         Component accessMsg = Component.literal(accessPolicyLabel(pendingAccessPolicy));
         Component routeMsg  = Component.literal(transportLabel(pendingTransportMode));
-        int accessW = GuiButtons.fitWidth(font, accessMsg, 80, halfMax);
-        int routeW  = GuiButtons.fitWidth(font, routeMsg, 80, halfMax);
 
-        Button access = new Button(gui.width / 2 - 5 - accessW, steamOptsY, accessW, GuiButtons.HEIGHT,
+        // Same dual-column 150 slots as vanilla game-mode / commands (and as 1.20.1).
+        event.addListener(new Button(gui.width / 2 - 155, steamOptsY, 150, GuiButtons.HEIGHT,
                 accessMsg, b -> {
             pendingAccessPolicy = (pendingAccessPolicy == SteamServer.AccessPolicy.EVERYONE)
                     ? SteamServer.AccessPolicy.FRIENDS_ONLY : SteamServer.AccessPolicy.EVERYONE;
-            GuiButtons.setMessageFit(font, b,
-                    Component.literal(accessPolicyLabel(pendingAccessPolicy)), true, 80, halfMax);
+            b.setMessage(Component.literal(accessPolicyLabel(pendingAccessPolicy)));
             saveShareToLanSettings(gui);
-        });
+        }));
 
-        Button transport = new Button(gui.width / 2 + 5, steamOptsY, routeW, GuiButtons.HEIGHT,
+        event.addListener(new Button(gui.width / 2 + 5, steamOptsY, 150, GuiButtons.HEIGHT,
                 routeMsg, b -> {
             pendingTransportMode = nextTransportMode(pendingTransportMode);
-            GuiButtons.setMessageFit(font, b,
-                    Component.literal(transportLabel(pendingTransportMode)), false, 80, halfMax);
+            b.setMessage(Component.literal(transportLabel(pendingTransportMode)));
             saveShareToLanSettings(gui);
-        });
+        }));
 
-        event.addListener(access);
-        event.addListener(transport);
+        // Bottom: Start LAN | Open via Steam | Cancel (Open Steam between the two vanilla ones).
+        Button startLan = findButtonByMessage(event, "lanServer.start");
+        Button cancel   = findButtonByMessage(event, "gui.cancel");
+        int bottomY = gui.height - 28;
+        int gap = 6;
+        int leftEdge = gui.width / 2 - 155;
+        int rightEdge = gui.width / 2 + 155;
 
-        Component openSteam = Component.translatable("steambridge.gui.open_steam");
-        event.addListener(GuiButtons.createCentered(font, gui.width / 2, gui.height - 52, openSteam,
-                b -> startSteamHost(gui), 120, gui.width - 20));
+        Component openSteamMsg = Component.translatable("steambridge.gui.open_steam");
+        Component startMsg = startLan != null ? startLan.getMessage() : Component.translatable("lanServer.start");
+        Component cancelMsg = cancel != null ? cancel.getMessage() : Component.translatable("gui.cancel");
+
+        int slotMax = 110;
+        int startW = GuiButtons.fitWidth(font, startMsg, 80, slotMax);
+        int steamW = GuiButtons.fitWidth(font, openSteamMsg, 80, slotMax);
+        int cancelW = GuiButtons.fitWidth(font, cancelMsg, 80, slotMax);
+        int total = startW + steamW + cancelW + 2 * gap;
+        int span = rightEdge - leftEdge;
+        if (total > span) {
+            // Prefer equal shrink so nothing drops off the dual-column frame.
+            int over = total - span;
+            int each = (over + 2) / 3;
+            startW = Math.max(70, startW - each);
+            steamW = Math.max(70, steamW - each);
+            cancelW = Math.max(70, cancelW - each);
+            total = startW + steamW + cancelW + 2 * gap;
+        }
+        int x0 = leftEdge + Math.max(0, (span - total) / 2);
+
+        if (startLan != null) {
+            startLan.setWidth(startW);
+            startLan.x = x0;
+            startLan.y = bottomY;
+        }
+        if (cancel != null) {
+            cancel.setWidth(cancelW);
+            cancel.x = x0 + startW + gap + steamW + gap;
+            cancel.y = bottomY;
+        }
+        event.addListener(new Button(x0 + startW + gap, bottomY, steamW, GuiButtons.HEIGHT,
+                openSteamMsg, b -> startSteamHost(gui)));
+    }
+
+    /**
+     * Draws the "Steam session settings" heading under vanilla's "Other players" block
+     * and above the access/route toggles (same role as 1.12.2 DrawScreenEvent hook).
+     */
+    @SubscribeEvent
+    public static void onShareToLanRender(ScreenEvent.Render.Post event) {
+        if (!(event.getScreen() instanceof ShareToLanScreen gui)) return;
+        // steam opts row is at y=140; title sits just above it.
+        int titleY = 128;
+        String title = I18n.get("steambridge.gui.steam_settings");
+        PoseStack pose = event.getPoseStack();
+        Font font = Minecraft.getInstance().font;
+        int x = gui.width / 2 - font.width(title) / 2;
+        font.draw(pose, title, x, titleY, 0xFFFFFF);
     }
 
     private static void injectFriendsButton(ScreenEvent.Init.Post event, Screen gui) {
