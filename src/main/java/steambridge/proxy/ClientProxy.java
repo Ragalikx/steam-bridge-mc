@@ -187,6 +187,16 @@ public class ClientProxy extends CommonProxy {
                     );
                     deferredServerStopTicks = -1;
                     server.stop();
+                } else if (shouldStopHostAfterFullRejoin(mc, server)) {
+                    // Left to menu and reloaded the same save: integrated is back but no
+                    // longer published. Keeping the old Steam listen socket blocks re-open
+                    // and hides Manage Session (gate requires getPublic()).
+                    SteamBridgeMod.LOG.info(
+                        "[SteamBridge] Integrated world reloaded without LAN publish (was '{}'), stopping leftover Steam host.",
+                        server.getWorldKey()
+                    );
+                    deferredServerStopTicks = -1;
+                    server.stop();
                 }
             }
         }
@@ -217,6 +227,26 @@ public class ClientProxy extends CommonProxy {
         } catch (Throwable t) {
             return false;
         }
+    }
+
+    /**
+     * Full leave + rejoin of the same save: integrated server is running again but
+     * {@code getPublic()} is false. Dimension travel keeps public=true, so this only
+     * fires after a real unload/reload, not mid-session travel.
+     */
+    private boolean shouldStopHostAfterFullRejoin(Minecraft mc, SteamServer server) {
+        if (server == null || !server.isRunning()) {
+            return false;
+        }
+        net.minecraft.server.integrated.IntegratedServer integrated = mc.getIntegratedServer();
+        if (integrated == null || integrated.getPublic()) {
+            return false;
+        }
+        // Wait until the world is actually loaded so we do not race unload ticks.
+        if (mc.theWorld == null || mc.thePlayer == null) {
+            return false;
+        }
+        return isSameHostedWorld(mc, server);
     }
 
     @SubscribeEvent
@@ -328,8 +358,15 @@ public class ClientProxy extends CommonProxy {
     }
 
     private boolean shouldDeferSteamServerStop(Minecraft mc) {
+        // Host: only defer for real in-world travel screens. screen==null is common
+        // during full leave-to-menu and must not keep a Steam listen socket alive.
         return mc.getIntegratedServer() != null
-            && isLikelyTransientSteamDisconnectScreen(mc.currentScreen);
+            && isLikelyTransientSteamHostDisconnectScreen(mc.currentScreen);
+    }
+
+    private boolean isLikelyTransientSteamHostDisconnectScreen(GuiScreen screen) {
+        return screen instanceof GuiDownloadTerrain
+            || isGalacticraftTravelScreen(screen);
     }
 
     private boolean shouldShowLoginMismatchHint(Minecraft mc, SteamClient client) {
@@ -421,8 +458,10 @@ public class ClientProxy extends CommonProxy {
                     screenName(mc.currentScreen));
                 server.stop();
             } else if (mc.getIntegratedServer() != null && mc.theWorld != null
+                    && mc.getIntegratedServer().getPublic()
                     && isSameHostedWorld(mc, server)) {
-                // Same world came back (dimension / terrain screen) — keep hosting.
+                // Same hosted world still published (dimension / terrain) — keep hosting.
+                // Full rejoin after menu has public=false and must not preserve the socket.
                 deferredServerStopTicks = -1;
                 SteamBridgeMod.LOG.info("[SteamBridge] Preserved Steam host across transient world reload.");
             } else if (--deferredServerStopTicks <= 0) {

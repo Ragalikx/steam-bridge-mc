@@ -188,6 +188,15 @@ public class SteamServer {
             return true;
         }
 
+        // Always tear down a previous host first. Leaving its listen socket open
+        // (virtualPort 0) makes the next createListenSocketP2P fail and, if we
+        // still clear activeServer on failure, orphans that old instance forever.
+        SteamServer previous = SteamManager.getInstance().getActiveServer();
+        if (previous != null && previous != this && previous.isRunning()) {
+            SteamBridgeMod.LOG.info("[SteamServer] Stopping previous host before start.");
+            previous.stop();
+        }
+
         running = true;
         steamIdByConnection.clear();
         connectionBySteamId.clear();
@@ -203,7 +212,9 @@ public class SteamServer {
         listenSocket = SteamManager.getInstance().createListenSocketP2P(steambridge.SteamBridgeConfig.virtualPort);
         if (listenSocket == 0) {
             running = false;
-            SteamManager.getInstance().setActiveServer(null);
+            if (SteamManager.getInstance().getActiveServer() == this) {
+                SteamManager.getInstance().setActiveServer(null);
+            }
             SteamBridgeMod.LOG.error("[SteamServer] Failed to create listen socket for Steam relay.");
             return false;
         }
@@ -223,7 +234,11 @@ public class SteamServer {
         }
 
         running = false;
-        SteamManager.getInstance().setActiveServer(null);
+        // Only clear the manager pointer if we are still the active host.
+        // A newer start() may have already replaced us; do not wipe that.
+        if (SteamManager.getInstance().getActiveServer() == this) {
+            SteamManager.getInstance().setActiveServer(null);
+        }
 
         // Close all active connections
         for (Map.Entry<Integer, Long> entry : steamIdByConnection.entrySet()) {

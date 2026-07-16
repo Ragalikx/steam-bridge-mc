@@ -457,6 +457,10 @@ public class VanillaGuiIntegration {
                         btn.enabled = true;
                         btn.displayString = net.minecraft.client.resources.I18n.format("steambridge.gui.manage_session");
                     } else if (isLan) {
+                        // Vanilla disables Open to LAN once public. Keep it clickable so the
+                        // player can open Share-to-LAN again and retry "Open via Steam"
+                        // after a failed Steam host start (published LAN, no Steam session).
+                        btn.enabled = true;
                         btn.displayString += net.minecraft.client.resources.I18n.format("steambridge.gui.lan_suffix");
                     }
                     break;
@@ -476,6 +480,8 @@ public class VanillaGuiIntegration {
             return false;
         }
         net.minecraft.server.integrated.IntegratedServer integrated = mc.getIntegratedServer();
+        // Require published integrated server: a leftover host after full rejoin is
+        // cleaned up by ClientProxy (unpublished + same world key → stop).
         if (integrated == null || !integrated.getPublic()) {
             return false;
         }
@@ -555,40 +561,65 @@ public class VanillaGuiIntegration {
                         pendingAccessPolicy,
                         pendingTransportMode);
 
-                String port;
-                try {
-                    port = mc.getIntegratedServer().shareToLAN(gameType, ac);
-                    SteamBridgeMod.LOG.info("[SteamHost] shareToLAN returned port={}", port);
-                } catch (Exception e) {
-                    SteamBridgeMod.LOG.error("[SteamHost] shareToLAN failed", e);
-                    mc.ingameGUI.getChatGUI().printChatMessage(new net.minecraft.util.ChatComponentText(
-                            "\u00A7c" + net.minecraft.client.resources.I18n.format("steambridge.gui.host_failed")));
-                    return;
+                // Drop any leftover host before publishing / binding a new listen socket.
+                SteamServer existing = SteamManager.getInstance().getActiveServer();
+                if (existing != null && existing.isRunning()) {
+                    SteamBridgeMod.LOG.info("[SteamHost] Stopping leftover host before re-open.");
+                    existing.stop();
                 }
 
+                // Prefer binding Steam first so a listen-socket failure does not leave the
+                // world permanently published with a dead Open-to-LAN button. If the world
+                // is already public (retry after a previous partial start), skip re-publish.
                 SteamServer server = new SteamServer(pendingAccessPolicy, worldKey, "World");
                 server.setTransportMode(pendingTransportMode);
-                if (port != null) {
-                    try { server.setMcPort(Integer.parseInt(port)); }
-                    catch (NumberFormatException ignored) {}
+                boolean alreadyPublic = mc.getIntegratedServer().getPublic();
+                String port = null;
+                if (alreadyPublic) {
+                    try {
+                        port = Integer.toString(mc.getIntegratedServer().getServerPort());
+                    } catch (Exception ignored) {}
                 }
+
                 boolean started;
                 try {
+                    if (port != null) {
+                        try { server.setMcPort(Integer.parseInt(port)); }
+                        catch (NumberFormatException ignored) {}
+                    }
                     started = server.start();
                 } catch (Exception e) {
                     SteamBridgeMod.LOG.error("[SteamHost] SteamServer.start failed", e);
                     started = false;
                 }
 
-                if (started) {
-                    mc.ingameGUI.getChatGUI().printChatMessage(new net.minecraft.util.ChatComponentText(
-                            "\u00A7a" + net.minecraft.client.resources.I18n.format("steambridge.gui.host_started")));
-                    mc.displayGuiScreen(null);
-                    mc.setIngameFocus();
-                } else {
+                if (!started) {
                     mc.ingameGUI.getChatGUI().printChatMessage(new net.minecraft.util.ChatComponentText(
                             "\u00A7c" + net.minecraft.client.resources.I18n.format("steambridge.gui.host_failed")));
+                    return;
                 }
+
+                if (!alreadyPublic) {
+                    try {
+                        port = mc.getIntegratedServer().shareToLAN(gameType, ac);
+                        SteamBridgeMod.LOG.info("[SteamHost] shareToLAN returned port={}", port);
+                        if (port != null) {
+                            try { server.setMcPort(Integer.parseInt(port)); }
+                            catch (NumberFormatException ignored) {}
+                        }
+                    } catch (Exception e) {
+                        SteamBridgeMod.LOG.error("[SteamHost] shareToLAN failed after Steam start", e);
+                        server.stop();
+                        mc.ingameGUI.getChatGUI().printChatMessage(new net.minecraft.util.ChatComponentText(
+                                "\u00A7c" + net.minecraft.client.resources.I18n.format("steambridge.gui.host_failed")));
+                        return;
+                    }
+                }
+
+                mc.ingameGUI.getChatGUI().printChatMessage(new net.minecraft.util.ChatComponentText(
+                        "\u00A7a" + net.minecraft.client.resources.I18n.format("steambridge.gui.host_started")));
+                mc.displayGuiScreen(null);
+                mc.setIngameFocus();
             }
         }
 
