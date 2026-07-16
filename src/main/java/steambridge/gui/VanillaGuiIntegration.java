@@ -524,18 +524,49 @@ public final class VanillaGuiIntegration {
         }, 20, 80));
     }
 
+    /**
+     * After the world is open on Steam, vanilla disables {@code menu.shareToLan}
+     * ({@code isPublished() == true}). Forge 1.16.5 also has no "Mods" row on this screen
+     * (unlike 1.19+), so the 1.19.2 "insert above Mods" trick finds nothing.
+     * <p>
+     * Match 1.12.2: repurpose the gray "Open to LAN" button into "Manage Steam session".
+     * If that label is missing (modded pause menus), fall back to inserting a new button
+     * above Return to Menu / Disconnect.
+     */
     private static void injectPauseMenuControl(GuiScreenEvent.InitGuiEvent.Post event, Screen gui) {
         if (!(gui instanceof IngameMenuScreen)) return;
         SteamServer server = SteamManager.getInstance().getActiveServer();
         if (server == null || !server.isRunning()) return;
 
-        Button mods = findButtonByMessage(event, "fml.menu.mods");
-        if (mods == null) return;
-
         FontRenderer font = Minecraft.getInstance().font;
         ITextComponent manageMsg = new TranslationTextComponent("steambridge.gui.manage_session");
-        int manageW = GuiButtons.fitWidth(font, manageMsg, mods.getWidth(), gui.width - mods.x - 8);
-        int x = mods.x, y = mods.y;
+
+        Button shareToLan = findButtonByMessage(event, "menu.shareToLan");
+        if (shareToLan != null) {
+            shareToLan.active = true;
+            int maxW = Math.max(shareToLan.getWidth(), gui.width - shareToLan.x - 8);
+            int w = GuiButtons.fitWidth(font, manageMsg, shareToLan.getWidth(), maxW);
+            shareToLan.setWidth(w);
+            shareToLan.setMessage(manageMsg);
+            wrapOnPress(shareToLan, original -> b ->
+                    Minecraft.getInstance().setScreen(new GuiSteamHostManagement(gui)));
+            return;
+        }
+
+        // Fallback for heavily modded pause menus without shareToLan.
+        Button anchor = findButtonByMessage(event, "menu.returnToMenu");
+        if (anchor == null) {
+            anchor = findButtonByMessage(event, "menu.disconnect");
+        }
+        if (anchor == null) {
+            SteamBridgeMod.LOG.warn(
+                    "[SteamBridge] Pause menu: no shareToLan/returnToMenu to attach manage-session control.");
+            return;
+        }
+
+        int manageW = GuiButtons.fitWidth(font, manageMsg, 98, Math.min(204, gui.width - 20));
+        int x = gui.width / 2 - manageW / 2;
+        int y = anchor.y;
         final int rowShift = 24;
         for (Widget w : event.getWidgetList()) {
             if (w instanceof Button) {
@@ -545,7 +576,6 @@ public final class VanillaGuiIntegration {
                 }
             }
         }
-
         event.addWidget(new Button(x, y, manageW, GuiButtons.HEIGHT, manageMsg,
                 b -> Minecraft.getInstance().setScreen(new GuiSteamHostManagement(gui))));
     }
