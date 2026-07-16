@@ -325,12 +325,14 @@ public final class VanillaGuiIntegration {
             }
         }
 
-        // 1.19.2 ShareToLan has no Port EditBox (that arrived in 1.20). Prefer type lookup,
-        // fall back to a fixed row under the game-mode controls.
-        EditBox portEdit = findByType(gui, EditBox.class);
-        int rowY = portEdit != null ? portEdit.y + portEdit.getHeight() + 20 : gui.height / 4 + 72;
+        // 1.19.2 ShareToLan: game mode / commands at y=100, Start LAN + Cancel at height-28
+        // with full 150px width. Do NOT resize or move those vanilla buttons (long locales
+        // like ru "Открыть мир для сети" overflow a squeezed 96px slot).
+        // Steam controls sit on their own rows: options under game mode, open action above
+        // the bottom pair.
+        int steamOptsY = 128;
 
-        Button access = new Button(gui.width / 2 - 155, rowY, 150, 20,
+        Button access = new Button(gui.width / 2 - 155, steamOptsY, 150, 20,
                 Component.literal(accessPolicyLabel(pendingAccessPolicy)), b -> {
             pendingAccessPolicy = (pendingAccessPolicy == SteamServer.AccessPolicy.EVERYONE)
                     ? SteamServer.AccessPolicy.FRIENDS_ONLY : SteamServer.AccessPolicy.EVERYONE;
@@ -338,7 +340,7 @@ public final class VanillaGuiIntegration {
             saveShareToLanSettings(gui);
         });
 
-        Button transport = new Button(gui.width / 2 + 5, rowY, 150, 20,
+        Button transport = new Button(gui.width / 2 + 5, steamOptsY, 150, 20,
                 Component.literal(transportLabel(pendingTransportMode)), b -> {
             pendingTransportMode = nextTransportMode(pendingTransportMode);
             b.setMessage(Component.literal(transportLabel(pendingTransportMode)));
@@ -348,23 +350,8 @@ public final class VanillaGuiIntegration {
         event.addListener(access);
         event.addListener(transport);
 
-        // Squeeze vanilla's "Start LAN World" + "Cancel" into a 3-button bottom row alongside
-        // our new "Open for Steam" button so all three fit without overlapping.
-        // Three 96px-wide buttons with 8px gaps, centered: [-152,-56] [-48,48] [56,152]
-        Button startLan = findButtonByMessage(event, "lanServer.start");
-        Button cancel   = findButtonByMessage(event, "gui.cancel");
-        int bottomY = gui.height - 28;
-        if (startLan != null) {
-            startLan.setWidth(96);
-            startLan.x = gui.width / 2 - 152;
-            startLan.y = bottomY;
-        }
-        if (cancel != null) {
-            cancel.setWidth(96);
-            cancel.x = gui.width / 2 + 56;
-            cancel.y = bottomY;
-        }
-        event.addListener(new Button(gui.width / 2 - 48, bottomY, 96, 20,
+        // Full dual-column width so "Open via Steam" fits; leave Start LAN / Cancel alone.
+        event.addListener(new Button(gui.width / 2 - 155, gui.height - 52, 310, 20,
                 Component.translatable("steambridge.gui.open_steam"),
                 b -> startSteamHost(gui)));
     }
