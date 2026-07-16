@@ -187,24 +187,22 @@ public class SteamClient {
             statusMsg = i18n("steambridge.status.path_ready", "Steam path ready - activating pipeline...");
             final Screen screen = connectingScreen;
 
-            int proxyPort = SteamTransport.allocateClientLoopbackPort(conn);
-            if (proxyPort < 0) {
+            java.net.SocketAddress proxyAddr = SteamTransport.allocateClientLoopbackEndpoint(conn);
+            if (proxyAddr == null) {
                 fail(i18n("steambridge.status.fail_proxy", "Failed to start loopback proxy for connection."));
                 return;
             }
 
-            SteamBridgeMod.LOG.info("[SteamClient] Loopback proxy ready: conn={} steamID={} port={}",
-                    conn, remoteSteamID, proxyPort);
+            SteamBridgeMod.LOG.info("[SteamClient] Loopback proxy ready: conn={} steamID={} addr={}",
+                    conn, remoteSteamID, proxyAddr);
 
-            // Vanilla ConnectScreen does connect + handshake on a worker thread, not the
-            // render/main thread. Doing it on main (mc.execute) was closing the TCP leg
-            // immediately after LoginStart on Fabric 1.16.5.
-            final int finalProxyPort = proxyPort;
+            // Vanilla ConnectScreen does connect + handshake on a worker thread, not main.
+            final java.net.SocketAddress finalProxyAddr = proxyAddr;
             final Screen finalScreen = screen;
             Thread mcConnect = new Thread(() -> {
                 try {
                     boolean ok2 = SteamTransport.connectClientToLoopback(
-                            conn, remoteSteamID, finalProxyPort, finalScreen, SteamClient.this);
+                            conn, remoteSteamID, finalProxyAddr, finalScreen, SteamClient.this);
                     if (ok2) {
                         state = State.STEAM_READY;
                         statusMsg = i18n("steambridge.status.steam_ready",
@@ -213,9 +211,9 @@ public class SteamClient {
                                 "[SteamClient] Loopback mode active - Steam transport is ready.");
                     } else {
                         SteamBridgeMod.LOG.error(
-                                "[SteamClient] Loopback connect to port {} failed.", finalProxyPort);
+                                "[SteamClient] Loopback connect to {} failed.", finalProxyAddr);
                         fail(i18n("steambridge.status.fail_proxy",
-                                "Failed to connect to loopback proxy port ") + finalProxyPort);
+                                "Failed to connect to loopback proxy ") + finalProxyAddr);
                     }
                 } catch (Exception e) {
                     SteamBridgeMod.LOG.error(

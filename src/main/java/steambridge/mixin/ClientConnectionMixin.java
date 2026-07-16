@@ -6,6 +6,7 @@ package steambridge.mixin;
 
 import net.minecraft.network.ClientConnection;
 import net.minecraft.text.Text;
+import net.minecraft.text.TranslatableText;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -25,12 +26,22 @@ public class ClientConnectionMixin {
                 && SteamManager.getInstance().getActiveServer() == null) {
             return;
         }
+        ClientConnection self = (ClientConnection) (Object) this;
         String msg = reason != null ? reason.getString() : "null";
-        SteamBridgeMod.LOG.warn(
-                "[SteamBridge] ClientConnection.disconnect: reason='{}'",
-                SteamBridgeMod.safeLog(msg));
-        if (SteamBridgeMod.LOG.isDebugEnabled()) {
-            SteamBridgeMod.LOG.debug("[SteamBridge] ClientConnection.disconnect stack", new Throwable("disconnect"));
+        String key = "";
+        if (reason instanceof TranslatableText) {
+            key = ((TranslatableText) reason).getKey();
         }
+        SteamBridgeMod.LOG.warn(
+                "[SteamBridge] ClientConnection.disconnect: reason='{}' key='{}' class={} open={} addr={}",
+                SteamBridgeMod.safeLog(msg),
+                key,
+                reason != null ? reason.getClass().getSimpleName() : "null",
+                self.isOpen(),
+                self.getAddress());
+        // Always print a short stack so we can see the caller (login vs channelInactive vs us).
+        SteamBridgeMod.LOG.warn(
+                "[SteamBridge] ClientConnection.disconnect stack",
+                new Throwable("disconnect-trace"));
     }
 }
