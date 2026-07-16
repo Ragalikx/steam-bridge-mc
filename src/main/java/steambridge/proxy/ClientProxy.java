@@ -17,8 +17,8 @@ import net.minecraft.client.gui.GuiMultiplayer;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.resources.I18n;
 import net.minecraft.entity.player.EntityPlayerMP;
-import net.minecraft.util.text.ITextComponent;
-import net.minecraft.util.text.TextComponentTranslation;
+import net.minecraft.util.IChatComponent;
+import net.minecraft.util.ChatComponentTranslation;
 import net.minecraftforge.client.event.GuiOpenEvent;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.common.event.FMLInitializationEvent;
@@ -51,23 +51,25 @@ public class ClientProxy extends CommonProxy {
     @Override
     public void init(FMLInitializationEvent event) {
         MinecraftForge.EVENT_BUS.register(this);
+        // 1.8.9 has no @Mod.EventBusSubscriber — register GUI hooks manually.
+        MinecraftForge.EVENT_BUS.register(steambridge.gui.VanillaGuiIntegration.class);
     }
 
     @SubscribeEvent
     public void onGuiOpen(GuiOpenEvent event) {
-        GuiScreen next = event.getGui();
+        GuiScreen next = event.gui;
         Minecraft mc = Minecraft.getMinecraft();
-        
+
         if (next != null) {
             boolean isDisconnect = next instanceof GuiDisconnected;
             boolean isModReject = next.getClass().getName().endsWith("GuiOldSaveLoadConfirm") || next.getClass().getName().endsWith("GuiModReject");
-            
+
             if (isDisconnect || isModReject) {
                 // If we already have an error screen (e.g. detailed FML mod mismatch) and Vanilla tries
                 // to open a generic "Disconnected" due to the loopback socket closing, block the generic one!
-                boolean isCurrentScreenError = mc.currentScreen instanceof GuiDisconnected || 
+                boolean isCurrentScreenError = mc.currentScreen instanceof GuiDisconnected ||
                     (mc.currentScreen != null && (mc.currentScreen.getClass().getName().endsWith("GuiOldSaveLoadConfirm") || mc.currentScreen.getClass().getName().endsWith("GuiModReject")));
-                
+
                 if (isDisconnect && isCurrentScreenError) {
                     boolean mayReplaceGeneric = isGenericDisconnectScreen(mc.currentScreen)
                         && !isGenericDisconnectScreen(next);
@@ -77,7 +79,7 @@ public class ClientProxy extends CommonProxy {
                         return;
                     }
                 }
-                
+
                 // Force all disconnect/error screens to return to Multiplayer Server List, NOT DirectConnect
                 try {
                     net.minecraft.client.gui.GuiMultiplayer serverList = new net.minecraft.client.gui.GuiMultiplayer(new net.minecraft.client.gui.GuiMainMenu());
@@ -91,7 +93,7 @@ public class ClientProxy extends CommonProxy {
                 } catch (Exception ignored) {}
             }
         }
-        
+
         handleSteamGuiOpen(event);
     }
 
@@ -110,7 +112,7 @@ public class ClientProxy extends CommonProxy {
                 deferredServerStopTicks = TRANSIENT_DISCONNECT_GRACE_TICKS;
                 SteamBridgeMod.LOG.info(
                     "[SteamBridge] Deferring Steam host shutdown after client disconnect; screen={} world={} integratedServer={}",
-                    screenName(mc.currentScreen), mc.world != null, mc.getIntegratedServer() != null);
+                    screenName(mc.currentScreen), mc.theWorld != null, mc.getIntegratedServer() != null);
             } else {
                 deferredServerStopTicks = -1;
                 server.stop();
@@ -127,7 +129,7 @@ public class ClientProxy extends CommonProxy {
                 deferredClientDisconnectTicks = TRANSIENT_DISCONNECT_GRACE_TICKS;
                 SteamBridgeMod.LOG.info(
                     "[SteamBridge] Deferring Steam client disconnect; possible dimension transfer. screen={} world={} player={} channelOpen={}",
-                    screenName(mc.currentScreen), mc.world != null, mc.player != null, client.isSteamChannelOpen());
+                    screenName(mc.currentScreen), mc.theWorld != null, mc.thePlayer != null, client.isSteamChannelOpen());
             } else {
                 deferredClientDisconnectTicks = -1;
                 client.disconnect();
@@ -141,13 +143,13 @@ public class ClientProxy extends CommonProxy {
             Minecraft mc = Minecraft.getMinecraft();
             processDeferredNetworkTeardown(mc);
             SteamClient client = SteamManager.getInstance().getActiveClient();
-            if (client != null && client.isAlive() && mc.world != null && mc.player != null && !client.isInWorld()) {
-                client.onMinecraftWorldJoined(mc.player.getName(), mc.player.dimension);
+            if (client != null && client.isAlive() && mc.theWorld != null && mc.thePlayer != null && !client.isInWorld()) {
+                client.onMinecraftWorldJoined(mc.thePlayer.getName(), mc.thePlayer.dimension);
             }
 
             SteamServer server = SteamManager.getInstance().getActiveServer();
             if (server != null && server.isRunning()) {
-                if (mc.world == null && mc.getIntegratedServer() == null && !(mc.currentScreen instanceof GuiDownloadTerrain)) {
+                if (mc.theWorld == null && mc.getIntegratedServer() == null && !(mc.currentScreen instanceof GuiDownloadTerrain)) {
                     SteamBridgeMod.LOG.info("[SteamBridge] World closed, stopping Steam server...");
                     server.stop();
                 }
@@ -159,7 +161,7 @@ public class ClientProxy extends CommonProxy {
     public void onClientConnectedToServer(FMLNetworkEvent.ClientConnectedToServerEvent event) {
         SteamClient client = SteamManager.getInstance().getActiveClient();
         if (client != null) {
-            client.onMinecraftHandshakeStarted(event.getConnectionType());
+            client.onMinecraftHandshakeStarted(event.connectionType);
         }
     }
 
@@ -175,11 +177,11 @@ public class ClientProxy extends CommonProxy {
         }
 
         EntityPlayerMP player = (EntityPlayerMP) event.player;
-        if (player.connection == null) {
+        if (player.playerNetServerHandler == null) {
             return;
         }
 
-        SocketAddress remote = player.connection.getNetworkManager().getRemoteAddress();
+        SocketAddress remote = player.playerNetServerHandler.getNetworkManager().getRemoteAddress();
         if (remote instanceof InetSocketAddress) {
             server.attachMinecraftPlayer((InetSocketAddress) remote, player.getName());
         }
@@ -188,7 +190,7 @@ public class ClientProxy extends CommonProxy {
     @SubscribeEvent
     public void onPlayerChangedDimension(PlayerEvent.PlayerChangedDimensionEvent event) {
         Minecraft mc = Minecraft.getMinecraft();
-        if (mc.player != null && event.player == mc.player) {
+        if (mc.thePlayer != null && event.player == mc.thePlayer) {
             SteamClient client = SteamManager.getInstance().getActiveClient();
             if (client != null) {
                 client.onMinecraftWorldJoined(event.player.getName(), event.toDim);
@@ -199,7 +201,7 @@ public class ClientProxy extends CommonProxy {
 
 
     private void handleSteamGuiOpen(GuiOpenEvent event) {
-        GuiScreen next = event.getGui();
+        GuiScreen next = event.gui;
         SteamClient client = SteamManager.getInstance().getActiveClient();
 
 
@@ -224,7 +226,7 @@ public class ClientProxy extends CommonProxy {
                         SteamBridgeMod.safeLog(compactText(info.message))
                     );
                     GuiDisconnected replacement = createModMismatchHintScreen();
-                    event.setGui(replacement);
+                    event.gui = replacement;
                     info = extractDisconnectedInfo(replacement);
                 }
                 client.onMinecraftDisconnect(info.reason, info.message);
@@ -268,7 +270,7 @@ public class ClientProxy extends CommonProxy {
     }
 
     private boolean shouldShowLoginMismatchHint(Minecraft mc, SteamClient client) {
-        if (client == null || mc.world != null || mc.player != null) {
+        if (client == null || mc.theWorld != null || mc.thePlayer != null) {
             return false;
         }
 
@@ -327,11 +329,11 @@ public class ClientProxy extends CommonProxy {
                     "[SteamBridge] Deferred Steam client disconnect resolved as real disconnect. screen={} channelOpen={}",
                     screenName(mc.currentScreen), client.isSteamChannelOpen());
                 client.disconnect();
-            } else if (mc.world != null && mc.player != null && client.isSteamChannelOpen()) {
+            } else if (mc.theWorld != null && mc.thePlayer != null && client.isSteamChannelOpen()) {
                 deferredClientDisconnectTicks = -1;
                 SteamBridgeMod.LOG.info(
                     "[SteamBridge] Preserved Steam client across transient world reload. dim={}",
-                    mc.player.dimension);
+                    mc.thePlayer.dimension);
             } else if (--deferredClientDisconnectTicks <= 0) {
                 deferredClientDisconnectTicks = TRANSIENT_DISCONNECT_GRACE_TICKS;
                 SteamBridgeMod.LOG.info(
@@ -350,7 +352,7 @@ public class ClientProxy extends CommonProxy {
                     "[SteamBridge] Deferred Steam host shutdown resolved as real disconnect. screen={}",
                     screenName(mc.currentScreen));
                 server.stop();
-            } else if (mc.getIntegratedServer() != null && mc.world != null) {
+            } else if (mc.getIntegratedServer() != null && mc.theWorld != null) {
                 deferredServerStopTicks = -1;
                 SteamBridgeMod.LOG.info("[SteamBridge] Preserved Steam host across transient world reload.");
             } else if (--deferredServerStopTicks <= 0) {
@@ -437,14 +439,15 @@ public class ClientProxy extends CommonProxy {
         return new GuiDisconnected(
             new GuiMultiplayer(new net.minecraft.client.gui.GuiMainMenu()),
             "connect.failed",
-            new TextComponentTranslation(MOD_MISMATCH_HINT_KEY)
+            new ChatComponentTranslation(MOD_MISMATCH_HINT_KEY)
         );
     }
 
     private String modMismatchHintText() {
         try {
-            if (I18n.hasKey(MOD_MISMATCH_HINT_KEY)) {
-                return I18n.format(MOD_MISMATCH_HINT_KEY);
+            String t = I18n.format(MOD_MISMATCH_HINT_KEY);
+            if (t != null && !t.equals(MOD_MISMATCH_HINT_KEY)) {
+                return t;
             }
         } catch (Exception ignored) {}
         return MOD_MISMATCH_HINT_FALLBACK;
@@ -486,7 +489,7 @@ public class ClientProxy extends CommonProxy {
             Field reasonField = ReflectionHelper.findField(GuiDisconnected.class, "reason", "field_146306_a");
             Field messageField = ReflectionHelper.findField(GuiDisconnected.class, "message", "field_146304_f");
             String reason = (String) reasonField.get(gui);
-            ITextComponent message = (ITextComponent) messageField.get(gui);
+            IChatComponent message = (IChatComponent) messageField.get(gui);
             return new DisconnectedInfo(
                 reason != null ? reason : "",
                 message != null ? message.getUnformattedText() : ""

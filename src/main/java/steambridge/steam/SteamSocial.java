@@ -14,7 +14,7 @@ import steambridge.SteamBridgeMod;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.util.ResourceLocation;
-import net.minecraft.world.GameType;
+import net.minecraft.world.WorldSettings.GameType;
 
 import java.awt.image.BufferedImage;
 import java.io.File;
@@ -50,7 +50,7 @@ public final class SteamSocial {
 
     /**
      * Caches Steam persona names and avatar textures.
-     * Singleton - obtain via {@code SteamSocial.ProfileCache.get()}. 
+     * Singleton - obtain via {@code SteamSocial.ProfileCache.get()}.
      */
     public static final class ProfileCache {
 
@@ -234,7 +234,7 @@ public final class SteamSocial {
     /**
      * Manages the per-world Steam ban list.
      * Stored at {@code <gameDir>/steambridge/ban-cache.json}.
-     * Singleton - obtain via {@code SteamSocial.Bans.get()}. 
+     * Singleton - obtain via {@code SteamSocial.Bans.get()}.
      */
     public static final class Bans {
 
@@ -370,7 +370,7 @@ public final class SteamSocial {
         private static File resolveStorageFile() {
             try {
                 Minecraft mc = Minecraft.getMinecraft();
-                File gameDir = mc != null ? mc.gameDir : null;
+                File gameDir = mc != null ? mc.mcDataDir : null;
                 if (gameDir != null) return new File(gameDir, "steambridge/ban-cache.json");
             } catch (Exception ignored) {}
             return new File("steambridge-ban-cache.json");
@@ -384,7 +384,7 @@ public final class SteamSocial {
     /**
      * Persists per-world host settings across sessions.
      * Stored at {@code <gameDir>/steambridge/world-settings.json}.
-     * Singleton - obtain via {@code SteamSocial.Worlds.get()}. 
+     * Singleton - obtain via {@code SteamSocial.Worlds.get()}.
      */
     public static final class Worlds {
 
@@ -487,8 +487,8 @@ public final class SteamSocial {
         private static File resolveFile() {
             try {
                 Minecraft mc = Minecraft.getMinecraft();
-                if (mc != null && mc.gameDir != null)
-                    return new File(mc.gameDir, "steambridge/world-settings.json");
+                if (mc != null && mc.mcDataDir != null)
+                    return new File(mc.mcDataDir, "steambridge/world-settings.json");
             } catch (Exception ignored) {}
             return new File("steambridge-world-settings.json");
         }

@@ -12,7 +12,7 @@ import net.minecraft.client.gui.GuiMainMenu;
 import net.minecraft.client.gui.GuiMultiplayer;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.resources.I18n;
-import net.minecraft.util.text.TextComponentString;
+import net.minecraft.util.ChatComponentText;
 
 import java.io.IOException;
 
@@ -29,7 +29,7 @@ public class GuiSteamConnecting extends GuiScreen {
     @Override
     public void initGui() {
         this.buttonList.clear();
-        this.buttonList.add(GuiButtons.createCentered(0, this.fontRenderer, this.width / 2,
+        this.buttonList.add(GuiButtons.createCentered(0, this.fontRendererObj, this.width / 2,
                 this.height / 4 + 120 + 12, I18n.format("gui.cancel"), 100, this.width - 20));
     }
 
@@ -46,7 +46,7 @@ public class GuiSteamConnecting extends GuiScreen {
         this.drawDefaultBackground();
 
         if (client != null) {
-            this.drawCenteredString(this.fontRenderer,
+            this.drawCenteredString(this.fontRendererObj,
                     client.getStatusMsg(),
                     this.width / 2, this.height / 2 - 50,
                     0xFFFFFF);
@@ -56,7 +56,7 @@ public class GuiSteamConnecting extends GuiScreen {
                 this.mc.displayGuiScreen(new GuiDisconnected(
                         buildServerListScreen(),
                         "connect.failed",
-                        new TextComponentString(client.getStatusMsg())));
+                        new ChatComponentText(client.getStatusMsg())));
             }
         }
 

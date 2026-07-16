@@ -31,7 +31,7 @@ public class GuiSteamBanList extends GuiScreen {
     @Override
     public void initGui() {
         this.buttonList.clear();
-        this.buttonList.add(GuiButtons.createCentered(BUTTON_BACK, this.fontRenderer, this.width / 2, this.height - 30,
+        this.buttonList.add(GuiButtons.createCentered(BUTTON_BACK, this.fontRendererObj, this.width / 2, this.height - 30,
                 net.minecraft.client.resources.I18n.format("gui.back"), 100, this.width - 20));
         updateBanButtons();
     }
@@ -45,7 +45,7 @@ public class GuiSteamBanList extends GuiScreen {
             String unbanText = net.minecraft.client.resources.I18n.format("steambridge.gui.unban");
             for (int i = 0; i < bans.size(); i++) {
                 int y = yStart + (i * 25);
-                this.buttonList.add(GuiButtons.createRightAligned(100 + i, this.fontRenderer, this.width - 8, y,
+                this.buttonList.add(GuiButtons.createRightAligned(100 + i, this.fontRendererObj, this.width - 8, y,
                         unbanText, 50, 100));
             }
         }
@@ -83,14 +83,14 @@ public class GuiSteamBanList extends GuiScreen {
     public void drawScreen(int mouseX, int mouseY, float partialTicks) {
         this.drawDefaultBackground();
         String bannedText = net.minecraft.client.resources.I18n.format("steambridge.gui.banned");
-        this.drawCenteredString(this.fontRenderer, bannedText, this.width / 2, 10, 16777215);
+        this.drawCenteredString(this.fontRendererObj, bannedText, this.width / 2, 10, 16777215);
 
         if (server != null) {
             List<SteamSocial.Bans.Record> bans = server.getBanRecords();
             int yStart = 40;
 
             if (bans.isEmpty()) {
-                this.drawCenteredString(this.fontRenderer, net.minecraft.client.resources.I18n.format("steambridge.gui.no_bans"), this.width / 2, yStart + 10, 0xAAAAAA);
+                this.drawCenteredString(this.fontRendererObj, net.minecraft.client.resources.I18n.format("steambridge.gui.no_bans"), this.width / 2, yStart + 10, 0xAAAAAA);
             } else {
                 for (int i = 0; i < bans.size(); i++) {
                     SteamSocial.Bans.Record ban = bans.get(i);
@@ -103,7 +103,7 @@ public class GuiSteamBanList extends GuiScreen {
                         net.minecraft.client.gui.Gui.drawModalRectWithCustomSizedTexture(this.width / 2 - 170, y + 2, 0, 0, 16, 16, 16, 16);
                     }
 
-                    this.drawString(this.fontRenderer, ban.getSteamName() + " (" + ban.getMinecraftName() + ")", this.width / 2 - 150, y + 6, 16777215);
+                    this.drawString(this.fontRendererObj, ban.getSteamName() + " (" + ban.getMinecraftName() + ")", this.width / 2 - 150, y + 6, 16777215);
                 }
             }
         }

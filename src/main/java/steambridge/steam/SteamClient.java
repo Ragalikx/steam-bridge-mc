@@ -74,7 +74,6 @@ public class SteamClient {
             statusMsg = "Disconnected.";
         }
         connectLatch.countDown();
-        steambridge.proxy.SteamUdpProxy.getInstance().stopClient();
         SteamManager.getInstance().setActiveClient(null);
 
         if (connectionHandle != 0) {
@@ -124,11 +123,6 @@ public class SteamClient {
                     conn, state
                 );
                 return;
-            }
-
-            // Voice tunnel on virtualPort+1; start before MC login so SVC sockets are intercepted.
-            if (steambridge.SteamBridgeConfig.interceptUdp) {
-                steambridge.proxy.SteamUdpProxy.getInstance().startClient(hostSteamID);
             }
 
             statusMsg = i18n("steambridge.status.path_ready", "Steam path ready - activating pipeline...");
@@ -195,7 +189,7 @@ public class SteamClient {
             String error = status.getLastError().isEmpty()
                 ? status.describeState()
                 : status.getLastError();
-                
+
             // If the server sent a raw localization key, translate it on the client side
             error = i18n(error, error);
 
@@ -331,7 +325,6 @@ public class SteamClient {
         statusMsg = TextColors.RED + msg;
         alive.set(false);
         connectLatch.countDown();
-        steambridge.proxy.SteamUdpProxy.getInstance().stopClient();
         SteamManager.getInstance().setActiveClient(null);
 
         if (connectionHandle != 0) {
@@ -351,7 +344,7 @@ public class SteamClient {
                 mc.displayGuiScreen(new net.minecraft.client.gui.GuiDisconnected(
                     connectingScreen != null ? connectingScreen : new net.minecraft.client.gui.GuiMainMenu(),
                     "connect.failed",
-                    new net.minecraft.util.text.TextComponentString(msg)
+                    new net.minecraft.util.ChatComponentText(msg)
                 ));
             }
         });
@@ -393,8 +386,10 @@ public class SteamClient {
     /** Returns the I18n translation for {@code key}, or {@code fallback} if unavailable. */
     private static String i18n(String key, String fallback) {
         try {
-            if (net.minecraft.client.resources.I18n.hasKey(key)) {
-                return net.minecraft.client.resources.I18n.format(key);
+            // 1.8.9 I18n has no hasKey(); format returns the key when missing.
+            String t = net.minecraft.client.resources.I18n.format(key);
+            if (t != null && !t.isEmpty() && !t.equals(key)) {
+                return t;
             }
         } catch (Exception ignored) {
             // Minecraft not yet fully initialised - use English fallback.

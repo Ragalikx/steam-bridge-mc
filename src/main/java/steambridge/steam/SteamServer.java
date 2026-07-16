@@ -147,7 +147,6 @@ public class SteamServer {
     public void setMcPort(int port) {
         mcPort = port;
         SteamBridgeMod.LOG.info("[SteamServer] MC port updated to {}", port);
-        steambridge.proxy.SteamUdpProxy.getInstance().setHostGamePort(port);
     }
 
     public int getMcPort() {
@@ -209,9 +208,6 @@ public class SteamServer {
             return false;
         }
 
-        if (steambridge.SteamBridgeConfig.interceptUdp) {
-            steambridge.proxy.SteamUdpProxy.getInstance().startServer();
-        }
         SteamBridgeMod.LOG.info(
             "[SteamServer] Started. listenSocket={} SteamChannel (direct, no TCP) world={} access={}",
             listenSocket, worldKey, accessPolicy
@@ -227,7 +223,6 @@ public class SteamServer {
         }
 
         running = false;
-        steambridge.proxy.SteamUdpProxy.getInstance().stopServer();
         SteamManager.getInstance().setActiveServer(null);
 
         // Close all active connections

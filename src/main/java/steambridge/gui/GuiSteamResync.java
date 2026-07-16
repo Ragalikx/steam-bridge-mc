@@ -46,7 +46,7 @@ public class GuiSteamResync extends GuiScreen {
     @Override
     public void initGui() {
         this.buttonList.clear();
-        this.buttonList.add(GuiButtons.createCentered(0, this.fontRenderer, this.width / 2, this.height - 40,
+        this.buttonList.add(GuiButtons.createCentered(0, this.fontRendererObj, this.width / 2, this.height - 40,
                 I18n.format("gui.cancel"), 100, this.width - 20));
 
         // Kick off launch on first init
@@ -59,7 +59,7 @@ public class GuiSteamResync extends GuiScreen {
 
     private void launchAndScheduleRetry() {
         try {
-            SteamAppIdHelper.ensureAppId(net.minecraft.client.Minecraft.getMinecraft().gameDir);
+            SteamAppIdHelper.ensureAppId(net.minecraft.client.Minecraft.getMinecraft().mcDataDir);
             SteamAppIdHelper.launchSteam();
             state = State.WAITING;
             statusLine1 = "§e" + I18n.format("steambridge.gui.resync_starting");
@@ -125,10 +125,10 @@ public class GuiSteamResync extends GuiScreen {
         this.drawDefaultBackground();
 
         String title = "§b" + I18n.format("steambridge.gui.resync_title");
-        this.drawCenteredString(this.fontRenderer, title, this.width / 2, this.height / 2 - 50, 0xFFFFFF);
-        this.drawCenteredString(this.fontRenderer, statusLine1, this.width / 2, this.height / 2 - 20, 0xFFFFFF);
+        this.drawCenteredString(this.fontRendererObj, title, this.width / 2, this.height / 2 - 50, 0xFFFFFF);
+        this.drawCenteredString(this.fontRendererObj, statusLine1, this.width / 2, this.height / 2 - 20, 0xFFFFFF);
         if (!statusLine2.isEmpty()) {
-            this.drawCenteredString(this.fontRenderer, statusLine2, this.width / 2, this.height / 2, 0xAAAAAA);
+            this.drawCenteredString(this.fontRendererObj, statusLine2, this.width / 2, this.height / 2, 0xAAAAAA);
         }
 
         if (state == State.WAITING) {
@@ -136,7 +136,7 @@ public class GuiSteamResync extends GuiScreen {
             int dots = (ticksElapsed / 8) % 4;
             StringBuilder sb = new StringBuilder("§7");
             for (int i = 0; i < dots; i++) sb.append('.');
-            this.drawCenteredString(this.fontRenderer, sb.toString(), this.width / 2, this.height / 2 + 16, 0xFFFFFF);
+            this.drawCenteredString(this.fontRendererObj, sb.toString(), this.width / 2, this.height / 2 + 16, 0xFFFFFF);
         }
 
         super.drawScreen(mouseX, mouseY, partialTicks);

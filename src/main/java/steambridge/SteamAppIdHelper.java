@@ -39,7 +39,7 @@ public final class SteamAppIdHelper {
      * Writes {@code steam_appid.txt} into {@code gameDir} if it does not already exist
      * or contains a different value.
      *
-     * @param gameDir the .minecraft directory (Minecraft.getMinecraft().gameDir)
+     * @param gameDir the .minecraft directory (Minecraft.getMinecraft().mcDataDir)
      */
     public static void ensureAppId(File gameDir) {
         String appId = getAppId();

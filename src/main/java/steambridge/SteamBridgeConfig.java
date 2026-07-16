@@ -5,40 +5,48 @@
  */
 package steambridge;
 
-import net.minecraftforge.common.config.Config;
-import net.minecraftforge.common.config.ConfigManager;
-import net.minecraftforge.fml.client.event.ConfigChangedEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import net.minecraftforge.common.config.Configuration;
 
-@Config(modid = SteamBridgeMod.MODID, name = "steambridge")
-public class SteamBridgeConfig {
+import java.io.File;
 
-    @Config.Comment("Allow connections without validating Steam Auth Ticket. False is more secure but might affect some NAT types.")
-    @Config.Name("Allow Without Auth")
+/**
+ * Simple forge {@link Configuration} (1.8.9 has no {@code @Config} annotation API).
+ * Voice / UDP intercept is intentionally absent on this branch.
+ */
+public final class SteamBridgeConfig {
+
     public static boolean allowWithoutAuth = true;
-
-    @Config.Comment("Virtual port for Steam network. 0 is default. Change only if conflicting with other mods.")
-    @Config.Name("Virtual Port")
     public static int virtualPort = 0;
 
-    @Config.Comment("Intercept DatagramSockets and tunnel Simple Voice Chat / Plasmo Voice over Steam P2P.")
-    @Config.Name("Intercept UDP (voice)")
-    public static boolean interceptUdp = true;
+    private static Configuration config;
 
-    // NOTE: the Steam App ID is intentionally NOT configurable. It is hardcoded to 480
-    // (Spacewar) in SteamAppIdHelper. Letting users point it at a real game's App ID -
-    // especially one with an anti-cheat (VAC/EAC) - would get their account banned and
-    // damage the mod's reputation, so the option is removed entirely.
+    private SteamBridgeConfig() {}
 
-    @Mod.EventBusSubscriber(modid = SteamBridgeMod.MODID)
-    private static class EventHandler {
-        @SubscribeEvent
-        public static void onConfigChanged(ConfigChangedEvent.OnConfigChangedEvent event) {
-            if (event.getModID().equals(SteamBridgeMod.MODID)) {
-                ConfigManager.sync(SteamBridgeMod.MODID, Config.Type.INSTANCE);
+    public static void init(File configFile) {
+        config = new Configuration(configFile);
+        sync();
+    }
+
+    public static void sync() {
+        if (config == null) return;
+        try {
+            allowWithoutAuth = config.getBoolean(
+                "Allow Without Auth",
+                Configuration.CATEGORY_GENERAL,
+                true,
+                "Allow connections without validating Steam Auth Ticket."
+            );
+            virtualPort = config.getInt(
+                "Virtual Port",
+                Configuration.CATEGORY_GENERAL,
+                0, 0, 65535,
+                "Virtual port for Steam network. 0 is default."
+            );
+            if (config.hasChanged()) {
+                config.save();
             }
+        } catch (Exception e) {
+            SteamBridgeMod.LOG.warn("Failed to load steambridge config: {}", e.toString());
         }
     }
 }
-

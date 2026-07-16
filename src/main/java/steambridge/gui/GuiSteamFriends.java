@@ -75,10 +75,10 @@ public class GuiSteamFriends extends GuiScreen {
 
     @Override
     public void initGui() {
-        this.buttonList.add(GuiButtons.createCentered(0, this.fontRenderer, this.width / 2, this.height - 30,
+        this.buttonList.add(GuiButtons.createCentered(0, this.fontRendererObj, this.width / 2, this.height - 30,
                 net.minecraft.client.resources.I18n.format("gui.back"), 100, this.width - 20));
 
-        searchField = new GuiTextField(1, this.fontRenderer,
+        searchField = new GuiTextField(1, this.fontRendererObj,
                 this.width / 2 - 100, 35, 200, 20);
         searchField.setMaxStringLength(50);
         searchField.setFocused(true);
@@ -183,7 +183,7 @@ public class GuiSteamFriends extends GuiScreen {
     @Override
     public void drawScreen(int mouseX, int mouseY, float partialTicks) {
         this.drawDefaultBackground();
-        this.drawCenteredString(this.fontRenderer,
+        this.drawCenteredString(this.fontRendererObj,
                 net.minecraft.client.resources.I18n.format("steambridge.gui.select_friend"),
                 this.width / 2, 15, 0xFFFFFF);
 
@@ -228,7 +228,7 @@ public class GuiSteamFriends extends GuiScreen {
 
             // Name (offset by avatar width + 2px gap)
             int nameX = this.width / 2 - LIST_HALF_WIDTH + AVATAR_SIZE + 4;
-            this.drawString(this.fontRenderer, friend.name, nameX, y + 8, 0xFFFFFF);
+            this.drawString(this.fontRendererObj, friend.name, nameX, y + 8, 0xFFFFFF);
         }
     }
 

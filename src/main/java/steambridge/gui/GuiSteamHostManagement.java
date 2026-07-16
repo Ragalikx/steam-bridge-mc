@@ -57,11 +57,11 @@ public class GuiSteamHostManagement extends GuiScreen {
     public void initGui() {
         this.server = SteamManager.getInstance().getActiveServer();
         this.buttonList.clear();
-        this.buttonList.add(GuiButtons.createCentered(BUTTON_BACK, this.fontRenderer, this.width / 2, this.height - 30,
+        this.buttonList.add(GuiButtons.createCentered(BUTTON_BACK, this.fontRendererObj, this.width / 2, this.height - 30,
                 net.minecraft.client.resources.I18n.format("gui.back"), 100, this.width - 20));
 
         String bannedText = net.minecraft.client.resources.I18n.format("steambridge.gui.banned");
-        this.buttonList.add(GuiButtons.createRightAligned(BUTTON_BAN_LIST, this.fontRenderer, this.width - 8, 10,
+        this.buttonList.add(GuiButtons.createRightAligned(BUTTON_BAN_LIST, this.fontRendererObj, this.width - 8, 10,
                 bannedText, 60, 140));
 
         updatePlayerButtons();
@@ -77,9 +77,9 @@ public class GuiSteamHostManagement extends GuiScreen {
             String banText = net.minecraft.client.resources.I18n.format("steambridge.gui.ban");
             for (int i = 0; i < snaps.size(); i++) {
                 int y = yStart + (i * 25);
-                this.buttonList.add(GuiButtons.create(100 + i, this.fontRenderer, this.width / 2 + 50, y,
+                this.buttonList.add(GuiButtons.create(100 + i, this.fontRendererObj, this.width / 2 + 50, y,
                         kickText, 40, 80));
-                this.buttonList.add(GuiButtons.createRightAligned(200 + i, this.fontRenderer, this.width - 8, y,
+                this.buttonList.add(GuiButtons.createRightAligned(200 + i, this.fontRendererObj, this.width - 8, y,
                         banText, 40, 80));
             }
         }
@@ -122,26 +122,26 @@ public class GuiSteamHostManagement extends GuiScreen {
     @Override
     public void drawScreen(int mouseX, int mouseY, float partialTicks) {
         this.drawDefaultBackground();
-        this.drawCenteredString(this.fontRenderer, net.minecraft.client.resources.I18n.format("steambridge.gui.management"), this.width / 2, 10, 16777215);
+        this.drawCenteredString(this.fontRendererObj, net.minecraft.client.resources.I18n.format("steambridge.gui.management"), this.width / 2, 10, 16777215);
 
         if (server != null && server.isRunning()) {
             List<SteamServer.PlayerSnapshot> snaps = snapshots();
             int yStart = 40;
 
             if (snaps.isEmpty()) {
-                this.drawCenteredString(this.fontRenderer, net.minecraft.client.resources.I18n.format("steambridge.gui.no_players"), this.width / 2, yStart + 10, 0xAAAAAA);
+                this.drawCenteredString(this.fontRendererObj, net.minecraft.client.resources.I18n.format("steambridge.gui.no_players"), this.width / 2, yStart + 10, 0xAAAAAA);
             } else {
                 for (int i = 0; i < snaps.size(); i++) {
                     SteamServer.PlayerSnapshot snap = snaps.get(i);
                     int y = yStart + (i * 25);
-                    
+
                     String avatar = steambridge.steam.SteamSocial.ProfileCache.get().getAvatarTexture(snap.getSteamId());
                     if (avatar != null && !avatar.isEmpty()) {
                         this.mc.getTextureManager().bindTexture(new net.minecraft.util.ResourceLocation(avatar));
                         net.minecraft.client.renderer.GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
                         net.minecraft.client.gui.Gui.drawModalRectWithCustomSizedTexture(this.width / 2 - 170, y + 2, 0, 0, 16, 16, 16, 16);
                     }
-                    
+
                     SteamConnectionStatus status = snap.getConnectionStatus();
                     String pingStr  = (status != null && status.getPingMs() >= 0) ? status.getPingMs() + "ms" : "~";
                     String connType = (status != null && status.isConnectionActive())
@@ -149,14 +149,14 @@ public class GuiSteamHostManagement extends GuiScreen {
                                 ? net.minecraft.client.resources.I18n.format("steambridge.gui.conn_relay")
                                 : net.minecraft.client.resources.I18n.format("steambridge.gui.conn_p2p"))
                             : "?";
-                    this.drawString(this.fontRenderer,
+                    this.drawString(this.fontRendererObj,
                             snap.getSteamName() + " (" + snap.getMinecraftName() + ") "
                             + pingStr + " [" + connType + "]",
                             this.width / 2 - 150, y + 6, 16777215);
                 }
             }
         } else {
-            this.drawCenteredString(this.fontRenderer, net.minecraft.client.resources.I18n.format("steambridge.gui.not_running"), this.width / 2, 50, 16733525);
+            this.drawCenteredString(this.fontRendererObj, net.minecraft.client.resources.I18n.format("steambridge.gui.not_running"), this.width / 2, 50, 16733525);
         }
 
         super.drawScreen(mouseX, mouseY, partialTicks);

@@ -77,7 +77,7 @@ public final class GuiButtons {
         button.displayString = msg;
         button.width = newW;
         if (keepRightEdge && newW != oldW) {
-            button.x += oldW - newW;
+            button.xPosition += oldW - newW;
         }
     }
 }
