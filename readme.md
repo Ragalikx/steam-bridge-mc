@@ -154,29 +154,32 @@ Minecraft version links open the matching branch.
 
 ## Developer info
 
-What was used when building and testing each branch. Natives ship inside the mod jar (or come from the loader - see JNA notes).
+Exact pins from each branch tip (`build.gradle` / `gradle.properties` / `gradle-wrapper.properties`). Re-checked against git, not guesswork.
 
-| Minecraft | Platform | Java (compile / game) | Gradle JVM for build | Gradle | Build plugin | steamworks4j | JNA |
+| Minecraft | Platform | Java (compile) | JVM for Gradle daemon | Gradle wrapper | Build plugin (exact id / coordinate) | steamworks4j | JNA |
 |---|---|---|---|---|---|---|---|
-| 1.21.1 | NeoForge | 21 | 17+ (prefer 21) | 8.13 | NeoGradle userdev 7.0.170 | 1.10.0 | 5.14.0 (from NeoForge, not in mod jar) |
-| 1.21.1 | Fabric | 21 | 17+ (prefer 21) | 8.13 | fabric-loom 1.10.5 | 1.10.0 | 5.14.0 (slim win64 in mod jar) |
-| 1.20.1 | NeoForge/Forge | 17 | 17+ | 8.13 | MDG legacyforge 2.0.141 | 1.10.0 | 5.12.1 (from NeoForge/FML, not in mod jar) |
-| 1.20.1 | Fabric | 17 | 17+ | 8.13 | fabric-loom 1.10.5 | 1.10.0 | 5.14.0 (slim win64 in mod jar) |
-| 1.19.2 | Forge | 17 | 17+ | 8.13 | MDG legacyforge 2.0.141 | 1.10.0 | 5.12.1 (compileOnly, not in jar) |
-| 1.19.2 | Fabric | 17 | 17+ | 8.13 | fabric-loom 1.10.5 | 1.10.0 | 5.14.0 (slim win64 in mod jar) |
-| 1.16.5 | Forge | 8 | 8 or 17 | 7.5.1 | ForgeGradle 5.1.69 | 1.10.0 | 4.4.0 (game ships it; not shaded) |
-| 1.16.5 | Fabric | 8 bytecode | 17+ (Loom 1.6.12) | 8.8 | fabric-loom 1.6.12 | 1.10.0 | 5.14.0 (slim win64 in mod jar) |
-| 1.12.2 | Forge | 8 | 8 | 4.10.3 | ForgeGradle 3.+ | 1.10.0 | 5.14.0 (slim win64 in mod jar) |
-| 1.8.9 | Forge | 8 | 8 | 4.10.3 | ForgeGradle 2.1-SNAPSHOT | 1.10.0 | 5.14.0 (slim win64 in mod jar) |
-| 1.7.10 | Forge | 8 | 8 | 7.4.2 | ForgeGradle 1.2 (anatawa12) | 1.10.0 | 5.14.0 (slim win64 in mod jar) |
+| 1.21.1 | NeoForge 21.1.234 | 21 (`toolchain`) | 17+ (prefer 21) | 8.13 | `net.neoforged.gradle.userdev` **7.0.170** | 1.10.0 | 5.14.0 **compileOnly** (loader ships it; not in mod jar) |
+| 1.21.1 | Fabric loader 0.16.14 / API 0.116.13+1.21.1 | 21 (`toolchain` + `release 21`) | 17+ (prefer 21) | 8.13 | `fabric-loom` **1.10.5** | 1.10.0 | 5.14.0 **shaded** slim win64 (`slimJnaJar`) |
+| 1.20.1 | NeoForge 1.20.1-47.1.106 | 17 (`toolchain`) | 17+ | 8.13 | `net.neoforged.moddev.legacyforge` **2.0.141** | 1.10.0 | 5.12.1 **compileOnly** (loader ships it; not in mod jar) |
+| 1.20.1 | Fabric loader 0.16.14 / API 0.92.2+1.20.1 | 17 (`toolchain` + `release 17`) | 17+ | 8.13 | `fabric-loom` **1.10.5** | 1.10.0 | 5.14.0 **shaded** slim win64 |
+| 1.19.2 | MinecraftForge 1.19.2-43.5.0 | 17 (`toolchain`) | 17+ | 8.13 | `net.neoforged.moddev.legacyforge` **2.0.141** (builds **MinecraftForge**, not NeoForge) | 1.10.0 | 5.12.1 **compileOnly** (not in mod jar) |
+| 1.19.2 | Fabric loader 0.16.14 / API 0.76.1+1.19.2 | 17 (`toolchain` + `release 17`) | 17+ | 8.13 | `fabric-loom` **1.10.5** | 1.10.0 | 5.14.0 **shaded** slim win64 |
+| 1.16.5 | MinecraftForge 1.16.5-36.2.42 | 8 (`toolchain` 8) | 8 or 17 | 7.5.1 | `net.minecraftforge.gradle` **5.1.69** | 1.10.0 | 4.4.0 **compileOnly** (game already has JNA 4.4.0; do not shade 5.x) |
+| 1.16.5 | Fabric loader 0.14.25 / API 0.42.0+1.16 | 8 (`sourceCompatibility` + `release 8`) | 17+ (Gradle 8.8) | 8.8 | `fabric-loom` **1.6.12** | 1.10.0 | 5.14.0 **shaded** slim win64 |
+| 1.12.2 | MinecraftForge 1.12.2-14.23.5.2860 | 8 | 8 | 4.10.3 | classpath `net.minecraftforge.gradle:ForgeGradle:`**`3.+`** (dynamic range, `changing: true`) | 1.10.0 | 5.14.0 **shaded** slim win64 + trimmed classes |
+| 1.8.9 | MinecraftForge 1.8.9-11.15.1.2318-1.8.9 | 8 | 8 | 4.10.3 | classpath `net.minecraftforge.gradle:ForgeGradle:`**`2.1-SNAPSHOT`** | 1.10.0 | 5.14.0 **shaded** (win64 natives; non-Windows natives stripped) |
+| 1.7.10 | MinecraftForge 1.7.10-10.13.4.1614-1.7.10 | 8 | 8 | 7.4.2 | classpath `com.anatawa12.forge:ForgeGradle:`**`1.2-1.1.+`** (`changing: true`; apply plugin `forge`) | 1.10.0 | 5.14.0 **shaded**: win64 natives only, **full JNA Java classes** kept (LaunchWrapper `Native.initIDs`) |
 
 Notes:
 
 - Builds/tests: Windows 11 (amd64). Linux: in development; macOS no.
 - Steam AppID is fixed to **480 (Spacewar)**. Steam client must be running.
 - Release versioning: `-PmodVersion=1.145` -> `1.145+mc<mc_version>`. Without `-P`: `0.0.0-dev+mc<mc_version>`.
-- **Gradle JVM is not the same as compile target.** Fabric Loom 1.10.x and Gradle 8.13 need a **Java 17+** daemon even when the game is older. Toolchain only covers `compileJava`, not plugin load. Legacy Forge 1.7.10 / 1.8.9 / 1.12.2 must run Gradle on **Java 8**.
-- NeoForge does not bundle JNA in the mod (module clash). Compile is pinned to the JNA version the loader already ships. Fabric and older Forge shade a trimmed win64-only JNA (except Forge 1.16.5, which uses the game JNA 4.4.0).
+- **Gradle daemon JVM is not the same as compile target.** Loom **1.10.5** + Gradle **8.13** need a **Java 17+** daemon. Toolchain / `options.release` only affect compilation. Forge **1.7.10 / 1.8.9 / 1.12.2** must run Gradle on **Java 8**.
+- **Forge 1.19.2** uses NeoForged **ModDevGradle legacyforge** as the *build plugin*, but the game dependency is **MinecraftForge** `1.19.2-43.5.0` (`legacyForge { version = ... }`), not NeoForge.
+- **NeoForge 1.20.1** also uses `moddev.legacyforge` **2.0.141**, but with `neoForgeVersion = 1.20.1-47.1.106` (`net.neoforged:forge` coordinate).
+- **JNA packaging:** NeoForge / Forge 1.19.2 / Forge 1.16.5 = **not in mod jar**. Fabric = slim win64 shade. Forge 1.12.2 = aggressive class trim + win64. Forge 1.7.10 = full JNA classes + win64 natives only (not the same as Fabric slim).
+- **Dynamic pins:** ForgeGradle **`3.+`** and **`1.2-1.1.+`** resolve the newest matching artifact at build time (not a single frozen patch version in the script).
 
 ### Building a release jar
 
