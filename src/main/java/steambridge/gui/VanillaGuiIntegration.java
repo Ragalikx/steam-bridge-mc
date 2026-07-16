@@ -177,6 +177,22 @@ public final class VanillaGuiIntegration {
 
     // -- Steam-server marking (ping suppression) -------------------------------
 
+    private static void markSteamServer(ServerData data) {
+        data.pinged = true;
+        data.ping = 0L;
+        data.motd = Component.translatable("steambridge.gui.server_steam_motd");
+        data.status = Component.translatable("steambridge.gui.server_steam_status");
+        if (data.version == null) data.version = Component.literal("Steam");
+        if (data.playerList == null) data.playerList = java.util.Collections.emptyList();
+        try {
+            long steamId = Long.parseLong(extractSteamId(data.ip));
+            byte[] icon = SteamSocial.ProfileCache.get().getAvatarIconBytes(steamId);
+            if (icon != null && icon.length > 0 && !java.util.Arrays.equals(icon, data.getIconBytes())) {
+                data.setIconBytes(icon);
+            }
+        } catch (Exception ignored) {}
+    }
+
     private static void markAllSteamServers(JoinMultiplayerScreen gui) {
         ServerList list = gui.getServers();
         if (list == null) return;
@@ -184,8 +200,9 @@ public final class VanillaGuiIntegration {
             int steamIndex = 0;
             for (int i = 0; i < list.size(); i++) {
                 ServerData data = list.get(i);
+                if (data == null) continue;
                 if (isSteamServerId(data.ip)) {
-                    data.pinged = true;
+                    markSteamServer(data);
                     if (i > steamIndex) list.swap(i, steamIndex);
                     steamIndex++;
                 }
@@ -210,8 +227,7 @@ public final class VanillaGuiIntegration {
         Minecraft mc = Minecraft.getInstance();
 
         if (next instanceof ShareToLanScreen) {
-            SteamServer server = SteamManager.getInstance().getActiveServer();
-            if (server != null && server.isRunning()) {
+            if (isSteamHostSessionActive(mc)) {
                 event.setNewScreen(new GuiSteamHostManagement(mc.screen));
                 return;
             }
@@ -390,10 +406,9 @@ public final class VanillaGuiIntegration {
 
     private static void injectPauseMenuControl(ScreenEvent.Init.Post event, Screen gui) {
         if (!(gui instanceof PauseScreen)) return;
-        SteamServer server = SteamManager.getInstance().getActiveServer();
-        if (server == null || !server.isRunning()) return;
+        if (!isSteamHostSessionActive(Minecraft.getInstance())) return;
 
-        // Anchor a standalone "Manage Steam session" button directly above the Forge/NeoForge
+// Anchor a standalone "Manage Steam session" button directly above the Forge/NeoForge
         // "Mods" button. Once a world is already shared, vanilla removes its "Open to LAN"
         // entry, so there is no shareToLan button to attach to; the always-present "Mods"
         // button is a stable anchor instead. We deliberately do NOT hide or repurpose any
@@ -507,4 +522,26 @@ public final class VanillaGuiIntegration {
             return "__default_world__";
         }
     }
+    private static boolean isSteamHostSessionActive(Minecraft mc) {
+        SteamServer server = SteamManager.getInstance().getActiveServer();
+        if (server == null || !server.isRunning()) {
+            return false;
+        }
+        net.minecraft.client.server.IntegratedServer integrated = mc.getSingleplayerServer();
+        if (integrated == null) {
+            return false;
+        }
+        try {
+            String folder = worldKey(integrated);
+            String hosted = server.getWorldKey();
+            if (folder != null && !folder.isEmpty()
+                    && hosted != null && !hosted.isEmpty()
+                    && !hosted.equals("__default_world__")
+                    && !folder.equals(hosted)) {
+                return false;
+            }
+        } catch (Throwable ignored) {}
+        return true;
+    }
+
 }

@@ -140,6 +140,13 @@ public class SteamClientEvents {
         if (server != null && server.isRunning()) {
             if (mc.level == null && mc.getSingleplayerServer() == null && !(mc.screen instanceof ReceivingLevelScreen)) {
                 SteamBridgeMod.LOG.info("[SteamBridge] World closed, stopping Steam server...");
+                deferredServerStopTicks = -1;
+                server.stop();
+            } else if (shouldStopHostForWorldChange(mc, server)) {
+                SteamBridgeMod.LOG.info(
+                    "[SteamBridge] Integrated world changed (was '{}'), stopping leftover Steam host.",
+                    server.getWorldKey());
+                deferredServerStopTicks = -1;
                 server.stop();
             }
         }
@@ -207,13 +214,19 @@ public class SteamClientEvents {
             SteamServer server = SteamManager.getInstance().getActiveServer();
             if (server == null || !server.isRunning()) {
                 deferredServerStopTicks = -1;
+            } else if (shouldStopHostForWorldChange(mc, server)) {
+                deferredServerStopTicks = -1;
+                SteamBridgeMod.LOG.info(
+                    "[SteamBridge] Deferred host stop: world changed to a different save, stopping Steam.");
+                server.stop();
             } else if (shouldCloseDeferredServer(mc)) {
                 deferredServerStopTicks = -1;
                 SteamBridgeMod.LOG.info(
                     "[SteamBridge] Deferred Steam host shutdown resolved as real disconnect. screen={}",
                     screenName(mc.screen));
                 server.stop();
-            } else if (mc.getSingleplayerServer() != null && mc.level != null) {
+            } else if (mc.getSingleplayerServer() != null && mc.level != null
+                    && isSameHostedWorld(mc, server)) {
                 deferredServerStopTicks = -1;
                 SteamBridgeMod.LOG.info("[SteamBridge] Preserved Steam host across transient world reload.");
             } else if (--deferredServerStopTicks <= 0) {
@@ -225,6 +238,51 @@ public class SteamClientEvents {
             }
         }
     }
+
+    private static boolean shouldStopHostForWorldChange(Minecraft mc, SteamServer server) {
+        if (server == null || !server.isRunning()) {
+            return false;
+        }
+        var integrated = mc.getSingleplayerServer();
+        if (integrated == null) {
+            return false;
+        }
+        try {
+            String folder = worldFolderName(integrated);
+            if (folder == null || folder.isEmpty()) {
+                return false;
+            }
+            String hosted = server.getWorldKey();
+            return hosted != null && !hosted.isEmpty()
+                    && !hosted.equals("__default_world__")
+                    && !folder.equals(hosted);
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    private static boolean isSameHostedWorld(Minecraft mc, SteamServer server) {
+        if (server == null || mc.getSingleplayerServer() == null) {
+            return false;
+        }
+        try {
+            String folder = worldFolderName(mc.getSingleplayerServer());
+            String hosted = server.getWorldKey();
+            return folder != null && hosted != null && folder.equals(hosted);
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    private static String worldFolderName(net.minecraft.client.server.IntegratedServer srv) {
+        try {
+            return srv.getWorldPath(net.minecraft.world.level.storage.LevelResource.ROOT)
+                    .getParent().getFileName().toString();
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
 
     private boolean shouldDeferSteamClientDisconnect(Minecraft mc, SteamClient client) {
         return client != null

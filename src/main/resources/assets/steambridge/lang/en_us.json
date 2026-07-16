@@ -48,5 +48,7 @@
   "steambridge.gui.resync_success_hint": "Opening friends list...",
   "steambridge.gui.resync_timeout": "Timed out - Steam did not start.",
   "steambridge.gui.resync_timeout_hint": "Launch Steam manually and try again.",
-  "steambridge.gui.resync_countdown": "Waiting for Steam... (%s sec)"
+  "steambridge.gui.resync_countdown": "Waiting for Steam... (%s sec)",
+  "steambridge.gui.server_steam_motd": "Connects via Steam Bridge",
+  "steambridge.gui.server_steam_status": "Steam"
 }
