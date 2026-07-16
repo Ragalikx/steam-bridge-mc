@@ -48,5 +48,7 @@
   "steambridge.gui.resync_success_hint": "Відкриваємо список друзів...",
   "steambridge.gui.resync_timeout": "Час вийшов: Steam так і не запустився.",
   "steambridge.gui.resync_timeout_hint": "Запустіть Steam вручну і спробуйте знову.",
-  "steambridge.gui.resync_countdown": "Очікуємо Steam... (%s сек)"
+  "steambridge.gui.resync_countdown": "Очікуємо Steam... (%s сек)",
+  "steambridge.gui.server_steam_motd": "Підключення через Steam Bridge",
+  "steambridge.gui.server_steam_status": "Steam"
 }

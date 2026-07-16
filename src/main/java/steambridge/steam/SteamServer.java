@@ -257,6 +257,10 @@ public class SteamServer {
         return running;
     }
 
+    public String getWorldKey() {
+        return worldKey;
+    }
+
     public List<PlayerSnapshot> getPlayerSnapshots() {
         expireKickBlocks();
 
