@@ -176,11 +176,52 @@ public class VanillaGuiIntegration {
         }
     }
 
-    /** Iterates the saved server list of {@code gui} and marks all Steam entries. */
+    /**
+     * Steam multiplayer-list polish: MOTD/status/avatar + pin Steam entries to the top.
+     * <p>
+     * Throttled so we do not walk/swap the list every tick and every draw frame.
+     * Immediate refresh when the set of Steam IDs in the list changes (user added/removed
+     * a Steam server); otherwise at most once per {@link #STEAM_LIST_MARK_INTERVAL_MS}
+     * so avatars can still fill in without burning CPU on vanilla TCP servers.
+     */
+    private static final long STEAM_LIST_MARK_INTERVAL_MS = 5000L;
+    private static long lastSteamListMarkMs = 0L;
+    private static String lastSteamListFingerprint = "";
+
+    /** Fingerprint of Steam64 entries only (order-sensitive) - ignores normal IP servers. */
+    private static String steamListFingerprint(ServerList list) {
+        if (list == null) return "";
+        StringBuilder sb = new StringBuilder(64);
+        try {
+            for (int i = 0; i < list.countServers(); i++) {
+                ServerData data = list.getServerData(i);
+                if (data == null || !isSteamServerId(data.serverIP)) continue;
+                sb.append(extractSteamId(data.serverIP)).append('\n');
+            }
+        } catch (Exception ignored) {}
+        return sb.toString();
+    }
+
+    /** Marks Steam entries; {@code force} skips the throttle (screen open / first paint). */
     private static void markAllSteamServers(GuiScreen gui) {
+        markAllSteamServers(gui, false);
+    }
+
+    private static void markAllSteamServers(GuiScreen gui, boolean force) {
         try {
             ServerList list = getSavedServerList(gui);
             if (list == null) return;
+
+            String fingerprint = steamListFingerprint(list);
+            long now = System.currentTimeMillis();
+            boolean steamSetChanged = !fingerprint.equals(lastSteamListFingerprint);
+            if (!force && !steamSetChanged
+                    && (now - lastSteamListMarkMs) < STEAM_LIST_MARK_INTERVAL_MS) {
+                return;
+            }
+            lastSteamListFingerprint = fingerprint;
+            lastSteamListMarkMs = now;
+
             int steamIndex = 0;
             for (int i = 0; i < list.countServers(); i++) {
                 ServerData data = list.getServerData(i);
@@ -200,19 +241,16 @@ public class VanillaGuiIntegration {
     public void onClientTick(TickEvent.ClientTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
         Minecraft mc = Minecraft.getMinecraft();
+        // Smart throttle: new Steam entry -> immediate; else at most every 5s (avatars).
+        // Does not touch non-Steam server list behaviour beyond this mark pass.
         if (mc.currentScreen instanceof GuiMultiplayer) {
-            markAllSteamServers(mc.currentScreen);
+            markAllSteamServers(mc.currentScreen, false);
         }
     }
 
     @SubscribeEvent
     public void onDrawScreenPre(GuiScreenEvent.DrawScreenEvent.Pre event) {
         GuiScreen gui = event.gui;
-
-        // Suppress Steam-server ping on the multiplayer list.
-        if (gui instanceof GuiMultiplayer) {
-            markAllSteamServers(gui);
-        }
 
         /*
          * Vanilla updateScreen() resets the button enabled-state every tick.
@@ -434,12 +472,12 @@ public class VanillaGuiIntegration {
             }
         }
 
-        // -- Pre-mark Steam servers + schedule a second pass before first render -
+        // -- Pre-mark Steam servers (force so first open is instant) ----------
         if (gui instanceof GuiMultiplayer) {
-            markAllSteamServers(gui);
-            // Schedule before the next render so MOTD sticks after list refresh.
+            markAllSteamServers(gui, true);
+            // Second force pass after list re-init so MOTD sticks on first paint.
             steambridge.ClientTasks.run(() -> {
-                if (Minecraft.getMinecraft().currentScreen == gui) markAllSteamServers(gui);
+                if (Minecraft.getMinecraft().currentScreen == gui) markAllSteamServers(gui, true);
             });
         }
 

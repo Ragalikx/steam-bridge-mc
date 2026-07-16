@@ -311,12 +311,12 @@ public class SteamServer {
         }
 
         if (status.isTerminal()) {
+            String err = status.getLastError();
             SteamBridgeMod.LOG.info(
                 "[SteamServer] Terminal state for conn={} steamID={} err={}",
-                connection, steamID, status.getLastError()
+                connection, steamID, SteamBridgeMod.safeLog(err)
             );
             String name = SteamSocial.ProfileCache.get().getDisplayName(steamID);
-            String err = status.getLastError();
             SteamBridgeMod.LOG.info("Disconnected: {} (steamID={}){}", SteamBridgeMod.safeLog(name), steamID,
                     err.isEmpty() ? "" : " - " + SteamBridgeMod.safeLog(err));
             cleanupConnection(connection, steamID);
