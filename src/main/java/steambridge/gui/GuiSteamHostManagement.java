@@ -60,31 +60,32 @@ public class GuiSteamHostManagement extends Screen {
     protected void init() {
         this.server = SteamManager.getInstance().getActiveServer();
 
-        this.addRenderableWidget(new Button(
-                this.width / 2 - 100, this.height - 30, 200, 20,
+        this.addRenderableWidget(GuiButtons.createCentered(this.font, this.width / 2, this.height - 30,
                 Component.translatable("gui.back"),
-                b -> this.minecraft.setScreen(parent)));
+                b -> this.minecraft.setScreen(parent), 100, this.width - 20));
 
-        this.addRenderableWidget(new Button(
-                this.width - 110, 10, 100, 20,
+        // Right edge margin 8 so long labels (ru "Список заблокированных") stay on screen.
+        this.addRenderableWidget(GuiButtons.createRightAligned(this.font, this.width - 8, 10,
                 Component.translatable("steambridge.gui.banned"),
-                b -> this.minecraft.setScreen(new GuiSteamBanList(this, server))));
+                b -> this.minecraft.setScreen(new GuiSteamBanList(this, server)),
+                40, this.width - 16));
 
         if (server != null && server.isRunning()) {
             List<SteamServer.PlayerSnapshot> snaps = snapshots();
             snapshotCount = snaps.size();
             int yStart = 40;
+            Component kickMsg = Component.translatable("steambridge.gui.kick");
+            Component banMsg  = Component.translatable("steambridge.gui.ban");
+            int gap = 4;
             for (int i = 0; i < snaps.size(); i++) {
                 int y = yStart + (i * 25);
                 final long steamId = snaps.get(i).getSteamId();
-                this.addRenderableWidget(new Button(
-                        this.width / 2 + 50, y, 40, 20,
-                        Component.translatable("steambridge.gui.kick"),
-                        b -> { server.kickPlayer(steamId); rebuild(); }));
-                this.addRenderableWidget(new Button(
-                        this.width / 2 + 95, y, 40, 20,
-                        Component.translatable("steambridge.gui.ban"),
-                        b -> { server.banPlayer(steamId); rebuild(); }));
+                Button ban = GuiButtons.createRightAligned(this.font, this.width - 8, y, banMsg,
+                        b -> { server.banPlayer(steamId); rebuild(); }, 30, 120);
+                Button kick = GuiButtons.createRightAligned(this.font, ban.x - gap, y, kickMsg,
+                        b -> { server.kickPlayer(steamId); rebuild(); }, 30, 120);
+                this.addRenderableWidget(kick);
+                this.addRenderableWidget(ban);
             }
         }
     }

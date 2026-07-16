@@ -7,7 +7,6 @@ package steambridge.gui;
 
 import steambridge.steam.SteamClient;
 import com.mojang.blaze3d.vertex.PoseStack;
-import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.DisconnectedScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
@@ -28,13 +27,13 @@ public class GuiSteamConnecting extends Screen {
 
     @Override
     protected void init() {
-        this.addRenderableWidget(new Button(
-                this.width / 2 - 100, this.height / 4 + 120 + 12, 200, 20,
+        this.addRenderableWidget(GuiButtons.createCentered(this.font, this.width / 2,
+                this.height / 4 + 120 + 12,
                 Component.translatable("gui.cancel"),
                 b -> {
                     client.disconnect();
                     this.minecraft.setScreen(buildServerListScreen());
-                }));
+                }, 100, this.width - 20));
     }
 
     @Override

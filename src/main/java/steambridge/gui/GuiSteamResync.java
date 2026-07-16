@@ -10,7 +10,6 @@ import steambridge.SteamBridgeMod;
 import steambridge.steam.SteamManager;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.resources.language.I18n;
 import net.minecraft.network.chat.Component;
@@ -48,10 +47,9 @@ public class GuiSteamResync extends Screen {
 
     @Override
     protected void init() {
-        this.addRenderableWidget(new Button(
-                this.width / 2 - 100, this.height - 40, 200, 20,
+        this.addRenderableWidget(GuiButtons.createCentered(this.font, this.width / 2, this.height - 40,
                 Component.translatable("gui.cancel"),
-                b -> this.minecraft.setScreen(parent)));
+                b -> this.minecraft.setScreen(parent), 100, this.width - 20));
 
         if (state == State.LAUNCHING) {
             statusLine1 = "§e" + I18n.get("steambridge.gui.resync_launching");

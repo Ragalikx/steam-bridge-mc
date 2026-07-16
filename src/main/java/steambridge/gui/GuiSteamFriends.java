@@ -12,7 +12,6 @@ import steambridge.steam.SteamSocial;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.renderer.GameRenderer;
@@ -58,10 +57,9 @@ public class GuiSteamFriends extends Screen {
 
     @Override
     protected void init() {
-        this.addRenderableWidget(new Button(
-                this.width / 2 - 100, this.height - 30, 200, 20,
+        this.addRenderableWidget(GuiButtons.createCentered(this.font, this.width / 2, this.height - 30,
                 Component.translatable("gui.back"),
-                b -> this.minecraft.setScreen(parent)));
+                b -> this.minecraft.setScreen(parent), 100, this.width - 20));
 
         searchField = new EditBox(this.font, this.width / 2 - 100, 35, 200, 20, Component.empty());
         searchField.setMaxLength(50);

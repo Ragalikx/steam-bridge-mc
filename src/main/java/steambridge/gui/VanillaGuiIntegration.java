@@ -325,35 +325,40 @@ public final class VanillaGuiIntegration {
             }
         }
 
-        // 1.19.2 ShareToLan: game mode / commands at y=100, Start LAN + Cancel at height-28
-        // with full 150px width. Do NOT resize or move those vanilla buttons (long locales
-        // like ru "Открыть мир для сети" overflow a squeezed 96px slot).
-        // Steam controls sit on their own rows: options under game mode, open action above
-        // the bottom pair.
+        // 1.19.2 ShareToLan: leave vanilla Start LAN / Cancel alone (full 150px).
+        // Steam rows: fit-to-text buttons so long locales never clip.
+        var font = Minecraft.getInstance().font;
         int steamOptsY = 128;
+        int halfMax = Math.max(80, gui.width / 2 - 15);
 
-        Button access = new Button(gui.width / 2 - 155, steamOptsY, 150, 20,
-                Component.literal(accessPolicyLabel(pendingAccessPolicy)), b -> {
+        Component accessMsg = Component.literal(accessPolicyLabel(pendingAccessPolicy));
+        Component routeMsg  = Component.literal(transportLabel(pendingTransportMode));
+        int accessW = GuiButtons.fitWidth(font, accessMsg, 80, halfMax);
+        int routeW  = GuiButtons.fitWidth(font, routeMsg, 80, halfMax);
+
+        Button access = new Button(gui.width / 2 - 5 - accessW, steamOptsY, accessW, GuiButtons.HEIGHT,
+                accessMsg, b -> {
             pendingAccessPolicy = (pendingAccessPolicy == SteamServer.AccessPolicy.EVERYONE)
                     ? SteamServer.AccessPolicy.FRIENDS_ONLY : SteamServer.AccessPolicy.EVERYONE;
-            b.setMessage(Component.literal(accessPolicyLabel(pendingAccessPolicy)));
+            GuiButtons.setMessageFit(font, b,
+                    Component.literal(accessPolicyLabel(pendingAccessPolicy)), true, 80, halfMax);
             saveShareToLanSettings(gui);
         });
 
-        Button transport = new Button(gui.width / 2 + 5, steamOptsY, 150, 20,
-                Component.literal(transportLabel(pendingTransportMode)), b -> {
+        Button transport = new Button(gui.width / 2 + 5, steamOptsY, routeW, GuiButtons.HEIGHT,
+                routeMsg, b -> {
             pendingTransportMode = nextTransportMode(pendingTransportMode);
-            b.setMessage(Component.literal(transportLabel(pendingTransportMode)));
+            GuiButtons.setMessageFit(font, b,
+                    Component.literal(transportLabel(pendingTransportMode)), false, 80, halfMax);
             saveShareToLanSettings(gui);
         });
 
         event.addListener(access);
         event.addListener(transport);
 
-        // Full dual-column width so "Open via Steam" fits; leave Start LAN / Cancel alone.
-        event.addListener(new Button(gui.width / 2 - 155, gui.height - 52, 310, 20,
-                Component.translatable("steambridge.gui.open_steam"),
-                b -> startSteamHost(gui)));
+        Component openSteam = Component.translatable("steambridge.gui.open_steam");
+        event.addListener(GuiButtons.createCentered(font, gui.width / 2, gui.height - 52, openSteam,
+                b -> startSteamHost(gui), 120, gui.width - 20));
     }
 
     private static void injectFriendsButton(ScreenEvent.Init.Post event, Screen gui) {
@@ -361,8 +366,10 @@ public final class VanillaGuiIntegration {
         EditBox ip = findIpEditBox(gui);
         if (ip == null) return;
 
-        Button friends = new Button(ip.x + ip.getWidth() + 4, ip.y, 20, 20,
-                Component.translatable("steambridge.gui.friends_short"), b -> {
+        var font = Minecraft.getInstance().font;
+        Component friendsMsg = Component.translatable("steambridge.gui.friends_short");
+        // Sit just right of the IP field; size to label (min 20 for the "S" glyph).
+        event.addListener(GuiButtons.create(font, ip.x + ip.getWidth() + 4, ip.y, friendsMsg, b -> {
             Minecraft mc = Minecraft.getInstance();
             if (gui instanceof EditServerScreen) {
                 EditBox nameBox = findNameEditBox(gui);
@@ -375,8 +382,7 @@ public final class VanillaGuiIntegration {
             } else {
                 mc.setScreen(new GuiSteamResync(gui, steamId -> pendingSteamId = steamId));
             }
-        });
-        event.addListener(friends);
+        }, 20, 80));
     }
 
     private static void injectPauseMenuControl(ScreenEvent.Init.Post event, Screen gui) {
@@ -384,13 +390,15 @@ public final class VanillaGuiIntegration {
         SteamServer server = SteamManager.getInstance().getActiveServer();
         if (server == null || !server.isRunning()) return;
 
-        // Anchor "Manage Steam session" above the Forge "Mods" button. Once a world is
-        // shared, vanilla removes "Open to LAN"; Mods is a stable anchor. We only add our
-        // widget and nudge Mods and entries below it down one row.
+        // Anchor above Forge "Mods". Size to the Steam label; if wider than Mods, grow
+        // rightward from Mods.x so short English and long Russian both fit.
         Button mods = findButtonByMessage(event, "fml.menu.mods");
         if (mods == null) return;
 
-        int x = mods.x, y = mods.y, w = mods.getWidth();
+        var font = Minecraft.getInstance().font;
+        Component manageMsg = Component.translatable("steambridge.gui.manage_session");
+        int manageW = GuiButtons.fitWidth(font, manageMsg, mods.getWidth(), gui.width - mods.x - 8);
+        int x = mods.x, y = mods.y;
         final int rowShift = 24;
         for (GuiEventListener l : event.getListenersList()) {
             if (l instanceof Button b && b.y >= y) {
@@ -398,8 +406,7 @@ public final class VanillaGuiIntegration {
             }
         }
 
-        event.addListener(new Button(x, y, w, 20,
-                Component.translatable("steambridge.gui.manage_session"),
+        event.addListener(new Button(x, y, manageW, GuiButtons.HEIGHT, manageMsg,
                 b -> Minecraft.getInstance().setScreen(new GuiSteamHostManagement(gui))));
     }
 

@@ -9,7 +9,6 @@ import steambridge.steam.SteamServer;
 import steambridge.steam.SteamSocial;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
-import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.resources.language.I18n;
@@ -40,25 +39,24 @@ public class GuiSteamBanList extends Screen {
 
     @Override
     protected void init() {
-        this.addRenderableWidget(new Button(
-                this.width / 2 - 100, this.height - 30, 200, 20,
+        this.addRenderableWidget(GuiButtons.createCentered(this.font, this.width / 2, this.height - 30,
                 Component.translatable("gui.back"),
-                b -> this.minecraft.setScreen(parent)));
+                b -> this.minecraft.setScreen(parent), 100, this.width - 20));
 
         if (server != null) {
             List<SteamSocial.Bans.Record> bans = server.getBanRecords();
             banCount = bans.size();
             int yStart = 40;
+            Component unbanMsg = Component.translatable("steambridge.gui.unban");
             for (int i = 0; i < bans.size(); i++) {
                 int y = yStart + (i * 25);
                 final long steamId = bans.get(i).getSteamId();
-                this.addRenderableWidget(new Button(
-                        this.width / 2 + 50, y, 60, 20,
-                        Component.translatable("steambridge.gui.unban"),
+                this.addRenderableWidget(GuiButtons.createRightAligned(this.font, this.width - 8, y,
+                        unbanMsg,
                         b -> {
                             server.unbanPlayer(steamId);
                             rebuild();
-                        }));
+                        }, 40, 160));
             }
         }
     }
