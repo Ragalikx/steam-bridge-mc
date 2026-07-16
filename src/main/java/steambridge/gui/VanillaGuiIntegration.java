@@ -5,13 +5,9 @@
  */
 package steambridge.gui;
 
-import steambridge.SteamAppIdHelper;
-import steambridge.SteamBridgeMod;
-import steambridge.steam.SteamClient;
-import steambridge.steam.SteamManager;
-import steambridge.steam.SteamServer;
-import steambridge.steam.SteamSocial;
-
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.fabricmc.fabric.api.client.screen.v1.Screens;
+import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -35,32 +31,84 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.util.HttpUtil;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.storage.LevelResource;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.client.event.ScreenEvent;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import steambridge.SteamAppIdHelper;
+import steambridge.SteamBridgeMod;
+import steambridge.steam.SteamClient;
+import steambridge.steam.SteamManager;
+import steambridge.steam.SteamServer;
+import steambridge.steam.SteamSocial;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
 
 /** Injects Steam Bridge controls into vanilla multiplayer/LAN screens. */
-@Mod.EventBusSubscriber(value = Dist.CLIENT, modid = SteamBridgeMod.MODID)
 public final class VanillaGuiIntegration {
 
     private VanillaGuiIntegration() {}
 
-    /** Transport route the host will start with, cycled by the button on the Share-to-LAN screen. */
     static SteamServer.TransportMode pendingTransportMode = SteamServer.TransportMode.AUTO;
-    /** Access policy (Friends/Everyone), toggled by the button on the Share-to-LAN screen. */
     static SteamServer.AccessPolicy pendingAccessPolicy = SteamServer.AccessPolicy.FRIENDS_ONLY;
-    /** Pending SteamID to inject when the parent screen re-initializes. */
     static String pendingSteamId = null;
-    /** Pending server name to restore in EditServerScreen after picking a friend. */
     static String pendingServerName = null;
 
-    // -- Steam-ID helpers ------------------------------------------------------
+    public static void register() {
+        ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            if (client.screen instanceof JoinMultiplayerScreen jms) {
+                markAllSteamServers(jms);
+            }
+        });
+
+        ScreenEvents.AFTER_INIT.register((client, screen, scaledWidth, scaledHeight) -> {
+            onScreenInit(screen);
+            if (screen instanceof ShareToLanScreen) {
+                ScreenEvents.remove(screen).register(VanillaGuiIntegration::saveShareToLanSettings);
+                ScreenEvents.afterRender(screen).register((s, matrices, mouseX, mouseY, tickDelta) ->
+                        renderShareToLanSteamTitle(s, matrices));
+            }
+        });
+    }
+
+    /**
+     * Called from {@code Minecraft.setScreen} mixin (like NeoForge ScreenEvent.Opening).
+     * @return replacement screen, or the same instance to proceed
+     */
+    public static Screen onSetScreen(Screen next) {
+        Minecraft mc = Minecraft.getInstance();
+
+        if (next instanceof ConnectScreen connectScreen) {
+            ServerData sd = mc.getCurrentServer();
+            if (sd != null && isSteamServerId(sd.ip)) {
+                abortVanillaConnect(connectScreen);
+                Screen parent = connectScreenParent(connectScreen);
+                if (parent == null) parent = mc.screen;
+                return beginSteamConnect(parent, sd.ip);
+            }
+        }
+
+        if (next instanceof ShareToLanScreen) {
+            SteamServer server = SteamManager.getInstance().getActiveServer();
+            if (server != null && server.isRunning()) {
+                return new GuiSteamHostManagement(mc.screen);
+            }
+        }
+        return next;
+    }
+
+    private static void renderShareToLanSteamTitle(Screen gui, PoseStack pose) {
+        Font font = Minecraft.getInstance().font;
+        String title = I18n.get("steambridge.gui.steam_settings");
+        font.draw(pose, title, gui.width / 2.0F - font.width(title) / 2.0F, 128, 0xFFFFFF);
+    }
+
+    private static void onScreenInit(Screen gui) {
+        applyPendingSteamId(gui);
+        injectShareToLanControls(gui);
+        injectFriendsButton(gui);
+        injectSteamConnectIntercept(gui);
+        if (gui instanceof JoinMultiplayerScreen jms) markAllSteamServers(jms);
+        injectPauseMenuControl(gui);
+    }
 
     private static boolean isSteamServerId(String ip) {
         if (ip == null) return false;
@@ -76,8 +124,6 @@ public final class VanillaGuiIntegration {
         return colon >= 0 ? host.substring(0, colon) : host;
     }
 
-    // -- Type-based reflection (no SRG names) ----------------------------------
-
     @SuppressWarnings("unchecked")
     private static <T> T findByType(Object owner, Class<T> type) {
         for (Field f : owner.getClass().getDeclaredFields()) {
@@ -89,21 +135,67 @@ public final class VanillaGuiIntegration {
         return null;
     }
 
-    private static boolean findPrimitiveBoolean(Object owner) {
-        for (Field f : owner.getClass().getDeclaredFields()) {
+    /**
+     * ShareToLanScreen.commands (single primitive boolean on this screen).
+     */
+    private static boolean getShareToLanCommands(Screen gui) {
+        for (Field f : gui.getClass().getDeclaredFields()) {
             if (f.getType() == boolean.class) {
-                try { f.setAccessible(true); return (boolean) f.get(owner); }
-                catch (Exception ignored) {}
+                try {
+                    f.setAccessible(true);
+                    return f.getBoolean(gui);
+                } catch (Exception ignored) {}
             }
         }
         return false;
     }
 
+    private static void setShareToLanCommands(Screen gui, boolean value) {
+        for (Field f : gui.getClass().getDeclaredFields()) {
+            if (f.getType() == boolean.class) {
+                try {
+                    f.setAccessible(true);
+                    f.setBoolean(gui, value);
+                    return;
+                } catch (Exception ignored) {}
+            }
+        }
+    }
+
+    private static GameType getShareToLanGameType(Screen gui) {
+        GameType gt = findByType(gui, GameType.class);
+        return gt != null ? gt : GameType.SURVIVAL;
+    }
+
+    private static void setShareToLanGameType(Screen gui, GameType value) {
+        if (value == null) return;
+        setByType(gui, GameType.class, value);
+    }
+
     private static void setByType(Object owner, Class<?> type, Object value) {
         for (Field f : owner.getClass().getDeclaredFields()) {
-            if (type.isAssignableFrom(f.getType())) {
+            if (type.isAssignableFrom(f.getType()) || (type == boolean.class && f.getType() == boolean.class)) {
                 try { f.setAccessible(true); f.set(owner, value); return; }
                 catch (Exception ignored) {}
+            }
+        }
+    }
+
+    /** After init(), force ShareToLan CycleButtons + fields to match saved host settings. */
+    @SuppressWarnings("unchecked")
+    private static void applySavedShareToLan(Screen gui, SteamSocial.Worlds.Settings saved) {
+        if (saved == null) return;
+        GameType gameType = SteamSocial.Worlds.parseGameType(saved.gametype);
+        setShareToLanGameType(gui, gameType);
+        setShareToLanCommands(gui, saved.allowCommands);
+
+        for (GuiEventListener l : gui.children()) {
+            if (!(l instanceof CycleButton<?> raw)) continue;
+            Object val = raw.getValue();
+            if (val instanceof Boolean) {
+                ((CycleButton<Boolean>) raw).setValue(saved.allowCommands);
+            } else if (val instanceof GameType) {
+                ((CycleButton<GameType>) raw).setValue(gameType);
             }
         }
     }
@@ -119,10 +211,6 @@ public final class VanillaGuiIntegration {
         return boxes;
     }
 
-    /**
-     * The server-address field. On {@link EditServerScreen} it is the first declared EditBox
-     * (ipEdit precedes nameEdit); on {@link DirectJoinServerScreen} there is only one.
-     */
     private static EditBox findIpEditBox(Screen gui) {
         List<EditBox> boxes = findEditBoxes(gui);
         if (gui instanceof EditServerScreen && !boxes.isEmpty()) return boxes.get(0);
@@ -134,11 +222,9 @@ public final class VanillaGuiIntegration {
         return (gui instanceof EditServerScreen && boxes.size() >= 2) ? boxes.get(1) : null;
     }
 
-    // -- Vanilla-button lookup by message --------------------------------------
-
-    private static Button findButtonByMessage(ScreenEvent.Init event, String translationKey) {
+    private static Button findButtonByMessage(Screen gui, String translationKey) {
         String want = I18n.get(translationKey);
-        for (GuiEventListener l : event.getListenersList()) {
+        for (GuiEventListener l : gui.children()) {
             if (l instanceof Button b && b.getMessage().getString().equals(want)) {
                 return b;
             }
@@ -146,13 +232,6 @@ public final class VanillaGuiIntegration {
         return null;
     }
 
-    /**
-     * Wraps a live {@link Button}'s {@code onPress} callback in place (found via type-based
-     * reflection ({@code Button} has exactly one field of type {@code Button.OnPress}). This
-     * lets us intercept a vanilla button's action without touching its position/active/visible
-     * state, which vanilla continues to manage normally (e.g. "Join Server" being disabled
-     * until a server-list entry is selected).
-     */
     private static void wrapOnPress(Button button, java.util.function.Function<Button.OnPress, Button.OnPress> wrapper) {
         for (Field f : Button.class.getDeclaredFields()) {
             if (Button.OnPress.class.isAssignableFrom(f.getType())) {
@@ -168,11 +247,10 @@ public final class VanillaGuiIntegration {
         }
     }
 
-    /**
-     * Starts a Steam P2P connect and returns the status screen. Does not call
-     * {@link Minecraft#setScreen} so callers can either set it themselves or inject it via
-     * {@link ScreenEvent.Opening#setNewScreen}.
-     */
+    private static void addButton(Screen gui, Button button) {
+        Screens.getButtons(gui).add(button);
+    }
+
     private static GuiSteamConnecting beginSteamConnect(Screen parent, String steamAddr) {
         long steamId = Long.parseLong(extractSteamId(steamAddr));
         SteamBridgeMod.LOG.info("Intercepted connection to SteamID: {}", steamId);
@@ -183,19 +261,10 @@ public final class VanillaGuiIntegration {
         return new GuiSteamConnecting(parent, client);
     }
 
-    /** Opens {@link GuiSteamConnecting} for a SteamID-shaped address, replacing normal vanilla connect. */
     private static void interceptSteamConnect(Screen parent, String steamAddr) {
         Minecraft.getInstance().setScreen(beginSteamConnect(parent, steamAddr));
     }
 
-    /**
-     * {@link ConnectScreen#startConnecting} always calls {@code connect()} after
-     * {@code setScreen}, even if Opening replaces the screen. Setting {@code aborted}
-     * stops the DNS/TCP thread from racing in a "Unknown host" disconnect.
-     * <p>
-     * Field is found by type (not name) so this works on production SRG runtime where
-     * the field is not called {@code aborted}.
-     */
     private static void abortVanillaConnect(ConnectScreen screen) {
         boolean set = false;
         for (Field f : ConnectScreen.class.getDeclaredFields()) {
@@ -223,54 +292,27 @@ public final class VanillaGuiIntegration {
         return Minecraft.getInstance().screen;
     }
 
-    // -- Steam-server marking (ping suppression + null MOTD safety) ------------
-
-    /**
-     * Vanilla {@code OnlineServerEntry.render} does {@code font.split(serverData.motd, ...)}.
-     * MOTD/status are only filled when a TCP ping starts. We set {@code pinged=true} so Steam
-     * IDs are never pinged, but then MOTD stays null (especially after load from servers.dat)
-     * and the multiplayer list crashes every launch until the entry is deleted.
-     */
     private static void sanitizeServerDataFields(ServerData data) {
-        if (data.motd == null) {
-            data.motd = CommonComponents.EMPTY;
-        }
-        if (data.status == null) {
-            data.status = CommonComponents.EMPTY;
-        }
-        if (data.version == null) {
-            data.version = Component.literal("???");
-        }
-        if (data.playerList == null) {
-            data.playerList = java.util.Collections.emptyList();
-        }
+        if (data.motd == null) data.motd = CommonComponents.EMPTY;
+        if (data.status == null) data.status = CommonComponents.EMPTY;
+        if (data.version == null) data.version = Component.literal("???");
+        if (data.playerList == null) data.playerList = java.util.Collections.emptyList();
     }
 
-    /** Skip TCP ping for a SteamID entry and give it safe display Components + avatar icon. */
     private static void markSteamServer(ServerData data) {
         data.pinged = true;
-        // Not -2 (vanilla "still pinging" spinner); 0 looks like a quiet live entry.
         data.ping = 0L;
         data.motd = Component.translatable("steambridge.gui.server_steam_motd");
         data.status = Component.translatable("steambridge.gui.server_steam_status");
-        if (data.version == null) {
-            data.version = Component.literal("Steam");
-        }
-        if (data.playerList == null) {
-            data.playerList = java.util.Collections.emptyList();
-        }
-
-        // Prefer the friend's Steam avatar over the default unknown-server tile.
+        if (data.version == null) data.version = Component.literal("Steam");
+        if (data.playerList == null) data.playerList = java.util.Collections.emptyList();
         try {
             long steamId = Long.parseLong(extractSteamId(data.ip));
             String iconB64 = SteamSocial.ProfileCache.get().getAvatarIconB64(steamId);
-            if (iconB64 != null && !iconB64.isEmpty()
-                    && !iconB64.equals(data.getIconB64())) {
+            if (iconB64 != null && !iconB64.isEmpty() && !iconB64.equals(data.getIconB64())) {
                 data.setIconB64(iconB64);
             }
-        } catch (Exception ignored) {
-            // keep default icon until Steam has the avatar ready
-        }
+        } catch (Exception ignored) {}
     }
 
     private static void markAllSteamServers(JoinMultiplayerScreen gui) {
@@ -281,7 +323,6 @@ public final class VanillaGuiIntegration {
             for (int i = 0; i < list.size(); i++) {
                 ServerData data = list.get(i);
                 if (data == null) continue;
-                // Belt-and-suspenders for any corrupt list entry (null MOTD NPE).
                 sanitizeServerDataFields(data);
                 if (isSteamServerId(data.ip)) {
                     markSteamServer(data);
@@ -292,78 +333,9 @@ public final class VanillaGuiIntegration {
         } catch (Exception ignored) {}
     }
 
-    // -- Events ----------------------------------------------------------------
-
-    @SubscribeEvent
-    public static void onClientTick(TickEvent.ClientTickEvent event) {
-        if (event.phase != TickEvent.Phase.END) return;
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.screen instanceof JoinMultiplayerScreen jms) {
-            markAllSteamServers(jms);
-        }
-    }
-
-    @SubscribeEvent
-    public static void onScreenOpening(ScreenEvent.Opening event) {
-        Screen next = event.getNewScreen();
-        Minecraft mc = Minecraft.getInstance();
-
-        // Catch every path that opens ConnectScreen with a SteamID address:
-        // bottom "Join Server" button (if not already wrapped), icon Play overlay,
-        // double-click on a list row, and direct-join confirm. Button wrap alone is
-        // not enough because OnlineServerEntry.mouseClicked calls joinSelectedServer()
-        // directly without going through Button.OnPress.
-        if (next instanceof ConnectScreen connectScreen) {
-            ServerData sd = mc.getCurrentServer();
-            if (sd != null && isSteamServerId(sd.ip)) {
-                abortVanillaConnect(connectScreen);
-                Screen parent = connectScreenParent(connectScreen);
-                if (parent == null) parent = mc.screen;
-                event.setNewScreen(beginSteamConnect(parent, sd.ip));
-                return;
-            }
-        }
-
-        if (next instanceof ShareToLanScreen) {
-            SteamServer server = SteamManager.getInstance().getActiveServer();
-            if (server != null && server.isRunning()) {
-                event.setNewScreen(new GuiSteamHostManagement(mc.screen));
-                return;
-            }
-            if (mc.getSingleplayerServer() != null) {
-                try {
-                    String worldKey = worldKey(mc.getSingleplayerServer());
-                    SteamSocial.Worlds.Settings saved = SteamSocial.Worlds.get().load(worldKey);
-                    setByType(next, GameType.class, SteamSocial.Worlds.parseGameType(saved.gametype));
-                    setByType(next, boolean.class, saved.allowCommands);
-                } catch (Exception e) {
-                    SteamBridgeMod.LOG.warn("Failed to load ShareToLan defaults", e);
-                }
-            }
-        }
-    }
-
-    @SubscribeEvent
-    public static void onScreenInitPost(ScreenEvent.Init.Post event) {
-        Screen gui = event.getScreen();
-
-        applyPendingSteamId(event, gui);
-        injectShareToLanControls(event, gui);
-        injectFriendsButton(event, gui);
-        injectSteamConnectIntercept(event, gui);
-        if (gui instanceof JoinMultiplayerScreen jms) markAllSteamServers(jms);
-        injectPauseMenuControl(event, gui);
-    }
-
-    /**
-     * Early intercept on the bottom-bar Join / Direct-join buttons. The icon "Play" overlay
-     * and double-click go through {@link JoinMultiplayerScreen#joinSelectedServer} and are
-     * caught in {@link #onScreenOpening} when {@link ConnectScreen} opens (with abort of the
-     * leftover vanilla connector thread).
-     */
-    private static void injectSteamConnectIntercept(ScreenEvent.Init.Post event, Screen gui) {
+    private static void injectSteamConnectIntercept(Screen gui) {
         if (gui instanceof DirectJoinServerScreen) {
-            Button join = findButtonByMessage(event, "selectServer.select");
+            Button join = findButtonByMessage(gui, "selectServer.select");
             if (join == null) return;
             wrapOnPress(join, original -> b -> {
                 EditBox ip = findIpEditBox(gui);
@@ -376,7 +348,7 @@ public final class VanillaGuiIntegration {
                 }
             });
         } else if (gui instanceof JoinMultiplayerScreen jms) {
-            Button join = findButtonByMessage(event, "selectServer.select");
+            Button join = findButtonByMessage(gui, "selectServer.select");
             if (join == null) return;
             wrapOnPress(join, original -> b -> {
                 ServerData selected = findByType(gui, ServerData.class);
@@ -389,9 +361,7 @@ public final class VanillaGuiIntegration {
         }
     }
 
-    // -- Injection helpers -----------------------------------------------------
-
-    private static void applyPendingSteamId(ScreenEvent.Init event, Screen gui) {
+    private static void applyPendingSteamId(Screen gui) {
         if (pendingSteamId == null) return;
         final String sid  = pendingSteamId;
         final String name = pendingServerName;
@@ -413,71 +383,47 @@ public final class VanillaGuiIntegration {
         }
     }
 
-    private static void injectShareToLanControls(ScreenEvent.Init.Post event, Screen gui) {
+    private static void injectShareToLanControls(Screen gui) {
         if (!(gui instanceof ShareToLanScreen)) return;
 
         IntegratedServer srv = Minecraft.getInstance().getSingleplayerServer();
-        SteamSocial.Worlds.Settings saved = null;
         if (srv != null) {
-            saved = SteamSocial.Worlds.get().load(worldKey(srv));
+            SteamSocial.Worlds.Settings saved = SteamSocial.Worlds.get().load(worldKey(srv));
             pendingTransportMode = SteamSocial.Worlds.parseTransportMode(saved.transportMode);
             pendingAccessPolicy  = SteamSocial.Worlds.parseAccessPolicy(saved.accessPolicy);
-
-            // ShareToLanScreen.init() overwrites commands from level.dat, discarding
-            // what onScreenOpening set. If our saved value differs, press the CycleButton once.
-            if (saved.allowCommands != findPrimitiveBoolean(gui)) {
-                // 1.19.2 uses selectWorld.allowCommands (no ".new" suffix).
-                String commandsLabel = I18n.get("selectWorld.allowCommands");
-                for (GuiEventListener l : event.getListenersList()) {
-                    if (l instanceof CycleButton<?> btn
-                            && btn.getMessage().getString().contains(commandsLabel)) {
-                        btn.onPress();
-                        break;
-                    }
-                }
-            }
+            // Restore after init() (it overwrites gameMode/commands from world data).
+            applySavedShareToLan(gui, saved);
         }
 
-        // Layout (same idea as 1.12.2 / NeoForge-1.20.1):
-        //   y~100 vanilla game mode + commands
-        //   section title "Steam session settings" (drawn in onShareToLanRender)
-        //   access + route row under that title
-        //   bottom row: [Start LAN] [Open via Steam] [Cancel]
-        Font font = Minecraft.getInstance().font;
-        // Game mode sits at y=100 on 1.19.2 ShareToLan; steam opts under the section title.
+        // 1.19.2 ShareToLan: game mode at y=100, no Port EditBox. Steam opts at y=140.
         int steamOptsY = 140;
+        Font font = Minecraft.getInstance().font;
 
-        Component accessMsg = Component.literal(accessPolicyLabel(pendingAccessPolicy));
-        Component routeMsg  = Component.literal(transportLabel(pendingTransportMode));
-
-        // Same dual-column 150 slots as vanilla game-mode / commands (and as 1.20.1).
-        event.addListener(new Button(gui.width / 2 - 155, steamOptsY, 150, GuiButtons.HEIGHT,
-                accessMsg, b -> {
+        addButton(gui, new Button(gui.width / 2 - 155, steamOptsY, 150, GuiButtons.HEIGHT,
+                Component.literal(accessPolicyLabel(pendingAccessPolicy)), b -> {
             pendingAccessPolicy = (pendingAccessPolicy == SteamServer.AccessPolicy.EVERYONE)
                     ? SteamServer.AccessPolicy.FRIENDS_ONLY : SteamServer.AccessPolicy.EVERYONE;
             b.setMessage(Component.literal(accessPolicyLabel(pendingAccessPolicy)));
             saveShareToLanSettings(gui);
         }));
 
-        event.addListener(new Button(gui.width / 2 + 5, steamOptsY, 150, GuiButtons.HEIGHT,
-                routeMsg, b -> {
+        addButton(gui, new Button(gui.width / 2 + 5, steamOptsY, 150, GuiButtons.HEIGHT,
+                Component.literal(transportLabel(pendingTransportMode)), b -> {
             pendingTransportMode = nextTransportMode(pendingTransportMode);
             b.setMessage(Component.literal(transportLabel(pendingTransportMode)));
             saveShareToLanSettings(gui);
         }));
 
-        // Bottom: Start LAN | Open via Steam | Cancel (Open Steam between the two vanilla ones).
-        Button startLan = findButtonByMessage(event, "lanServer.start");
-        Button cancel   = findButtonByMessage(event, "gui.cancel");
+        // Bottom: Start LAN | Open via Steam | Cancel
+        Button startLan = findButtonByMessage(gui, "lanServer.start");
+        Button cancel   = findButtonByMessage(gui, "gui.cancel");
         int bottomY = gui.height - 28;
         int gap = 6;
         int leftEdge = gui.width / 2 - 155;
         int rightEdge = gui.width / 2 + 155;
-
         Component openSteamMsg = Component.translatable("steambridge.gui.open_steam");
         Component startMsg = startLan != null ? startLan.getMessage() : Component.translatable("lanServer.start");
         Component cancelMsg = cancel != null ? cancel.getMessage() : Component.translatable("gui.cancel");
-
         int slotMax = 110;
         int startW = GuiButtons.fitWidth(font, startMsg, 80, slotMax);
         int steamW = GuiButtons.fitWidth(font, openSteamMsg, 80, slotMax);
@@ -485,16 +431,13 @@ public final class VanillaGuiIntegration {
         int total = startW + steamW + cancelW + 2 * gap;
         int span = rightEdge - leftEdge;
         if (total > span) {
-            // Prefer equal shrink so nothing drops off the dual-column frame.
-            int over = total - span;
-            int each = (over + 2) / 3;
+            int each = (total - span + 2) / 3;
             startW = Math.max(70, startW - each);
             steamW = Math.max(70, steamW - each);
             cancelW = Math.max(70, cancelW - each);
             total = startW + steamW + cancelW + 2 * gap;
         }
         int x0 = leftEdge + Math.max(0, (span - total) / 2);
-
         if (startLan != null) {
             startLan.setWidth(startW);
             startLan.x = x0;
@@ -505,35 +448,18 @@ public final class VanillaGuiIntegration {
             cancel.x = x0 + startW + gap + steamW + gap;
             cancel.y = bottomY;
         }
-        event.addListener(new Button(x0 + startW + gap, bottomY, steamW, GuiButtons.HEIGHT,
+        addButton(gui, new Button(x0 + startW + gap, bottomY, steamW, GuiButtons.HEIGHT,
                 openSteamMsg, b -> startSteamHost(gui)));
     }
 
-    /**
-     * Draws the "Steam session settings" heading under vanilla's "Other players" block
-     * and above the access/route toggles (same role as 1.12.2 DrawScreenEvent hook).
-     */
-    @SubscribeEvent
-    public static void onShareToLanRender(ScreenEvent.Render.Post event) {
-        if (!(event.getScreen() instanceof ShareToLanScreen gui)) return;
-        // steam opts row is at y=140; title sits just above it.
-        int titleY = 128;
-        String title = I18n.get("steambridge.gui.steam_settings");
-        PoseStack pose = event.getPoseStack();
-        Font font = Minecraft.getInstance().font;
-        int x = gui.width / 2 - font.width(title) / 2;
-        font.draw(pose, title, x, titleY, 0xFFFFFF);
-    }
-
-    private static void injectFriendsButton(ScreenEvent.Init.Post event, Screen gui) {
+    private static void injectFriendsButton(Screen gui) {
         if (!(gui instanceof EditServerScreen || gui instanceof DirectJoinServerScreen)) return;
         EditBox ip = findIpEditBox(gui);
         if (ip == null) return;
 
-        var font = Minecraft.getInstance().font;
-        Component friendsMsg = Component.translatable("steambridge.gui.friends_short");
-        // Sit just right of the IP field; size to label (min 20 for the "S" glyph).
-        event.addListener(GuiButtons.create(font, ip.x + ip.getWidth() + 4, ip.y, friendsMsg, b -> {
+        addButton(gui, GuiButtons.create(Minecraft.getInstance().font,
+                ip.x + ip.getWidth() + 4, ip.y,
+                Component.translatable("steambridge.gui.friends_short"), b -> {
             Minecraft mc = Minecraft.getInstance();
             if (gui instanceof EditServerScreen) {
                 EditBox nameBox = findNameEditBox(gui);
@@ -549,32 +475,43 @@ public final class VanillaGuiIntegration {
         }, 20, 80));
     }
 
-    private static void injectPauseMenuControl(ScreenEvent.Init.Post event, Screen gui) {
+    private static void injectPauseMenuControl(Screen gui) {
         if (!(gui instanceof PauseScreen)) return;
         SteamServer server = SteamManager.getInstance().getActiveServer();
         if (server == null || !server.isRunning()) return;
 
-        // Anchor above Forge "Mods". Size to the Steam label; if wider than Mods, grow
-        // rightward from Mods.x so short English and long Russian both fit.
-        Button mods = findButtonByMessage(event, "fml.menu.mods");
-        if (mods == null) return;
+        final int rowStep = 24;
+        Button returnToGame = findButtonByMessage(gui, "menu.returnToGame");
+        Button options = findButtonByMessage(gui, "menu.options");
 
-        var font = Minecraft.getInstance().font;
-        Component manageMsg = Component.translatable("steambridge.gui.manage_session");
-        int manageW = GuiButtons.fitWidth(font, manageMsg, mods.getWidth(), gui.width - mods.x - 8);
-        int x = mods.x, y = mods.y;
-        final int rowShift = 24;
-        for (GuiEventListener l : event.getListenersList()) {
-            if (l instanceof Button b && b.y >= y) {
-                b.y += rowShift;
+        int x;
+        int w;
+        int insertY;
+        if (returnToGame != null) {
+            x = returnToGame.x;
+            w = returnToGame.getWidth();
+            insertY = returnToGame.y + returnToGame.getHeight() + 4;
+        } else if (options != null) {
+            w = 204;
+            x = gui.width / 2 - 102;
+            insertY = options.y;
+        } else {
+            x = gui.width / 2 - 102;
+            w = 204;
+            insertY = gui.height / 4 + 48;
+        }
+
+        for (GuiEventListener listener : List.copyOf(gui.children())) {
+            if (listener instanceof Button b && b.y >= insertY) {
+                b.y += rowStep;
             }
         }
 
-        event.addListener(new Button(x, y, manageW, GuiButtons.HEIGHT, manageMsg,
+        Component manageMsg = Component.translatable("steambridge.gui.manage_session");
+        int manageW = GuiButtons.fitWidth(Minecraft.getInstance().font, manageMsg, w, gui.width - x - 8);
+        addButton(gui, new Button(x, insertY, manageW, GuiButtons.HEIGHT, manageMsg,
                 b -> Minecraft.getInstance().setScreen(new GuiSteamHostManagement(gui))));
     }
-
-    // -- Host start ------------------------------------------------------------
 
     private static void startSteamHost(Screen gui) {
         Minecraft mc = Minecraft.getInstance();
@@ -582,8 +519,6 @@ public final class VanillaGuiIntegration {
         if (srv == null) return;
 
         if (!SteamManager.getInstance().isInitialized()) {
-            // Try reinit first in case Steam was launched recently
-            // but the mod hasn't detected it yet.
             if (!SteamManager.getInstance().reinit()) {
                 try {
                     SteamAppIdHelper.ensureAppId(mc.gameDirectory);
@@ -591,16 +526,16 @@ public final class VanillaGuiIntegration {
                 } catch (Exception e) {
                     SteamBridgeMod.LOG.warn("[SteamHost] Failed to launch Steam: {}", e.getMessage());
                 }
-                mc.player.displayClientMessage(
-                        Component.literal("§e" + I18n.get("steambridge.gui.host_steam_launching")), false);
+                if (mc.player != null) {
+                    mc.player.displayClientMessage(
+                            Component.literal("§e" + I18n.get("steambridge.gui.host_steam_launching")), false);
+                }
                 return;
             }
-            // reinit succeeded, fall through and open the world
         }
 
-        GameType gameType = findByType(gui, GameType.class);
-        if (gameType == null) gameType = GameType.SURVIVAL;
-        boolean commands = findPrimitiveBoolean(gui);
+        GameType gameType = getShareToLanGameType(gui);
+        boolean commands = getShareToLanCommands(gui);
 
         String worldKey = worldKey(srv);
         SteamSocial.Worlds.get().save(worldKey, gameType, commands, pendingAccessPolicy, pendingTransportMode);
@@ -613,27 +548,27 @@ public final class VanillaGuiIntegration {
         if (published) server.setMcPort(srv.getPort());
         server.start();
 
-        if (server.isRunning()) {
-            mc.player.displayClientMessage(
-                    Component.literal("§a" + I18n.get("steambridge.gui.host_started")), false);
-        } else {
-            mc.player.displayClientMessage(
-                    Component.literal("§c" + I18n.get("steambridge.gui.host_failed")), false);
+        if (mc.player != null) {
+            if (server.isRunning()) {
+                mc.player.displayClientMessage(
+                        Component.literal("§a" + I18n.get("steambridge.gui.host_started")), false);
+            } else {
+                mc.player.displayClientMessage(
+                        Component.literal("§c" + I18n.get("steambridge.gui.host_failed")), false);
+            }
         }
         mc.setScreen(null);
     }
 
     private static void saveShareToLanSettings(Screen gui) {
+        if (!(gui instanceof ShareToLanScreen)) return;
         Minecraft mc = Minecraft.getInstance();
         IntegratedServer srv = mc.getSingleplayerServer();
         if (srv == null) return;
-        GameType gameType = findByType(gui, GameType.class);
-        if (gameType == null) gameType = GameType.SURVIVAL;
-        boolean commands = findPrimitiveBoolean(gui);
+        GameType gameType = getShareToLanGameType(gui);
+        boolean commands = getShareToLanCommands(gui);
         SteamSocial.Worlds.get().save(worldKey(srv), gameType, commands, pendingAccessPolicy, pendingTransportMode);
     }
-
-    // -- Labels ----------------------------------------------------------------
 
     private static SteamServer.TransportMode nextTransportMode(SteamServer.TransportMode mode) {
         switch (mode) {
@@ -658,10 +593,9 @@ public final class VanillaGuiIntegration {
                 ? "steambridge.gui.access_everyone" : "steambridge.gui.access_friends");
     }
 
-    /** World folder name - used as the stable per-world settings/ban key. */
     private static String worldKey(IntegratedServer srv) {
         try {
-            return srv.getWorldPath(LevelResource.ROOT).getParent().getFileName().toString();
+            return srv.getWorldPath(LevelResource.ROOT).normalize().getFileName().toString();
         } catch (Exception e) {
             return "__default_world__";
         }

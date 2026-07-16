@@ -5,83 +5,61 @@
  */
 package steambridge;
 
-import net.minecraftforge.common.ForgeConfigSpec;
-import net.minecraftforge.fml.event.config.ModConfigEvent;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonObject;
+import net.fabricmc.loader.api.FabricLoader;
 
-/**
- * Client config (Forge 1.19.2, {@link ForgeConfigSpec}).
- *
- * <p>The {@code virtualPort} / {@code allowWithoutAuth} static fields are plain mirrors of
- * the spec values so the rest of the codebase can read them directly. They are refreshed
- * from the spec on every config load/reload via {@link #onLoad}/{@link #onReload}.</p>
- */
+import java.io.IOException;
+import java.io.Reader;
+import java.io.Writer;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+/** Client config (JSON under config/steambridge.json). */
 public final class SteamBridgeConfig {
 
     private SteamBridgeConfig() {}
 
-    // -- Live mirror values (read throughout the mod) --------------------------
-    // NOTE: the Steam App ID is intentionally NOT configurable. It is hardcoded to 480
-    // (Spacewar) in SteamAppIdHelper. Letting users point it at a real game's App ID -
-    // especially one with an anti-cheat (VAC/EAC) - would get their account banned.
+    // App ID is fixed to 480 (Spacewar) in SteamAppIdHelper; not configurable.
     public static boolean allowWithoutAuth = true;
     public static int     virtualPort      = 0;
-    /**
-     * Whether to install a JVM-wide {@link java.net.DatagramSocketImplFactory} that intercepts
-     * UDP sockets so voice-chat mods (Simple Voice Chat, Plasmo Voice, etc.) can be tunnelled
-     * through Steam alongside Minecraft traffic.
-     *
-     * <p>Setting this to {@code false} disables the interception - voice mods will stop working
-     * through Steam Bridge, but no DatagramSocket factory will be installed and no UDP port will
-     * be hijacked. The setting takes effect only at launch; changing it mid-session has no effect
-     * because the factory is a one-time JVM-lifetime operation.</p>
-     */
+    /** Voice UDP intercept (JVM DatagramSocket factory). Launch-only. */
     public static boolean interceptUdp    = true;
 
-    // -- Spec definition -------------------------------------------------------
-    public static final ForgeConfigSpec SPEC;
-    private static final ForgeConfigSpec.BooleanValue ALLOW_WITHOUT_AUTH;
-    private static final ForgeConfigSpec.IntValue     VIRTUAL_PORT;
-    private static final ForgeConfigSpec.BooleanValue INTERCEPT_UDP;
+    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    private static final String FILE_NAME = "steambridge.json";
 
-    static {
-        ForgeConfigSpec.Builder b = new ForgeConfigSpec.Builder();
-
-        ALLOW_WITHOUT_AUTH = b
-            .comment("Allow connections without validating Steam Auth Ticket. "
-                   + "False is more secure but might affect some NAT types.")
-            .define("allowWithoutAuth", true);
-
-        VIRTUAL_PORT = b
-            .comment("Virtual port for Steam network. 0 is default. "
-                   + "Change only if conflicting with other mods.")
-            .defineInRange("virtualPort", 0, 0, 65535);
-
-        INTERCEPT_UDP = b
-            .comment("Install a JVM-wide DatagramSocket factory so that voice-chat mods "
-                   + "(Simple Voice Chat, Plasmo Voice, etc.) work through Steam Bridge. "
-                   + "If disabled, voice chat will not be tunnelled but no UDP interception occurs. "
-                   + "Takes effect only on launch - cannot be toggled at runtime.")
-            .define("interceptUdp", true);
-
-        SPEC = b.build();
-    }
-
-    /** Refreshes the mirror fields from the spec. Call after the config is loaded/reloaded. */
-    public static void bake() {
-        allowWithoutAuth = ALLOW_WITHOUT_AUTH.get();
-        virtualPort      = VIRTUAL_PORT.get();
-        interceptUdp     = INTERCEPT_UDP.get();
-    }
-
-    public static void onLoad(ModConfigEvent.Loading event) {
-        if (event.getConfig().getSpec() == SPEC) {
-            bake();
+    public static void load() {
+        Path path = FabricLoader.getInstance().getConfigDir().resolve(FILE_NAME);
+        if (!Files.isRegularFile(path)) {
+            save();
+            return;
+        }
+        try (Reader r = Files.newBufferedReader(path)) {
+            JsonObject o = GSON.fromJson(r, JsonObject.class);
+            if (o == null) return;
+            if (o.has("allowWithoutAuth")) allowWithoutAuth = o.get("allowWithoutAuth").getAsBoolean();
+            if (o.has("virtualPort"))      virtualPort      = o.get("virtualPort").getAsInt();
+            if (o.has("interceptUdp"))     interceptUdp     = o.get("interceptUdp").getAsBoolean();
+        } catch (Exception e) {
+            SteamBridgeMod.LOG.warn("[SteamBridge] Failed to load config: {}", e.getMessage());
         }
     }
 
-    public static void onReload(ModConfigEvent.Reloading event) {
-        if (event.getConfig().getSpec() == SPEC) {
-            bake();
+    public static void save() {
+        Path path = FabricLoader.getInstance().getConfigDir().resolve(FILE_NAME);
+        JsonObject o = new JsonObject();
+        o.addProperty("allowWithoutAuth", allowWithoutAuth);
+        o.addProperty("virtualPort", virtualPort);
+        o.addProperty("interceptUdp", interceptUdp);
+        try {
+            Files.createDirectories(path.getParent());
+            try (Writer w = Files.newBufferedWriter(path)) {
+                GSON.toJson(o, w);
+            }
+        } catch (IOException e) {
+            SteamBridgeMod.LOG.warn("[SteamBridge] Failed to save config: {}", e.getMessage());
         }
     }
 }

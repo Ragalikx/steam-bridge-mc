@@ -5,68 +5,43 @@
  */
 package steambridge;
 
-import com.mojang.logging.LogUtils;
+import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.minecraft.client.Minecraft;
-import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.eventbus.api.IEventBus;
-import net.minecraftforge.fml.ModLoadingContext;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.config.ModConfig;
-import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
-import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import org.slf4j.Logger;
-
+import org.slf4j.LoggerFactory;
 import steambridge.event.SteamClientEvents;
+import steambridge.gui.VanillaGuiIntegration;
 import steambridge.steam.SteamManager;
 
-/**
- * Steam Bridge entry point (Forge 1.19.2).
- *
- * <p>Client-only mod: launches the Steam bridge during client setup and wires up the
- * client-side event handlers. Ported from the NeoForge 1.20.1 / 1.12.2 lifecycle.</p>
- */
-@Mod(SteamBridgeMod.MODID)
-public class SteamBridgeMod {
+/** Steam Bridge entry (Fabric 1.19.2, client-only). */
+public class SteamBridgeMod implements ClientModInitializer {
 
-    public static final String MODID = "steambridge";
-    public static final String NAME  = "Steam Bridge";
+    public static final String NAME    = "Steam Bridge";
     public static final String VERSION = BuildInfo.VERSION;
 
-    public static final Logger LOG = LogUtils.getLogger();
+    public static final Logger LOG = LoggerFactory.getLogger(NAME);
 
-    public SteamBridgeMod() {
-        LOG.info("=== Steam Bridge pre-init (Forge 1.19.2) v{} ===", VERSION);
+    @Override
+    public void onInitializeClient() {
+        LOG.info("=== Steam Bridge pre-init (Fabric 1.19.2) v{} ===", VERSION);
 
-        IEventBus modBus = FMLJavaModLoadingContext.get().getModEventBus();
-        modBus.addListener(this::onClientSetup);
-        modBus.addListener(SteamBridgeConfig::onLoad);
-        modBus.addListener(SteamBridgeConfig::onReload);
+        SteamBridgeConfig.load();
+        SteamClientEvents.register();
+        VanillaGuiIntegration.register();
 
-        ModLoadingContext.get().registerConfig(ModConfig.Type.CLIENT, SteamBridgeConfig.SPEC);
-
-        // Forge event bus: client-side gameplay/GUI hooks (ported from ClientProxy).
-        MinecraftForge.EVENT_BUS.register(new SteamClientEvents());
-    }
-
-    private void onClientSetup(FMLClientSetupEvent event) {
-        event.enqueueWork(() -> {
-            LOG.info("=== SteamBridge client setup - initializing Steam... ===");
-            // Install UDP intercept factory before any voice mod creates DatagramSockets.
+        ClientLifecycleEvents.CLIENT_STARTED.register(client -> {
+            LOG.info("=== SteamBridge client setup: initializing Steam... ===");
             if (SteamBridgeConfig.interceptUdp) {
                 steambridge.proxy.UdpInterceptFactory.install();
             }
-            // Ensure steam_appid.txt exists in the game dir before SteamAPI.init()
-            SteamAppIdHelper.ensureAppId(Minecraft.getInstance().gameDirectory);
+            SteamAppIdHelper.ensureAppId(client.gameDirectory);
             boolean ok = SteamManager.getInstance().init();
             LOG.info("=== Steam init result: {} ===", ok ? "SUCCESS" : "FAILED");
         });
     }
 
-    /**
-     * Neutralises log4j message-lookup syntax in untrusted strings (Steam persona names,
-     * Minecraft names, remote disconnect messages) before they reach the logger.
-     * Retained from the 1.12.2 build as a defensive measure for remote-controlled text.
-     */
+    /** Strip log4j lookup syntax from untrusted strings before logging. */
     public static String safeLog(String s) {
         if (s == null) {
             return "";
