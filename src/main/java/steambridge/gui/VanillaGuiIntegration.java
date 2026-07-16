@@ -53,7 +53,7 @@ public final class VanillaGuiIntegration {
     public static void register() {
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             if (client.currentScreen instanceof MultiplayerScreen) {
-                markAllSteamServers((MultiplayerScreen) client.currentScreen);
+                markAllSteamServers((MultiplayerScreen) client.currentScreen, false);
             }
         });
         ScreenEvents.AFTER_INIT.register((client, screen, scaledWidth, scaledHeight) -> {
@@ -107,7 +107,7 @@ public final class VanillaGuiIntegration {
         injectFriendsButton(gui);
         injectSteamConnectIntercept(gui);
         if (gui instanceof MultiplayerScreen) {
-            markAllSteamServers((MultiplayerScreen) gui);
+            markAllSteamServers((MultiplayerScreen) gui, true);
         }
         injectPauseMenuControl(gui);
     }
@@ -342,10 +342,46 @@ public final class VanillaGuiIntegration {
         }
     }
 
-    private static void markAllSteamServers(MultiplayerScreen gui) {
+    
+    /**
+     * Steam multiplayer-list polish throttle.
+     * Immediate when the SteamID set changes; otherwise at most every 5s (avatars).
+     */
+    private static final long STEAM_LIST_MARK_INTERVAL_MS = 5000L;
+    private static long lastSteamListMarkMs = 0L;
+    private static String lastSteamListFingerprint = "";
+
+    private static String steamListFingerprint(ServerList list) {
+        if (list == null) return "";
+        StringBuilder sb = new StringBuilder(64);
+        try {
+            for (int i = 0; i < list.size(); i++) {
+                ServerInfo data = list.get(i);
+                if (data == null || !isSteamServerId(data.address)) continue;
+                sb.append(extractSteamId(data.address)).append('\n');
+            }
+        } catch (Exception ignored) {}
+        return sb.toString();
+    }
+
+private static void markAllSteamServers(MultiplayerScreen gui) {
+        markAllSteamServers(gui, false);
+    }
+
+    private static void markAllSteamServers(MultiplayerScreen gui, boolean force) {
         ServerList list = gui.getServerList();
         if (list == null) return;
         try {
+            String fingerprint = steamListFingerprint(list);
+            long now = System.currentTimeMillis();
+            boolean steamSetChanged = !fingerprint.equals(lastSteamListFingerprint);
+            if (!force && !steamSetChanged
+                    && (now - lastSteamListMarkMs) < STEAM_LIST_MARK_INTERVAL_MS) {
+                return;
+            }
+            lastSteamListFingerprint = fingerprint;
+            lastSteamListMarkMs = now;
+
             int steamIndex = 0;
             for (int i = 0; i < list.size(); i++) {
                 ServerInfo data = list.get(i);

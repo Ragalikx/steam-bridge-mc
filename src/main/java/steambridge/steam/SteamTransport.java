@@ -328,7 +328,8 @@ final class LoopbackBridge extends io.netty.channel.ChannelInboundHandlerAdapter
         if (closed) return;
         closed = true;
         SteamBridgeMod.LOG.info(
-            "[LoopbackBridge] Closing conn={}, reason={}", connectionHandle, reason);
+            "[LoopbackBridge] Closing conn={}, reason={}",
+                connectionHandle, SteamBridgeMod.safeLog(reason));
         io.netty.channel.ChannelHandlerContext c = ctx;
         if (c != null && c.channel().isOpen()) {
             c.close();
