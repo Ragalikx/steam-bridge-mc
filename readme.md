@@ -16,33 +16,139 @@ It routes game traffic through the Steam Networking Sockets API (SDR / P2P). Lat
 
 Minecraft version links open the matching branch.
 
-| Minecraft | Platform | Loader version | Windows | Linux | macOS | Status |
-|---|---|---|---|---|---|---|
-| [1.21.1](https://github.com/Ragalikx/steam-bridge-mc/tree/NeoForge-1.21.1) | NeoForge | 21.1.234 | ✅ | ⏳ (In development) | ❌ | Available |
-| [1.21.1](https://github.com/Ragalikx/steam-bridge-mc/tree/Fabric-1.21.1) | Fabric | 0.16.14 + API 0.116.13 | ✅ | ⏳ (In development) | ❌ | Available |
-| [1.20.1](https://github.com/Ragalikx/steam-bridge-mc/tree/NeoForge-1.20.1) | NeoForge/Forge | 47.1.106 | ✅ | ⏳ (In development) | ❌ | Available |
-| [1.20.1](https://github.com/Ragalikx/steam-bridge-mc/tree/Fabric-1.20.1) | Fabric | 0.16.14 + API 0.92.2 | ✅ | ⏳ (In development) | ❌ | Available |
-| [1.19.2](https://github.com/Ragalikx/steam-bridge-mc/tree/Forge-1.19.2) | Forge | 43.5.0 | ✅ | ⏳ (In development) | ❌ | In development |
-| [1.19.2](https://github.com/Ragalikx/steam-bridge-mc/tree/Fabric-1.19.2) | Fabric | 0.16.14 + API 0.76.1 | ✅ | ⏳ (In development) | ❌ | In development |
-| [1.16.5](https://github.com/Ragalikx/steam-bridge-mc/tree/Forge-1.16.5) | Forge | 36.2.42 | ✅ | ⏳ (In development) | ❌ | In development |
-| [1.16.5](https://github.com/Ragalikx/steam-bridge-mc/tree/Fabric-1.16.5) | Fabric | 0.14.25 + API 0.42.0 | ✅ | ⏳ (In development) | ❌ | In development |
-| [1.12.2](https://github.com/Ragalikx/steam-bridge-mc/tree/Forge-1.12.2) | Forge | 14.23.5.2860 | ✅ | ⏳ (In development) | ❌ | Available |
-| [1.8.9](https://github.com/Ragalikx/steam-bridge-mc/tree/Forge-1.8.9) | Forge | 11.15.1.2318 | ✅ | ⏳ (In development) | ❌ | In development |
-| [1.7.10](https://github.com/Ragalikx/steam-bridge-mc/tree/Forge-1.7.10) | Forge | 10.13.4.1614 | ✅ | ⏳ (In development) | ❌ | In development |
+<table>
+<thead>
+<tr>
+<th rowspan="2">Minecraft</th>
+<th rowspan="2">Platform</th>
+<th rowspan="2">Loader version</th>
+<th rowspan="2">UDP Tunnel*</th>
+<th colspan="3">OS</th>
+<th rowspan="2">Status</th>
+</tr>
+<tr>
+<th>Win</th>
+<th>Linux</th>
+<th>macOS</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://github.com/Ragalikx/steam-bridge-mc/tree/NeoForge-1.21.1">1.21.1</a></td>
+<td>NeoForge</td>
+<td>21.1.234</td>
+<td>✅</td>
+<td>✅</td>
+<td>⏳</td>
+<td>❌</td>
+<td>Available</td>
+</tr>
+<tr>
+<td><a href="https://github.com/Ragalikx/steam-bridge-mc/tree/Fabric-1.21.1">1.21.1</a></td>
+<td>Fabric</td>
+<td>0.16.14 + API 0.116.13</td>
+<td>✅</td>
+<td>✅</td>
+<td>⏳</td>
+<td>❌</td>
+<td>Available</td>
+</tr>
+<tr>
+<td><a href="https://github.com/Ragalikx/steam-bridge-mc/tree/NeoForge-1.20.1">1.20.1</a></td>
+<td>NeoForge/Forge</td>
+<td>47.1.106</td>
+<td>✅</td>
+<td>✅</td>
+<td>⏳</td>
+<td>❌</td>
+<td>Available</td>
+</tr>
+<tr>
+<td><a href="https://github.com/Ragalikx/steam-bridge-mc/tree/Fabric-1.20.1">1.20.1</a></td>
+<td>Fabric</td>
+<td>0.16.14 + API 0.92.2</td>
+<td>✅</td>
+<td>✅</td>
+<td>⏳</td>
+<td>❌</td>
+<td>Available</td>
+</tr>
+<tr>
+<td><a href="https://github.com/Ragalikx/steam-bridge-mc/tree/Forge-1.19.2">1.19.2</a></td>
+<td>Forge</td>
+<td>43.5.0</td>
+<td>✅</td>
+<td>✅</td>
+<td>⏳</td>
+<td>❌</td>
+<td>Available</td>
+</tr>
+<tr>
+<td><a href="https://github.com/Ragalikx/steam-bridge-mc/tree/Fabric-1.19.2">1.19.2</a></td>
+<td>Fabric</td>
+<td>0.16.14 + API 0.76.1</td>
+<td>✅</td>
+<td>✅</td>
+<td>⏳</td>
+<td>❌</td>
+<td>Available</td>
+</tr>
+<tr>
+<td><a href="https://github.com/Ragalikx/steam-bridge-mc/tree/Forge-1.16.5">1.16.5</a></td>
+<td>Forge</td>
+<td>36.2.42</td>
+<td>✅</td>
+<td>✅</td>
+<td>⏳</td>
+<td>❌</td>
+<td>Available</td>
+</tr>
+<tr>
+<td><a href="https://github.com/Ragalikx/steam-bridge-mc/tree/Fabric-1.16.5">1.16.5</a></td>
+<td>Fabric</td>
+<td></td>
+<td>✅</td>
+<td>❌</td>
+<td>⏳</td>
+<td>❌</td>
+<td>In development</td>
+</tr>
+<tr>
+<td><a href="https://github.com/Ragalikx/steam-bridge-mc/tree/Forge-1.12.2">1.12.2</a></td>
+<td>Forge</td>
+<td>14.23.5.2860</td>
+<td>✅</td>
+<td>✅</td>
+<td>⏳</td>
+<td>❌</td>
+<td>Available</td>
+</tr>
+<tr>
+<td><a href="https://github.com/Ragalikx/steam-bridge-mc/tree/Forge-1.8.9">1.8.9</a></td>
+<td>Forge</td>
+<td>11.15.1.2318</td>
+<td>❌</td>
+<td>✅</td>
+<td>⏳</td>
+<td>❌</td>
+<td>Available</td>
+</tr>
+<tr>
+<td><a href="https://github.com/Ragalikx/steam-bridge-mc/tree/Forge-1.7.10">1.7.10</a></td>
+<td>Forge</td>
+<td>10.13.4.1614</td>
+<td>❌</td>
+<td>✅</td>
+<td>⏳</td>
+<td>❌</td>
+<td>Available</td>
+</tr>
+</tbody>
+</table>
 
-*(Fabric builds need Fabric API)*
+\*Fabric builds need Fabric API.
 
-### Feature parity (all listed branches)
-
-| Feature | Notes |
-|---|---|
-| Host world via Steam (Open via Steam / Share to LAN UI) | Yes |
-| Friends picker to fill a SteamID when adding a server | Yes (Edit Server / Direct Connect) |
-| Multiplayer list: SteamID entries get MOTD, status, no TCP ping, sort to top, avatar when ready | Yes |
-| Join by SteamID (saved list or direct connect) | Yes |
-| Access policy (friends / everyone) + transport route (auto / P2P / relay) | Yes |
-| Host management (kick / ban list) | Yes |
-| Voice UDP intercept (`interceptUdp`) | Modern branches (1.12.2+ where wired). **1.7.10 / 1.8.9: no voice chat port** |
+\*UDP Tunnel: optional JVM-wide `DatagramSocket` intercept (`interceptUdp`). Game traffic already goes over Steam; this also routes **UDP from voice mods** (Simple Voice Chat, Plasmo Voice, etc.) through the same Steam channel. Off by default in config where present. Not implemented on 1.7.10 / 1.8.9.
 
 ---
 

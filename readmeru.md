@@ -16,33 +16,139 @@
 
 Ссылки на версии Minecraft ведут на нужную ветку с кодом.
 
-| Minecraft | Платформа | Версия загрузчика | Windows | Linux | macOS | Статус |
-|---|---|---|---|---|---|---|
-| [1.21.1](https://github.com/Ragalikx/steam-bridge-mc/tree/NeoForge-1.21.1) | NeoForge | 21.1.234 | ✅ | ⏳ (В разработке) | ❌ | Доступно |
-| [1.21.1](https://github.com/Ragalikx/steam-bridge-mc/tree/Fabric-1.21.1) | Fabric | 0.16.14 + API 0.116.13 | ✅ | ⏳ (В разработке) | ❌ | Доступно |
-| [1.20.1](https://github.com/Ragalikx/steam-bridge-mc/tree/NeoForge-1.20.1) | NeoForge/Forge | 47.1.106 | ✅ | ⏳ (В разработке) | ❌ | Доступно |
-| [1.20.1](https://github.com/Ragalikx/steam-bridge-mc/tree/Fabric-1.20.1) | Fabric | 0.16.14 + API 0.92.2 | ✅ | ⏳ (В разработке) | ❌ | Доступно |
-| [1.19.2](https://github.com/Ragalikx/steam-bridge-mc/tree/Forge-1.19.2) | Forge | 43.5.0 | ✅ | ⏳ (В разработке) | ❌ | В разработке |
-| [1.19.2](https://github.com/Ragalikx/steam-bridge-mc/tree/Fabric-1.19.2) | Fabric | 0.16.14 + API 0.76.1 | ✅ | ⏳ (В разработке) | ❌ | В разработке |
-| [1.16.5](https://github.com/Ragalikx/steam-bridge-mc/tree/Forge-1.16.5) | Forge | 36.2.42 | ✅ | ⏳ (В разработке) | ❌ | В разработке |
-| [1.16.5](https://github.com/Ragalikx/steam-bridge-mc/tree/Fabric-1.16.5) | Fabric | 0.14.25 + API 0.42.0 | ✅ | ⏳ (В разработке) | ❌ | В разработке |
-| [1.12.2](https://github.com/Ragalikx/steam-bridge-mc/tree/Forge-1.12.2) | Forge | 14.23.5.2860 | ✅ | ⏳ (В разработке) | ❌ | Доступно |
-| [1.8.9](https://github.com/Ragalikx/steam-bridge-mc/tree/Forge-1.8.9) | Forge | 11.15.1.2318 | ✅ | ⏳ (В разработке) | ❌ | В разработке |
-| [1.7.10](https://github.com/Ragalikx/steam-bridge-mc/tree/Forge-1.7.10) | Forge | 10.13.4.1614 | ✅ | ⏳ (В разработке) | ❌ | В разработке |
+<table>
+<thead>
+<tr>
+<th rowspan="2">Minecraft</th>
+<th rowspan="2">Платформа</th>
+<th rowspan="2">Версия загрузчика</th>
+<th rowspan="2">UDP Tunnel*</th>
+<th colspan="3">ОС</th>
+<th rowspan="2">Статус</th>
+</tr>
+<tr>
+<th>Win</th>
+<th>Linux</th>
+<th>macOS</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://github.com/Ragalikx/steam-bridge-mc/tree/NeoForge-1.21.1">1.21.1</a></td>
+<td>NeoForge</td>
+<td>21.1.234</td>
+<td>✅</td>
+<td>✅</td>
+<td>⏳</td>
+<td>❌</td>
+<td>Доступно</td>
+</tr>
+<tr>
+<td><a href="https://github.com/Ragalikx/steam-bridge-mc/tree/Fabric-1.21.1">1.21.1</a></td>
+<td>Fabric</td>
+<td>0.16.14 + API 0.116.13</td>
+<td>✅</td>
+<td>✅</td>
+<td>⏳</td>
+<td>❌</td>
+<td>Доступно</td>
+</tr>
+<tr>
+<td><a href="https://github.com/Ragalikx/steam-bridge-mc/tree/NeoForge-1.20.1">1.20.1</a></td>
+<td>NeoForge/Forge</td>
+<td>47.1.106</td>
+<td>✅</td>
+<td>✅</td>
+<td>⏳</td>
+<td>❌</td>
+<td>Доступно</td>
+</tr>
+<tr>
+<td><a href="https://github.com/Ragalikx/steam-bridge-mc/tree/Fabric-1.20.1">1.20.1</a></td>
+<td>Fabric</td>
+<td>0.16.14 + API 0.92.2</td>
+<td>✅</td>
+<td>✅</td>
+<td>⏳</td>
+<td>❌</td>
+<td>Доступно</td>
+</tr>
+<tr>
+<td><a href="https://github.com/Ragalikx/steam-bridge-mc/tree/Forge-1.19.2">1.19.2</a></td>
+<td>Forge</td>
+<td>43.5.0</td>
+<td>✅</td>
+<td>✅</td>
+<td>⏳</td>
+<td>❌</td>
+<td>Доступно</td>
+</tr>
+<tr>
+<td><a href="https://github.com/Ragalikx/steam-bridge-mc/tree/Fabric-1.19.2">1.19.2</a></td>
+<td>Fabric</td>
+<td>0.16.14 + API 0.76.1</td>
+<td>✅</td>
+<td>✅</td>
+<td>⏳</td>
+<td>❌</td>
+<td>Доступно</td>
+</tr>
+<tr>
+<td><a href="https://github.com/Ragalikx/steam-bridge-mc/tree/Forge-1.16.5">1.16.5</a></td>
+<td>Forge</td>
+<td>36.2.42</td>
+<td>✅</td>
+<td>✅</td>
+<td>⏳</td>
+<td>❌</td>
+<td>Доступно</td>
+</tr>
+<tr>
+<td><a href="https://github.com/Ragalikx/steam-bridge-mc/tree/Fabric-1.16.5">1.16.5</a></td>
+<td>Fabric</td>
+<td></td>
+<td>✅</td>
+<td>❌</td>
+<td>⏳</td>
+<td>❌</td>
+<td>В разработке</td>
+</tr>
+<tr>
+<td><a href="https://github.com/Ragalikx/steam-bridge-mc/tree/Forge-1.12.2">1.12.2</a></td>
+<td>Forge</td>
+<td>14.23.5.2860</td>
+<td>✅</td>
+<td>✅</td>
+<td>⏳</td>
+<td>❌</td>
+<td>Доступно</td>
+</tr>
+<tr>
+<td><a href="https://github.com/Ragalikx/steam-bridge-mc/tree/Forge-1.8.9">1.8.9</a></td>
+<td>Forge</td>
+<td>11.15.1.2318</td>
+<td>❌</td>
+<td>✅</td>
+<td>⏳</td>
+<td>❌</td>
+<td>Доступно</td>
+</tr>
+<tr>
+<td><a href="https://github.com/Ragalikx/steam-bridge-mc/tree/Forge-1.7.10">1.7.10</a></td>
+<td>Forge</td>
+<td>10.13.4.1614</td>
+<td>❌</td>
+<td>✅</td>
+<td>⏳</td>
+<td>❌</td>
+<td>Доступно</td>
+</tr>
+</tbody>
+</table>
 
-*(Для Fabric нужен Fabric API)*
+\*Для Fabric нужен Fabric API.
 
-### Паритет фич (все перечисленные ветки)
-
-| Фича | Примечание |
-|---|---|
-| Хост мира через Steam (кнопка Open via Steam / Share to LAN) | Да |
-| Выбор друга (SteamID) при добавлении сервера | Да (Edit Server / Direct Connect) |
-| Список серверов: SteamID - MOTD, статус, без TCP-ping, вверх списка, аватар | Да |
-| Вход по SteamID (сохранённый список или прямой ввод) | Да |
-| Политика доступа (друзья / все) + маршрут (auto / P2P / relay) | Да |
-| Управление хостом (kick / ban) | Да |
-| Voice UDP (`interceptUdp`) | Современные ветки (где подключено). **1.7.10 / 1.8.9: без voice** |
+\*UDP Tunnel: опциональный JVM-wide перехват `DatagramSocket` (`interceptUdp`). Игровой трафик и так идёт через Steam; это дополнительно пускает **UDP войсов** (Simple Voice Chat, Plasmo Voice и т.п.) в тот же Steam-канал. Включается в конфиге. На 1.7.10 / 1.8.9 нет.
 
 ---
 
