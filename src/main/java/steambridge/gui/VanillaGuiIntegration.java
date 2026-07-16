@@ -78,8 +78,7 @@ public final class VanillaGuiIntegration {
             }
         }
         if (next instanceof OpenToLanScreen) {
-            SteamServer server = SteamManager.getInstance().getActiveServer();
-            if (server != null && server.isRunning()) {
+            if (isSteamHostSessionActive(mc)) {
                 return new GuiSteamHostManagement(mc.currentScreen);
             }
             if (mc.getServer() != null) {
@@ -538,8 +537,7 @@ public final class VanillaGuiIntegration {
      */
     private static void injectPauseMenuControl(Screen gui) {
         if (!(gui instanceof GameMenuScreen)) return;
-        SteamServer server = SteamManager.getInstance().getActiveServer();
-        if (server == null || !server.isRunning()) return;
+        if (!isSteamHostSessionActive(MinecraftClient.getInstance())) return;
 
         TextRenderer font = MinecraftClient.getInstance().textRenderer;
         Text manageMsg = new TranslatableText("steambridge.gui.manage_session");
@@ -678,5 +676,27 @@ public final class VanillaGuiIntegration {
         } catch (Exception e) {
             return "__default_world__";
         }
+    }
+
+    private static boolean isSteamHostSessionActive(MinecraftClient mc) {
+        SteamServer server = SteamManager.getInstance().getActiveServer();
+        if (server == null || !server.isRunning()) {
+            return false;
+        }
+        IntegratedServer integrated = mc.getServer();
+        if (integrated == null) {
+            return false;
+        }
+        try {
+            String folder = worldKey(integrated);
+            String hosted = server.getWorldKey();
+            if (folder != null && !folder.isEmpty()
+                    && hosted != null && !hosted.isEmpty()
+                    && !hosted.equals("__default_world__")
+                    && !folder.equals(hosted)) {
+                return false;
+            }
+        } catch (Throwable ignored) {}
+        return true;
     }
 }
