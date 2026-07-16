@@ -452,7 +452,7 @@ public class SteamServer {
         // This runs on the SteamBridge-Callbacks thread; getIntegratedServer() and everything
         // below it touches world/server state, which must only be read/mutated on the main thread.
         net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getMinecraft();
-        mc.addScheduledTask(() -> {
+        steambridge.ClientTasks.run(() -> {
             if (mc.getIntegratedServer() != null) {
                 // Reconnect guard
                 Integer oldConn = connectionBySteamId.get(steamID);

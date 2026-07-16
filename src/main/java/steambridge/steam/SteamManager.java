@@ -752,7 +752,7 @@ public class SteamManager {
 
         try {
             net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getMinecraft();
-            mc.addScheduledTask(() -> {
+            steambridge.ClientTasks.run(() -> {
                 try {
                     boolean wasClient = activeClient != null;
                     boolean wasHost   = activeServer != null && activeServer.isRunning();

@@ -94,7 +94,7 @@ public class GuiSteamResync extends GuiScreen {
                 statusLine1 = "§a" + I18n.format("steambridge.gui.resync_success");
                 statusLine2 = "§7" + I18n.format("steambridge.gui.resync_success_hint");
                 // Open friends screen on next tick
-                net.minecraft.client.Minecraft.getMinecraft().addScheduledTask(() ->
+                steambridge.ClientTasks.run(() ->
                         net.minecraft.client.Minecraft.getMinecraft().displayGuiScreen(
                                 new GuiSteamFriends(parent, null, onSteamIdSelected)));
                 return;
@@ -114,7 +114,7 @@ public class GuiSteamResync extends GuiScreen {
     }
 
     @Override
-    protected void actionPerformed(GuiButton button) throws IOException {
+    protected void actionPerformed(GuiButton button) {
         if (button.id == 0) {
             this.mc.displayGuiScreen(parent);
         }

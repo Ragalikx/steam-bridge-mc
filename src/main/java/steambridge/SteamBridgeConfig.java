@@ -6,11 +6,12 @@
 package steambridge;
 
 import net.minecraftforge.common.config.Configuration;
+import net.minecraftforge.common.config.Property;
 
 import java.io.File;
 
 /**
- * Simple forge {@link Configuration} (1.8.9 has no {@code @Config} annotation API).
+ * Forge {@link Configuration} for 1.7.10 (classic Property API).
  * Voice / UDP intercept is intentionally absent on this branch.
  */
 public final class SteamBridgeConfig {
@@ -30,18 +31,23 @@ public final class SteamBridgeConfig {
     public static void sync() {
         if (config == null) return;
         try {
-            allowWithoutAuth = config.getBoolean(
-                "Allow Without Auth",
+            config.load();
+            Property auth = config.get(
                 Configuration.CATEGORY_GENERAL,
+                "Allow Without Auth",
                 true,
                 "Allow connections without validating Steam Auth Ticket."
             );
-            virtualPort = config.getInt(
-                "Virtual Port",
+            allowWithoutAuth = auth.getBoolean(true);
+
+            Property port = config.get(
                 Configuration.CATEGORY_GENERAL,
-                0, 0, 65535,
+                "Virtual Port",
+                0,
                 "Virtual port for Steam network. 0 is default."
             );
+            virtualPort = Math.max(0, Math.min(65535, port.getInt(0)));
+
             if (config.hasChanged()) {
                 config.save();
             }

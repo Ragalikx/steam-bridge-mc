@@ -68,7 +68,7 @@ public class GuiSteamHostManagement extends GuiScreen {
     }
 
     private void updatePlayerButtons() {
-        this.buttonList.removeIf(b -> b.id >= 100);
+        this.buttonList.removeIf(b -> ((GuiButton) b).id >= 100);
         if (server != null && server.isRunning()) {
             List<SteamServer.PlayerSnapshot> snaps = snapshots();
             snapshotCount = snaps.size();
@@ -97,7 +97,7 @@ public class GuiSteamHostManagement extends GuiScreen {
     }
 
     @Override
-    protected void actionPerformed(GuiButton button) throws IOException {
+    protected void actionPerformed(GuiButton button) {
         if (button.id == BUTTON_BACK) {
             this.mc.displayGuiScreen(parent);
         } else if (button.id == BUTTON_BAN_LIST) {
@@ -138,8 +138,8 @@ public class GuiSteamHostManagement extends GuiScreen {
                     String avatar = steambridge.steam.SteamSocial.ProfileCache.get().getAvatarTexture(snap.getSteamId());
                     if (avatar != null && !avatar.isEmpty()) {
                         this.mc.getTextureManager().bindTexture(new net.minecraft.util.ResourceLocation(avatar));
-                        net.minecraft.client.renderer.GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
-                        net.minecraft.client.gui.Gui.drawModalRectWithCustomSizedTexture(this.width / 2 - 170, y + 2, 0, 0, 16, 16, 16, 16);
+                        org.lwjgl.opengl.GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+                        net.minecraft.client.gui.Gui.func_146110_a(this.width / 2 - 170, y + 2, 0, 0, 16, 16, 16, 16);
                     }
 
                     SteamConnectionStatus status = snap.getConnectionStatus();

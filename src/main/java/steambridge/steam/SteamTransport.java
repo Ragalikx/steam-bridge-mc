@@ -16,8 +16,15 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.util.ReferenceCountUtil;
 import net.minecraft.client.Minecraft;
-import net.minecraft.network.EnumPacketDirection;
+import net.minecraft.network.EnumConnectionState;
 import net.minecraft.network.NetworkManager;
+import net.minecraft.network.handshake.client.C00Handshake;
+import net.minecraft.network.login.client.C00PacketLoginStart;
+import net.minecraft.util.MessageDeserializer;
+import net.minecraft.util.MessageDeserializer2;
+import net.minecraft.util.MessageSerializer;
+import net.minecraft.util.MessageSerializer2;
+import io.netty.handler.timeout.ReadTimeoutHandler;
 
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
@@ -169,6 +176,10 @@ public final class SteamTransport {
                     new net.minecraft.client.gui.GuiMultiplayer(
                             new net.minecraft.client.gui.GuiMainMenu());
 
+            // Mirror NetworkManager.provideLanClient pipeline (1.7.10), but target our loopback proxy.
+            final NetworkManager nm = new NetworkManager(true);
+            nmHolder[0] = nm;
+
             io.netty.bootstrap.Bootstrap bootstrap = new io.netty.bootstrap.Bootstrap()
                 .group(NIO_GROUP)
                 .channel(NioSocketChannel.class)
@@ -176,21 +187,13 @@ public final class SteamTransport {
                 .handler(new ChannelInitializer<NioSocketChannel>() {
                     @Override
                     protected void initChannel(NioSocketChannel ch) throws Exception {
-                        NetworkManager nm = new NetworkManager(EnumPacketDirection.CLIENTBOUND);
-                        setNmChannel(nm, ch);
-                        setNmSocketAddress(nm, new InetSocketAddress("SteamRelay", 25565));
-                        nmHolder[0] = nm;
-
-                        // Vanilla client pipeline (1.8.9 class names) - NO steam_valve
                         ch.pipeline()
-                            .addLast("splitter",        new net.minecraft.util.MessageDeserializer2())
-                            .addLast("decoder",         new net.minecraft.util.MessageDeserializer(EnumPacketDirection.CLIENTBOUND))
-                            .addLast("prepender",       new net.minecraft.util.MessageSerializer2())
-                            .addLast("encoder",         new net.minecraft.util.MessageSerializer(EnumPacketDirection.SERVERBOUND))
-                            .addLast("packet_handler",  nm);
-
-                        nm.setNetHandler(
-                            new net.minecraft.client.network.NetHandlerLoginClient(nm, mc, returnScreen));
+                            .addLast("timeout",  new ReadTimeoutHandler(20))
+                            .addLast("splitter", new MessageDeserializer2())
+                            .addLast("decoder",  new MessageDeserializer(NetworkManager.field_152462_h))
+                            .addLast("prepender", new MessageSerializer2())
+                            .addLast("encoder",  new MessageSerializer(NetworkManager.field_152462_h))
+                            .addLast("packet_handler", nm);
                     }
                 });
 
@@ -201,13 +204,14 @@ public final class SteamTransport {
                 return false;
             }
 
-            NetworkManager nm = nmHolder[0];
-            // Protocol 47 = Minecraft 1.8.x; FML marker required for Forge handshake.
-            nm.sendPacket(new net.minecraft.network.handshake.client.C00Handshake(
-                    47, "SteamRelay", 25565,
-                    net.minecraft.network.EnumConnectionState.LOGIN, true));
-            nm.sendPacket(new net.minecraft.network.login.client.C00PacketLoginStart(
-                    mc.getSession().getProfile()));
+            // Fake remote for logs / disconnect UI; channelActive already bound the Netty channel.
+            setNmSocketAddress(nm, new InetSocketAddress("SteamRelay", 25565));
+            nm.setNetHandler(new net.minecraft.client.network.NetHandlerLoginClient(nm, mc, returnScreen));
+
+            // Protocol 5 = Minecraft 1.7.10. "\0FML\0" marks a Forge client for the FML handshake.
+            nm.scheduleOutboundPacket(new C00Handshake(
+                    5, "SteamRelay\0FML\0", 25565, EnumConnectionState.LOGIN));
+            nm.scheduleOutboundPacket(new C00PacketLoginStart(mc.getSession().func_148256_e()));
 
             SteamBridgeMod.LOG.info("[LoopbackBridge][Client] Connected to loopback proxy. proxyPort={} conn={} steamID={}",
                 proxyPort, connectionHandle, remoteSteamID);

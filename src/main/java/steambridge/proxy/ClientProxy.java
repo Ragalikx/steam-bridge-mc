@@ -5,6 +5,8 @@
  */
 package steambridge.proxy;
 
+import steambridge.ClientTasks;
+import steambridge.SteamAppIdHelper;
 import steambridge.SteamBridgeMod;
 import steambridge.gui.GuiSteamConnecting;
 import steambridge.steam.SteamClient;
@@ -21,13 +23,14 @@ import net.minecraft.util.IChatComponent;
 import net.minecraft.util.ChatComponentTranslation;
 import net.minecraftforge.client.event.GuiOpenEvent;
 import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.fml.common.event.FMLInitializationEvent;
-import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import net.minecraftforge.fml.common.gameevent.PlayerEvent;
-import net.minecraftforge.fml.common.gameevent.TickEvent;
-import net.minecraftforge.fml.common.network.FMLNetworkEvent;
-import net.minecraftforge.fml.relauncher.ReflectionHelper;
+import cpw.mods.fml.common.event.FMLInitializationEvent;
+import cpw.mods.fml.common.event.FMLPostInitializationEvent;
+import cpw.mods.fml.common.event.FMLPreInitializationEvent;
+import cpw.mods.fml.common.eventhandler.SubscribeEvent;
+import cpw.mods.fml.common.gameevent.PlayerEvent;
+import cpw.mods.fml.common.gameevent.TickEvent;
+import cpw.mods.fml.common.network.FMLNetworkEvent;
+import cpw.mods.fml.relauncher.ReflectionHelper;
 
 import java.lang.reflect.Field;
 import java.net.InetSocketAddress;
@@ -51,10 +54,17 @@ public class ClientProxy extends CommonProxy {
     @Override
     public void init(FMLInitializationEvent event) {
         MinecraftForge.EVENT_BUS.register(this);
-        // 1.8.9 has no @Mod.EventBusSubscriber. EventBus.register(Class) also does not
-        // pick up static @SubscribeEvent methods (it walks java.lang.Class instead).
-        // Register an instance so GUI hooks actually fire.
+        // 1.7.10 EventBus has no Class/static registration. Use an instance.
         MinecraftForge.EVENT_BUS.register(new steambridge.gui.VanillaGuiIntegration());
+    }
+
+    @Override
+    public void postInit(FMLPostInitializationEvent event) {
+        SteamBridgeMod.LOG.info("=== SteamBridge client postInit - initializing Steam... ===");
+        // No DatagramSocket intercept / voice tunnel on 1.7.10.
+        SteamAppIdHelper.ensureAppId(Minecraft.getMinecraft().mcDataDir);
+        boolean ok = SteamManager.getInstance().init();
+        SteamBridgeMod.LOG.info("=== Steam init result: {} ===", ok ? "SUCCESS" : "FAILED");
     }
 
     @SubscribeEvent
@@ -86,10 +96,10 @@ public class ClientProxy extends CommonProxy {
                 try {
                     net.minecraft.client.gui.GuiMultiplayer serverList = new net.minecraft.client.gui.GuiMultiplayer(new net.minecraft.client.gui.GuiMainMenu());
                     if (isDisconnect) {
-                        net.minecraftforge.fml.relauncher.ReflectionHelper.setPrivateValue(GuiDisconnected.class, (GuiDisconnected) next, serverList, "parentScreen", "field_146307_h");
+                        cpw.mods.fml.relauncher.ReflectionHelper.setPrivateValue(GuiDisconnected.class, (GuiDisconnected) next, serverList, "parentScreen", "field_146307_h");
                     } else if (isModReject) {
                         try {
-                            net.minecraftforge.fml.relauncher.ReflectionHelper.setPrivateValue(net.minecraft.client.gui.GuiYesNo.class, (net.minecraft.client.gui.GuiYesNo) next, serverList, "parentScreen", "field_146313_a");
+                            cpw.mods.fml.relauncher.ReflectionHelper.setPrivateValue(net.minecraft.client.gui.GuiYesNo.class, (net.minecraft.client.gui.GuiYesNo) next, serverList, "parentScreen", "field_146313_a");
                         } catch (Exception ignored) {}
                     }
                 } catch (Exception ignored) {}
@@ -146,7 +156,7 @@ public class ClientProxy extends CommonProxy {
             processDeferredNetworkTeardown(mc);
             SteamClient client = SteamManager.getInstance().getActiveClient();
             if (client != null && client.isAlive() && mc.theWorld != null && mc.thePlayer != null && !client.isInWorld()) {
-                client.onMinecraftWorldJoined(mc.thePlayer.getName(), mc.thePlayer.dimension);
+                client.onMinecraftWorldJoined(mc.thePlayer.getCommandSenderName(), mc.thePlayer.dimension);
             }
 
             SteamServer server = SteamManager.getInstance().getActiveServer();
@@ -183,9 +193,10 @@ public class ClientProxy extends CommonProxy {
             return;
         }
 
-        SocketAddress remote = player.playerNetServerHandler.getNetworkManager().getRemoteAddress();
+        // 1.7.10: NetHandlerPlayServer.netManager (no getNetworkManager()).
+        SocketAddress remote = player.playerNetServerHandler.netManager.getSocketAddress();
         if (remote instanceof InetSocketAddress) {
-            server.attachMinecraftPlayer((InetSocketAddress) remote, player.getName());
+            server.attachMinecraftPlayer((InetSocketAddress) remote, player.getCommandSenderName());
         }
     }
 
@@ -195,7 +206,7 @@ public class ClientProxy extends CommonProxy {
         if (mc.thePlayer != null && event.player == mc.thePlayer) {
             SteamClient client = SteamManager.getInstance().getActiveClient();
             if (client != null) {
-                client.onMinecraftWorldJoined(event.player.getName(), event.toDim);
+                client.onMinecraftWorldJoined(event.player.getCommandSenderName(), event.toDim);
             }
         }
     }
@@ -295,7 +306,7 @@ public class ClientProxy extends CommonProxy {
             client.getState()
         );
         client.closeAfterMinecraftFailure("connect.failed", details);
-        mc.addScheduledTask(() -> {
+        steambridge.ClientTasks.run(() -> {
             GuiScreen current = mc.currentScreen;
             if (current == null || current instanceof GuiSteamConnecting || isGenericDisconnectScreen(current)) {
                 mc.displayGuiScreen(createModMismatchHintScreen());

@@ -2,12 +2,12 @@
   {
     "modid": "steambridge",
     "name": "Steam Bridge",
-    "description": "Steam Bridge — play Minecraft with friends without exposing your IP.\n\nPlayers connect via SteamID over P2P/SDR relay — no port-forwarding, works through NAT.\nSymmetric NAT automatically falls back to Valve SDR relay.\n\nRequires Steam (AppID 480 — Spacewar) to be running.",
+    "description": "Steam Bridge: play Minecraft with friends without exposing your IP.\n\nPlayers connect via SteamID over P2P/SDR relay, no port-forwarding, works through NAT.\nSymmetric NAT automatically falls back to Valve SDR relay.\n\nRequires Steam (AppID 480 / Spacewar) to be running.",
     "version": "${version}",
     "mcversion": "${mcversion}",
     "url": "https://github.com/Ragalikx/steam-bridge-mc",
     "authorList": ["Ragalikx"],
-    "credits": "Ragalikx — author; Valve — Steam SDR; code-disaster — steamworks4j; java-native-access — JNA",
+    "credits": "Ragalikx (author); Valve (Steam SDR); code-disaster (steamworks4j); java-native-access (JNA)",
     "logoFile": "",
     "screenshots": [],
     "dependencies": []

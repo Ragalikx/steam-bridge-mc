@@ -137,7 +137,7 @@ public class SteamClient {
             // Connect Minecraft to the proxy port on the MC main thread.
             final int finalProxyPort = proxyPort;
             net.minecraft.client.Minecraft mc2 = net.minecraft.client.Minecraft.getMinecraft();
-            mc2.addScheduledTask(() -> {
+            steambridge.ClientTasks.run(() -> {
                 try {
                     boolean ok2 = SteamTransport.connectClientToLoopback(
                             conn, remoteSteamID, finalProxyPort, screen);
@@ -337,7 +337,7 @@ public class SteamClient {
         connectionHandle = 0;
 
         net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getMinecraft();
-        mc.addScheduledTask(() -> {
+        steambridge.ClientTasks.run(() -> {
             net.minecraft.client.gui.GuiScreen current = mc.currentScreen;
             if (current instanceof net.minecraft.client.gui.GuiDownloadTerrain ||
                 current instanceof net.minecraft.client.multiplayer.GuiConnecting) {

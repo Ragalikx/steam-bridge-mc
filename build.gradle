@@ -1,23 +1,25 @@
 buildscript {
     repositories {
-        maven { url = 'https://maven.minecraftforge.net' }
         mavenCentral()
-        jcenter()
+        maven { name = 'forge'; url = 'https://maven.minecraftforge.net/' }
     }
     dependencies {
-        classpath 'net.minecraftforge.gradle:ForgeGradle:2.1-SNAPSHOT'
+        // Maintained FG 1.2 fork (official 1.2-SNAPSHOT is broken on modern Maven).
+        classpath('com.anatawa12.forge:ForgeGradle:1.2-1.1.+') {
+            changing = true
+        }
     }
 }
 
-apply plugin: 'net.minecraftforge.gradle.forge'
+apply plugin: 'forge'
 apply plugin: 'java'
 
 // -- Versioning ----------------------------------------------------------------
 // Release:  gradlew build "-PmodVersion=1.0.0"
-// Result:   project.version / jar / mcmod.info / BuildInfo = "1.0.0+mc1.8.9"
-// Dev:      "0.0.0-dev+mc1.8.9"
+// Result:   project.version / jar / mcmod.info / BuildInfo = "1.0.0+mc1.7.10"
+// Dev:      "0.0.0-dev+mc1.7.10"
 // No voice-chat / UDP intercept on this branch (host Steam P2P + GUI only).
-ext.minecraft_version = '1.8.9'
+ext.minecraft_version = '1.7.10'
 def rawModVersion = (findProperty('modVersion') ?: '0.0.0-dev').toString().trim()
 if (rawModVersion.isEmpty()) {
     throw new GradleException("modVersion is empty. Pass -PmodVersion=1.0.0 (or omit for 0.0.0-dev).")
@@ -36,16 +38,14 @@ version = "${rawModVersion}+mc${minecraft_version}"
 group = 'steambridge'
 archivesBaseName = 'steambridge'
 
-logger.lifecycle("Steam Bridge (Forge 1.8.9) version: {}  (modVersion={}, minecraft={})",
+logger.lifecycle("Steam Bridge (Forge 1.7.10) version: {}  (modVersion={}, minecraft={})",
     version, rawModVersion, minecraft_version)
 
+// 1.7.10 clients commonly run Java 8; keep bytecode at 1.8 for lambdas used in this codebase.
 sourceCompatibility = targetCompatibility = '1.8'
 compileJava.options.encoding = 'UTF-8'
 
 def generatedSrcDir = "${buildDir}/generated/java"
-sourceSets {
-    main { java { srcDir generatedSrcDir } }
-}
 
 task generateBuildInfo {
     def verFull = project.version.toString()
@@ -62,7 +62,7 @@ task generateBuildInfo {
 package steambridge;
 /** Auto-generated at build time. Do not edit or commit. */
 public final class BuildInfo {
-    /** Full release id, e.g. {@code 1.0.0+mc1.8.9}. */
+    /** Full release id, e.g. {@code 1.0.0+mc1.7.10}. */
     public static final String VERSION     = "${verFull}";
     /** Mod-only version from {@code -PmodVersion}. */
     public static final String MOD_VERSION = "${verMod}";
@@ -81,11 +81,15 @@ tasks.withType(JavaCompile) {
     options.encoding = 'UTF-8'
 }
 
+// FG 1.2 copies sources into build/sources; ensure generated BuildInfo is present first.
+tasks.matching { it.name == 'sourceMainJava' }.configureEach {
+    dependsOn generateBuildInfo
+}
+
 minecraft {
-    version = '1.8.9-11.15.1.2318-1.8.9'
+    // Last recommended 1.7.10 Forge line.
+    version = '1.7.10-10.13.4.1614-1.7.10'
     runDir = 'run'
-    mappings = 'stable_22'
-    makeObfSourceJar = false
 }
 
 repositories {
@@ -95,12 +99,20 @@ repositories {
 
 configurations {
     shade
-    compile.extendsFrom shade
 }
 
 dependencies {
     shade('com.code-disaster.steamworks4j:steamworks4j:1.10.0') { transitive = false }
     shade('net.java.dev.jna:jna:5.14.0') { transitive = false }
+}
+
+// Gradle 7 dropped `compile`; FG 1.2 still needs these jars on the compile classpath.
+sourceSets {
+    main {
+        java { srcDir generatedSrcDir }
+        compileClasspath += configurations.shade
+        runtimeClasspath += configurations.shade
+    }
 }
 
 jar {
@@ -166,20 +178,24 @@ jar {
 }
 
 processResources {
+    // Gradle 7 requires an explicit strategy when the same path is contributed twice.
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
     inputs.property 'version', project.version
     inputs.property 'mcversion', project.ext.minecraft_version
     from(sourceSets.main.resources.srcDirs) {
         include 'mcmod.info'
         expand 'version': project.version, 'mcversion': project.ext.minecraft_version
     }
-    from(sourceSets.main.resources.srcDirs) { exclude 'mcmod.info' }
+    from(sourceSets.main.resources.srcDirs) {
+        exclude 'mcmod.info'
+    }
 }
 
 tasks.matching { it.name == 'build' }.configureEach {
     doLast {
         def libs = file("${buildDir}/libs")
         def jars = libs.exists()
-            ? libs.listFiles({ d, n -> n.endsWith('.jar') && !n.endsWith('-sources.jar') } as FilenameFilter)
+            ? libs.listFiles({ d, n -> n.endsWith('.jar') && !n.endsWith('-sources.jar') && !n.endsWith('-dev.jar') } as FilenameFilter)
             : null
         logger.lifecycle('------------------------------------------------------------')
         logger.lifecycle(' Steam Bridge (Forge {})  version = {}', project.ext.minecraft_version, project.version)

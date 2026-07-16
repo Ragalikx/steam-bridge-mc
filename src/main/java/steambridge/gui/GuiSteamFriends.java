@@ -14,7 +14,7 @@ import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.GuiTextField;
 import net.minecraft.client.gui.Gui;
-import net.minecraft.client.renderer.GlStateManager;
+import org.lwjgl.opengl.GL11;
 import net.minecraft.util.ResourceLocation;
 
 import java.io.IOException;
@@ -78,7 +78,8 @@ public class GuiSteamFriends extends GuiScreen {
         this.buttonList.add(GuiButtons.createCentered(0, this.fontRendererObj, this.width / 2, this.height - 30,
                 net.minecraft.client.resources.I18n.format("gui.back"), 100, this.width - 20));
 
-        searchField = new GuiTextField(1, this.fontRendererObj,
+        // 1.7.10 GuiTextField has no component-id constructor arg.
+        searchField = new GuiTextField(this.fontRendererObj,
                 this.width / 2 - 100, 35, 200, 20);
         searchField.setMaxStringLength(50);
         searchField.setFocused(true);
@@ -123,7 +124,7 @@ public class GuiSteamFriends extends GuiScreen {
 
 
     @Override
-    protected void keyTyped(char typedChar, int keyCode) throws IOException {
+    protected void keyTyped(char typedChar, int keyCode) {
         if (searchField.textboxKeyTyped(typedChar, keyCode)) {
             updateFilter();
         } else {
@@ -132,7 +133,7 @@ public class GuiSteamFriends extends GuiScreen {
     }
 
     @Override
-    public void handleMouseInput() throws IOException {
+    public void handleMouseInput() {
         super.handleMouseInput();
 
         int wheel = org.lwjgl.input.Mouse.getEventDWheel();
@@ -145,7 +146,7 @@ public class GuiSteamFriends extends GuiScreen {
     }
 
     @Override
-    protected void mouseClicked(int mouseX, int mouseY, int mouseButton) throws IOException {
+    protected void mouseClicked(int mouseX, int mouseY, int mouseButton) {
         super.mouseClicked(mouseX, mouseY, mouseButton);
         searchField.mouseClicked(mouseX, mouseY, mouseButton);
 
@@ -172,7 +173,7 @@ public class GuiSteamFriends extends GuiScreen {
     }
 
     @Override
-    protected void actionPerformed(GuiButton button) throws IOException {
+    protected void actionPerformed(GuiButton button) {
         if (button.id == 0) {
             Minecraft.getMinecraft().displayGuiScreen(parent);
         }
@@ -243,9 +244,9 @@ public class GuiSteamFriends extends GuiScreen {
         try {
             ResourceLocation loc = new ResourceLocation(texturePath);
             this.mc.getTextureManager().bindTexture(loc);
-            GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
-            Gui.drawModalRectWithCustomSizedTexture(
-                    x, y, 0, 0, AVATAR_SIZE, AVATAR_SIZE, AVATAR_SIZE, AVATAR_SIZE);
+            GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+            // 1.7.10: Gui.func_146110_a == drawModalRectWithCustomSizedTexture on later versions.
+            Gui.func_146110_a(x, y, 0, 0, AVATAR_SIZE, AVATAR_SIZE, AVATAR_SIZE, AVATAR_SIZE);
         } catch (Exception ignored) {}
     }
 

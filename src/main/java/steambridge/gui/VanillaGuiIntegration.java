@@ -17,9 +17,9 @@ import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.multiplayer.ServerList;
 import net.minecraftforge.client.event.GuiOpenEvent;
 import net.minecraftforge.client.event.GuiScreenEvent;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import net.minecraftforge.fml.common.gameevent.TickEvent;
-import net.minecraftforge.fml.relauncher.ReflectionHelper;
+import cpw.mods.fml.common.eventhandler.SubscribeEvent;
+import cpw.mods.fml.common.gameevent.TickEvent;
+import cpw.mods.fml.relauncher.ReflectionHelper;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -146,21 +146,31 @@ public class VanillaGuiIntegration {
             String sid = extractSteamId(data.serverIP);
             long steamId = Long.parseLong(sid);
             String iconB64 = steambridge.steam.SteamSocial.ProfileCache.get().getAvatarIconB64(steamId);
-            // Always refresh when Steam delivers a new avatar (null → first paint uses default tile).
+            // MCP: getBase64EncodedIconData / setBase64EncodedIconData is func_147407_a on 1.7.10.
             if (iconB64 != null && !iconB64.isEmpty()
                     && !iconB64.equals(data.getBase64EncodedIconData())) {
-                data.setBase64EncodedIconData(iconB64);
+                data.func_147407_a(iconB64);
             }
         } catch (Exception ignored) {
             // keep default icon until Steam has the avatar ready
         }
     }
 
-    /** Public {@link GuiMultiplayer#getServerList()} (same role as getServers() on 1.16+). */
+    /**
+     * Saved multiplayer list. 1.7.10 has no public getServerList(); use reflection
+     * (MCP savedServerList / SRG field_146797_i across common mapping sets).
+     */
+    private static Field fSavedServerList;
+
     private static ServerList getSavedServerList(GuiScreen gui) {
         if (!(gui instanceof GuiMultiplayer)) return null;
         try {
-            return ((GuiMultiplayer) gui).getServerList();
+            if (fSavedServerList == null) {
+                fSavedServerList = resolveField(GuiMultiplayer.class,
+                        "savedServerList", "field_146804_i");
+            }
+            if (fSavedServerList == null) return null;
+            return (ServerList) fSavedServerList.get(gui);
         } catch (Exception e) {
             return null;
         }
@@ -210,9 +220,10 @@ public class VanillaGuiIntegration {
          */
         if (pendingConnectEnable || isDirectConnectWithAddress(gui)) {
             try {
-                List<GuiButton> buttons = ReflectionHelper.getPrivateValue(GuiScreen.class, gui, "buttonList", "field_146292_n");
+                List buttons = ReflectionHelper.getPrivateValue(GuiScreen.class, gui, "buttonList", "field_146292_n");
                 if (buttons != null) {
-                    for (GuiButton b : buttons) {
+                    for (Object __b : buttons) {
+                        GuiButton b = (GuiButton) __b;
                         if (b.id == 1) {
                             b.enabled = true;
                             break;
@@ -233,9 +244,10 @@ public class VanillaGuiIntegration {
             // Find the Game Mode button (id = 104) to anchor our text
             int textY = gui.height / 4 + 40; // fallback
             try {
-                List<GuiButton> buttons = ReflectionHelper.getPrivateValue(GuiScreen.class, gui, "buttonList", "field_146292_n");
+                List buttons = ReflectionHelper.getPrivateValue(GuiScreen.class, gui, "buttonList", "field_146292_n");
                 if (buttons != null) {
-                    for (GuiButton b : buttons) {
+                    for (Object __b : buttons) {
+                        GuiButton b = (GuiButton) __b;
                         if (b.id == 104) {
                             textY = b.yPosition + 28;
                             break;
@@ -244,7 +256,7 @@ public class VanillaGuiIntegration {
                 }
             } catch (Exception ignored) {}
 
-            gui.drawCenteredString(Minecraft.getMinecraft().fontRendererObj, title, gui.width / 2, textY, 0xFFFFFF);
+            gui.drawCenteredString(Minecraft.getMinecraft().fontRenderer, title, gui.width / 2, textY, 0xFFFFFF);
         }
     }
 
@@ -279,7 +291,7 @@ public class VanillaGuiIntegration {
         }
 
         if (next instanceof GuiConnecting) {
-            ServerData serverData = mc.getCurrentServerData();
+            ServerData serverData = mc.func_147104_D();
             if (serverData != null && isSteamServerId(serverData.serverIP)) {
                 long steamId = Long.parseLong(extractSteamId(serverData.serverIP));
                 SteamBridgeMod.LOG.info("Intercepted connection to SteamID: {}", steamId);
@@ -332,7 +344,8 @@ public class VanillaGuiIntegration {
                 } catch (Exception ignored) {}
                 // Enable "Add" button (id=0) if name is non-empty
                 if (name != null && !name.isEmpty()) {
-                    for (GuiButton b : event.buttonList) {
+                    for (Object _b : event.buttonList) {
+                        GuiButton b = (GuiButton) _b;
                         if (b.id == 0) { b.enabled = true; break; }
                     }
                 }
@@ -342,7 +355,8 @@ public class VanillaGuiIntegration {
                 if (tf != null) tf.setText(sid);
                 // Signal the draw hook to keep Connect (id=1) enabled every frame.
                 pendingConnectEnable = true;
-                for (GuiButton b : event.buttonList) {
+                for (Object _b : event.buttonList) {
+                    GuiButton b = (GuiButton) _b;
                     if (b.id == 1) { b.enabled = true; break; }
                 }
             }
@@ -350,7 +364,8 @@ public class VanillaGuiIntegration {
 
         if (gui instanceof GuiShareToLan) {
             GuiButton startLan = null, cancel = null, gameMode = null;
-            for (GuiButton b : event.buttonList) {
+            for (Object _b : event.buttonList) {
+                GuiButton b = (GuiButton) _b;
                 if (b.id == 101) startLan = b;
                 if (b.id == 102) cancel   = b;
                 if (b.id == 104) gameMode = b;
@@ -366,7 +381,7 @@ public class VanillaGuiIntegration {
                 }
 
                 // Steam settings row: sit directly below vanilla's Game Mode button
-                FontRenderer font = Minecraft.getMinecraft().fontRendererObj;
+                FontRenderer font = Minecraft.getMinecraft().fontRenderer;
                 int steamRowY = (gameMode != null) ? (gameMode.yPosition + 40) : (gui.height / 4 + 55);
                 String accessLabel = accessPolicyButtonLabel(pendingAccessPolicy);
                 String routeLabel  = transportButtonLabel(pendingTransportMode);
@@ -413,7 +428,7 @@ public class VanillaGuiIntegration {
         if (gui instanceof GuiScreenAddServer || gui instanceof GuiScreenServerList) {
             GuiTextField ipField = findIpTextField(gui);
             if (ipField != null) {
-                FontRenderer font = Minecraft.getMinecraft().fontRendererObj;
+                FontRenderer font = Minecraft.getMinecraft().fontRenderer;
                 String friendsMsg = net.minecraft.client.resources.I18n.format("steambridge.gui.friends_short");
                 event.buttonList.add(GuiButtons.create(
                         BTN_FRIENDS, font, ipField.xPosition + ipField.width + 4, ipField.yPosition, friendsMsg, 20, 80));
@@ -423,8 +438,8 @@ public class VanillaGuiIntegration {
         // -- Pre-mark Steam servers + schedule a second pass before first render -
         if (gui instanceof GuiMultiplayer) {
             markAllSteamServers(gui);
-            // addScheduledTask runs before the very next render loop -> belt-and-suspenders
-            Minecraft.getMinecraft().addScheduledTask(() -> {
+            // Schedule before the next render so MOTD sticks after list refresh.
+            steambridge.ClientTasks.run(() -> {
                 if (Minecraft.getMinecraft().currentScreen == gui) markAllSteamServers(gui);
             });
         }
@@ -435,7 +450,8 @@ public class VanillaGuiIntegration {
             SteamServer server = SteamManager.getInstance().getActiveServer();
             boolean isSteam = server != null && server.isRunning();
             boolean isLan   = mc.getIntegratedServer() != null && mc.getIntegratedServer().getPublic();
-            for (GuiButton btn : event.buttonList) {
+            for (Object _b : event.buttonList) {
+                GuiButton btn = (GuiButton) _b;
                 if (btn.id == 7) {
                     if (isSteam) {
                         btn.enabled = true;
