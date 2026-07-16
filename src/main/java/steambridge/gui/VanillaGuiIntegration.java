@@ -325,8 +325,7 @@ public final class VanillaGuiIntegration {
         }
 
         if (next instanceof ShareToLanScreen) {
-            SteamServer server = SteamManager.getInstance().getActiveServer();
-            if (server != null && server.isRunning()) {
+            if (isSteamHostSessionActive(mc)) {
                 event.setNewScreen(new GuiSteamHostManagement(mc.screen));
                 return;
             }
@@ -551,10 +550,9 @@ public final class VanillaGuiIntegration {
 
     private static void injectPauseMenuControl(ScreenEvent.Init.Post event, Screen gui) {
         if (!(gui instanceof PauseScreen)) return;
-        SteamServer server = SteamManager.getInstance().getActiveServer();
-        if (server == null || !server.isRunning()) return;
+        if (!isSteamHostSessionActive(Minecraft.getInstance())) return;
 
-        // Anchor above Forge "Mods". Size to the Steam label; if wider than Mods, grow
+// Anchor above Forge "Mods". Size to the Steam label; if wider than Mods, grow
         // rightward from Mods.x so short English and long Russian both fit.
         Button mods = findButtonByMessage(event, "fml.menu.mods");
         if (mods == null) return;
@@ -666,4 +664,26 @@ public final class VanillaGuiIntegration {
             return "__default_world__";
         }
     }
+    private static boolean isSteamHostSessionActive(Minecraft mc) {
+        SteamServer server = SteamManager.getInstance().getActiveServer();
+        if (server == null || !server.isRunning()) {
+            return false;
+        }
+        net.minecraft.client.server.IntegratedServer integrated = mc.getSingleplayerServer();
+        if (integrated == null) {
+            return false;
+        }
+        try {
+            String folder = worldKey(integrated);
+            String hosted = server.getWorldKey();
+            if (folder != null && !folder.isEmpty()
+                    && hosted != null && !hosted.isEmpty()
+                    && !hosted.equals("__default_world__")
+                    && !folder.equals(hosted)) {
+                return false;
+            }
+        } catch (Throwable ignored) {}
+        return true;
+    }
+
 }
