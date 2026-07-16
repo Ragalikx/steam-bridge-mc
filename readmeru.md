@@ -108,7 +108,7 @@
 <td>Fabric</td>
 <td></td>
 <td>⏳</td>
-<td>❌</td>
+<td>⏳</td>
 <td>⏳</td>
 <td>❌</td>
 <td>В разработке</td>

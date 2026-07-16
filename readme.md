@@ -108,7 +108,7 @@ Minecraft version links open the matching branch.
 <td>Fabric</td>
 <td></td>
 <td>⏳</td>
-<td>❌</td>
+<td>⏳</td>
 <td>⏳</td>
 <td>❌</td>
 <td>In development</td>
