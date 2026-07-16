@@ -63,6 +63,7 @@ public final class SteamSocial {
 
         private final Map<Long, String> personaNameBySteamId   = new ConcurrentHashMap<>();
         private final Map<Long, String> avatarTextureBySteamId = new ConcurrentHashMap<>();
+        private final Map<Long, byte[]> avatarIconBytesBySteamId = new ConcurrentHashMap<>();
         private final Map<Long, Long>   userInfoRequestedAt    = new ConcurrentHashMap<>();
         private final Map<Long, Long>   avatarRetryAt          = new ConcurrentHashMap<>();
 
@@ -144,6 +145,8 @@ public final class SteamSocial {
                     }
                 }
 
+                cacheServerIconBytes(steamId, nativeImage);
+
                 DynamicTexture texture  = new DynamicTexture(nativeImage);
                 ResourceLocation loc    = mc.getTextureManager().register(
                         "steambridge_avatar_" + steamId, texture);
@@ -159,16 +162,50 @@ public final class SteamSocial {
             }
         }
 
+        public byte[] getAvatarIconBytes(long steamId) {
+            if (steamId == 0L) return null;
+            byte[] cached = avatarIconBytesBySteamId.get(steamId);
+            if (cached != null) return cached;
+            getAvatarTexture(steamId);
+            return avatarIconBytesBySteamId.get(steamId);
+        }
+
+        private void cacheServerIconBytes(long steamId, NativeImage src) {
+            if (avatarIconBytesBySteamId.containsKey(steamId) || src == null) return;
+            NativeImage scaled = null;
+            try {
+                if (src.getWidth() == 64 && src.getHeight() == 64) {
+                    scaled = new NativeImage(64, 64, false);
+                    scaled.copyFrom(src);
+                } else {
+                    scaled = new NativeImage(64, 64, false);
+                    src.resizeSubRectTo(0, 0, src.getWidth(), src.getHeight(), scaled);
+                }
+                byte[] png = scaled.asByteArray();
+                if (png != null && png.length > 0) {
+                    avatarIconBytesBySteamId.put(steamId, png);
+                }
+            } catch (Exception e) {
+                SteamBridgeMod.LOG.warn("[ProfileCache] Avatar icon encode failed for {}: {}", steamId, e.getMessage());
+            } finally {
+                if (scaled != null) {
+                    scaled.close();
+                }
+            }
+        }
+
         public void invalidate(long steamId) {
             if (steamId == 0L) return;
             personaNameBySteamId.remove(steamId);
             avatarTextureBySteamId.remove(steamId);
+            avatarIconBytesBySteamId.remove(steamId);
             avatarRetryAt.remove(steamId);
         }
 
         public void invalidateAvatar(long steamId) {
             if (steamId == 0L) return;
             avatarTextureBySteamId.remove(steamId);
+            avatarIconBytesBySteamId.remove(steamId);
             avatarRetryAt.remove(steamId);
         }
 
