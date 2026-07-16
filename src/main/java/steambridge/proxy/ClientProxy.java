@@ -51,8 +51,10 @@ public class ClientProxy extends CommonProxy {
     @Override
     public void init(FMLInitializationEvent event) {
         MinecraftForge.EVENT_BUS.register(this);
-        // 1.8.9 has no @Mod.EventBusSubscriber — register GUI hooks manually.
-        MinecraftForge.EVENT_BUS.register(steambridge.gui.VanillaGuiIntegration.class);
+        // 1.8.9 has no @Mod.EventBusSubscriber. EventBus.register(Class) also does not
+        // pick up static @SubscribeEvent methods (it walks java.lang.Class instead).
+        // Register an instance so GUI hooks actually fire.
+        MinecraftForge.EVENT_BUS.register(new steambridge.gui.VanillaGuiIntegration());
     }
 
     @SubscribeEvent

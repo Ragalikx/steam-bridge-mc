@@ -187,7 +187,7 @@ public class VanillaGuiIntegration {
     // -- Event handlers --------------------------------------------------------
 
     @SubscribeEvent
-    public static void onClientTick(TickEvent.ClientTickEvent event) {
+    public void onClientTick(TickEvent.ClientTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
         Minecraft mc = Minecraft.getMinecraft();
         if (mc.currentScreen instanceof GuiMultiplayer) {
@@ -196,7 +196,7 @@ public class VanillaGuiIntegration {
     }
 
     @SubscribeEvent
-    public static void onDrawScreenPre(GuiScreenEvent.DrawScreenEvent.Pre event) {
+    public void onDrawScreenPre(GuiScreenEvent.DrawScreenEvent.Pre event) {
         GuiScreen gui = event.gui;
 
         // Suppress Steam-server ping on the multiplayer list.
@@ -225,7 +225,7 @@ public class VanillaGuiIntegration {
     }
 
     @SubscribeEvent
-    public static void onDrawScreenPost(GuiScreenEvent.DrawScreenEvent.Post event) {
+    public void onDrawScreenPost(GuiScreenEvent.DrawScreenEvent.Post event) {
         GuiScreen gui = event.gui;
         if (gui instanceof GuiShareToLan) {
             String title = net.minecraft.client.resources.I18n.format("steambridge.gui.steam_settings");
@@ -256,7 +256,7 @@ public class VanillaGuiIntegration {
     }
 
     @SubscribeEvent
-    public static void onGuiOpen(GuiOpenEvent event) {
+    public void onGuiOpen(GuiOpenEvent event) {
         GuiScreen next = event.gui;
         Minecraft mc   = Minecraft.getMinecraft();
 
@@ -303,7 +303,7 @@ public class VanillaGuiIntegration {
     }
 
     @SubscribeEvent
-    public static void onInitGuiPost(GuiScreenEvent.InitGuiEvent.Post event) {
+    public void onInitGuiPost(GuiScreenEvent.InitGuiEvent.Post event) {
         GuiScreen gui = event.gui;
 
         // -- Apply pending SteamID (and restored server name) ------------------
@@ -451,7 +451,7 @@ public class VanillaGuiIntegration {
     }
 
     @SubscribeEvent
-    public static void onActionPerformedPre(GuiScreenEvent.ActionPerformedEvent.Pre event) {
+    public void onActionPerformedPre(GuiScreenEvent.ActionPerformedEvent.Pre event) {
         if (event.gui instanceof GuiIngameMenu && event.button.id == 7) {
             SteamServer server = SteamManager.getInstance().getActiveServer();
             if (server != null && server.isRunning()) {
@@ -462,7 +462,7 @@ public class VanillaGuiIntegration {
     }
 
     @SubscribeEvent
-    public static void onActionPerformedPost(GuiScreenEvent.ActionPerformedEvent.Post event) {
+    public void onActionPerformedPost(GuiScreenEvent.ActionPerformedEvent.Post event) {
         GuiScreen gui = event.gui;
         GuiButton btn = event.button;
 
