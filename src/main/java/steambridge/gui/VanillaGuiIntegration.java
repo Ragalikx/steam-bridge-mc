@@ -147,10 +147,26 @@ public class VanillaGuiIntegration {
     // -- Steam-server marking --------------------------------------------------
 
     /**
-     * Prevents MC from sending a TCP ping to a Steam server entry.
+     * Skip TCP ping for a SteamID entry and set safe list display fields + avatar when ready.
      */
     private static void markSteamServer(ServerData data) {
         data.pinged = true;
+        data.pingToServer = 0L;
+        data.serverMOTD = net.minecraft.client.resources.I18n.format("steambridge.gui.server_steam_motd");
+        data.populationInfo = net.minecraft.client.resources.I18n.format("steambridge.gui.server_steam_status");
+        if (data.gameVersion == null || data.gameVersion.isEmpty()) {
+            data.gameVersion = "Steam";
+        }
+        try {
+            String sid = extractSteamId(data.serverIP);
+            long steamId = Long.parseLong(sid);
+            String iconB64 = steambridge.steam.SteamSocial.ProfileCache.get().getAvatarIconB64(steamId);
+            if (iconB64 != null && !iconB64.isEmpty()) {
+                data.setBase64EncodedIconData(iconB64);
+            }
+        } catch (Exception ignored) {
+            // keep default icon until Steam has the avatar ready
+        }
     }
 
     /** Iterates the saved server list of {@code gui} and marks all Steam entries. */
@@ -353,34 +369,57 @@ public class VanillaGuiIntegration {
                 }
 
                 // Steam settings row: sit directly below vanilla's Game Mode button
+                FontRenderer font = Minecraft.getMinecraft().fontRenderer;
                 int steamRowY = (gameMode != null) ? (gameMode.y + 40) : (gui.height / 4 + 55);
+                String accessLabel = accessPolicyButtonLabel(pendingAccessPolicy);
+                String routeLabel  = transportButtonLabel(pendingTransportMode);
                 event.getButtonList().add(new GuiButton(BTN_ACCESS_POLICY,
-                        gui.width / 2 - 155, steamRowY, 150, 20,
-                        accessPolicyButtonLabel(pendingAccessPolicy)));
+                        gui.width / 2 - 155, steamRowY, 150, 20, accessLabel));
                 event.getButtonList().add(new GuiButton(BTN_TRANSPORT_MODE,
-                        gui.width / 2 + 5, steamRowY, 150, 20,
-                        transportButtonLabel(pendingTransportMode)));
+                        gui.width / 2 + 5, steamRowY, 150, 20, routeLabel));
 
-                // Move Start LAN + Open for Steam + Cancel to the very bottom (3-button row)
-                startLan.width = 96;
-                startLan.x     = gui.width / 2 - 155;
-                startLan.y     = gui.height - 28;
+                // Bottom row: Start LAN + Open via Steam + Cancel (widths fit labels)
+                int bottomY = gui.height - 28;
+                int gap = 6;
+                int leftEdge = gui.width / 2 - 155;
+                int rightEdge = gui.width / 2 + 155;
+                String openSteam = net.minecraft.client.resources.I18n.format("steambridge.gui.open_steam");
+                String startMsg = startLan.displayString;
+                String cancelMsg = cancel.displayString;
+                int slotMax = 110;
+                int startW = GuiButtons.fitWidth(font, startMsg, 80, slotMax);
+                int steamW = GuiButtons.fitWidth(font, openSteam, 80, slotMax);
+                int cancelW = GuiButtons.fitWidth(font, cancelMsg, 80, slotMax);
+                int total = startW + steamW + cancelW + 2 * gap;
+                int span = rightEdge - leftEdge;
+                if (total > span) {
+                    int over = total - span;
+                    int each = (over + 2) / 3;
+                    startW = Math.max(70, startW - each);
+                    steamW = Math.max(70, steamW - each);
+                    cancelW = Math.max(70, cancelW - each);
+                    total = startW + steamW + cancelW + 2 * gap;
+                }
+                int x0 = leftEdge + Math.max(0, (span - total) / 2);
+                startLan.width = startW;
+                startLan.x = x0;
+                startLan.y = bottomY;
                 event.getButtonList().add(new GuiButton(BTN_STEAM_HOST,
-                        gui.width / 2 - 54, gui.height - 28, 96, 20,
-                        net.minecraft.client.resources.I18n.format("steambridge.gui.open_steam")));
-                cancel.width = 96;
-                cancel.x     = gui.width / 2 + 47;
-                cancel.y     = gui.height - 28;
+                        x0 + startW + gap, bottomY, steamW, 20, openSteam));
+                cancel.width = cancelW;
+                cancel.x = x0 + startW + gap + steamW + gap;
+                cancel.y = bottomY;
             }
         }
 
-        // -- Friends "S" button next to the server-address field ---------------
+        // -- Friends button next to the server-address field -------------------
         if (gui instanceof GuiScreenAddServer || gui instanceof GuiScreenServerList) {
             GuiTextField ipField = findIpTextField(gui);
             if (ipField != null) {
-                event.getButtonList().add(new GuiButton(BTN_FRIENDS,
-                        ipField.x + ipField.width + 4, ipField.y, 20, 20,
-                        net.minecraft.client.resources.I18n.format("steambridge.gui.friends_short")));
+                FontRenderer font = Minecraft.getMinecraft().fontRenderer;
+                String friendsMsg = net.minecraft.client.resources.I18n.format("steambridge.gui.friends_short");
+                event.getButtonList().add(GuiButtons.create(
+                        BTN_FRIENDS, font, ipField.x + ipField.width + 4, ipField.y, friendsMsg, 20, 80));
             }
         }
 
@@ -402,7 +441,8 @@ public class VanillaGuiIntegration {
             for (GuiButton btn : event.getButtonList()) {
                 if (btn.id == 7) {
                     if (isSteam) {
-                        btn.enabled       = true;
+                        btn.enabled = true;
+                        // Keep vanilla dual-column slot width; only refresh the label.
                         btn.displayString = net.minecraft.client.resources.I18n.format("steambridge.gui.manage_session");
                     } else if (isLan) {
                         btn.displayString += net.minecraft.client.resources.I18n.format("steambridge.gui.lan_suffix");

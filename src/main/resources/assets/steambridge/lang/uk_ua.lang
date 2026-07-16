@@ -54,3 +54,6 @@ steambridge.gui.resync_success_hint=Відкриваємо список друз
 steambridge.gui.resync_timeout=Час вийшов. Steam так і не запустився.
 steambridge.gui.resync_timeout_hint=Запустіть Steam вручну і спробуйте знову.
 steambridge.gui.resync_countdown=Очікуємо Steam... (%s сек)
+
+steambridge.gui.server_steam_motd=Steam P2P / Relay
+steambridge.gui.server_steam_status=Steam

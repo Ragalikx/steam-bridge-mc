@@ -29,9 +29,8 @@ public class GuiSteamConnecting extends GuiScreen {
     @Override
     public void initGui() {
         this.buttonList.clear();
-        this.buttonList.add(new GuiButton(0,
-                this.width / 2 - 100, this.height / 4 + 120 + 12,
-                I18n.format("gui.cancel")));
+        this.buttonList.add(GuiButtons.createCentered(0, this.fontRenderer, this.width / 2,
+                this.height / 4 + 120 + 12, I18n.format("gui.cancel"), 100, this.width - 20));
     }
 
     @Override

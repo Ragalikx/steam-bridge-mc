@@ -75,6 +75,11 @@ public class SteamBridgeMod {
     public void postInit(FMLPostInitializationEvent event) {
         LOG.info("=== SteamBridge postInit - initializing Steam... ===");
 
+        // DatagramSocketImplFactory is one-shot for the whole JVM. Install before voice mods open sockets.
+        if (SteamBridgeConfig.interceptUdp) {
+            steambridge.proxy.UdpInterceptFactory.install();
+        }
+
         // Ensure steam_appid.txt exists in .minecraft before SteamAPI.init()
         SteamAppIdHelper.ensureAppId(Minecraft.getMinecraft().gameDir);
 

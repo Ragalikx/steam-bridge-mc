@@ -31,7 +31,8 @@ public class GuiSteamBanList extends GuiScreen {
     @Override
     public void initGui() {
         this.buttonList.clear();
-        this.buttonList.add(new GuiButton(BUTTON_BACK, this.width / 2 - 100, this.height - 30, 200, 20, net.minecraft.client.resources.I18n.format("gui.back")));
+        this.buttonList.add(GuiButtons.createCentered(BUTTON_BACK, this.fontRenderer, this.width / 2, this.height - 30,
+                net.minecraft.client.resources.I18n.format("gui.back"), 100, this.width - 20));
         updateBanButtons();
     }
 
@@ -41,10 +42,11 @@ public class GuiSteamBanList extends GuiScreen {
             List<SteamSocial.Bans.Record> bans = server.getBanRecords();
             banCount = bans.size();
             int yStart = 40;
+            String unbanText = net.minecraft.client.resources.I18n.format("steambridge.gui.unban");
             for (int i = 0; i < bans.size(); i++) {
                 int y = yStart + (i * 25);
-                String unbanText = net.minecraft.client.resources.I18n.format("steambridge.gui.unban");
-                this.buttonList.add(new GuiButton(100 + i, this.width / 2 + 50, y, 60, 20, unbanText));
+                this.buttonList.add(GuiButtons.createRightAligned(100 + i, this.fontRenderer, this.width - 8, y,
+                        unbanText, 50, 100));
             }
         }
     }

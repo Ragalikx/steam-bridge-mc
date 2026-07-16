@@ -43,7 +43,7 @@ public final class SteamOffsets {
      * <p>
      * Must be called explicitly (see {@code SteamManager.init()}): the {@code MSG_OFF_*} fields are
      * compile-time constants that get inlined at their use sites, so nothing here would ever trigger
-     * class initialisation on its own — a {@code static} block would be dead code.
+     * class initialisation on its own - a {@code static} block would be dead code.
      *
      * @throws IllegalStateException if any offset disagrees with JNA's computed layout
      */
@@ -62,7 +62,7 @@ public final class SteamOffsets {
             throw new IllegalStateException(
                 "SteamNetworkingMessage_t layout mismatch: field '" + field + "' expected at offset "
                 + expected + " but JNA computed " + actual
-                + ". The bundled Steam SDK structs have changed — update SteamOffsets before use.");
+                + ". The bundled Steam SDK structs have changed - update SteamOffsets before use.");
         }
     }
 

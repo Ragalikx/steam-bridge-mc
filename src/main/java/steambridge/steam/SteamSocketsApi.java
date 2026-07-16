@@ -37,6 +37,8 @@ public final class SteamSocketsApi {
     public static final int STATE_LINGER = -2;
     public static final int STATE_DEAD = -3;
 
+    public static final int SEND_UNRELIABLE = 0;
+    public static final int SEND_UNRELIABLE_NO_NAGLE = 1;
     public static final int SEND_RELIABLE = 8;
     public static final int SEND_RELIABLE_NO_NAGLE = 9;
 
@@ -86,7 +88,7 @@ public final class SteamSocketsApi {
     private static final int CONFIG_SEND_BUFFER_SIZE          = 9;   // k_ESteamNetworkingConfig_SendBufferSize
     private static final int CONFIG_SEND_RATE_MIN             = 10;  // k_ESteamNetworkingConfig_SendRateMin
     private static final int CONFIG_SEND_RATE_MAX             = 11;  // k_ESteamNetworkingConfig_SendRateMax
-    // k_ESteamNetworkingConfig_NagleTime — time (µs) Steam holds a packet waiting to coalesce
+    // k_ESteamNetworkingConfig_NagleTime - time (µs) Steam holds a packet waiting to coalesce
     // with others. 0 = disable Nagle entirely at the Steam connection level.
     private static final int CONFIG_NAGLE_TIME                = 12;  // k_ESteamNetworkingConfig_NagleTime
     private static final int CONFIG_ALLOW_WITHOUT_AUTH        = 23;  // k_ESteamNetworkingConfig_IP_AllowWithoutAuth
@@ -104,11 +106,11 @@ public final class SteamSocketsApi {
     private static final int CONFIG_TYPE_STRING  = 4;   // k_ESteamNetworkingConfig_String
     // STUN servers ICE uses to discover each peer's public address (server-reflexive candidate).
     // Without at least one, ICE cannot gather routable candidates and every connection silently
-    // falls back to SDR relay — even on a LAN. Two Google public STUN servers (primary + backup).
+    // falls back to SDR relay - even on a LAN. Two Google public STUN servers (primary + backup).
     private static final String DEFAULT_STUN_SERVERS = "stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302";
-    private static final int SEND_BUFFER_VAL     = 2 * 1024 * 1024; // 2MB — reduced to prevent ACK window overflow during bulk dimension loads
-    private static final int SEND_RATE_MIN_VAL   = 512 * 1024;      // 512 KB/s — conservative floor (keeps Steam from over-sending on a friend's poor link)
-    private static final int SEND_RATE_MAX_VAL   = 8 * 1024 * 1024; // 8 MB/s — ceiling only; lets big-modpack join bursts (registry sync + first chunks) ramp fast over relay. Steam's congestion control still governs the actual rate, so this never over-sends on a bad link. Lower toward 4MB/s to be gentler on Valve relays.
+    private static final int SEND_BUFFER_VAL     = 2 * 1024 * 1024; // 2MB - reduced to prevent ACK window overflow during bulk dimension loads
+    private static final int SEND_RATE_MIN_VAL   = 512 * 1024;      // 512 KB/s - conservative floor (keeps Steam from over-sending on a friend's poor link)
+    private static final int SEND_RATE_MAX_VAL   = 8 * 1024 * 1024; // 8 MB/s - ceiling only; lets big-modpack join bursts (registry sync + first chunks) ramp fast over relay. Steam's congestion control still governs the actual rate, so this never over-sends on a bad link. Lower toward 4MB/s to be gentler on Valve relays.
     // k_nSteamNetworkingConfig_P2P_Transport_ICE_Enable_All = 0xFFFF (not 0x7FFFFFFF)
     private static final int P2P_TRANSPORT_ICE_ENABLE_ALL = 0xFFFF;
     private static final int P2P_TRANSPORT_ICE_PENALTY_VAL = 0;
@@ -117,9 +119,9 @@ public final class SteamSocketsApi {
     /**
      * Dynamically re-applies ICE/SDR transport preferences.
      * Call before {@link #createListenSocketP2P} or {@link #connectP2P}.
-     * AUTO   — both ICE and SDR available, SDR penalty = 25 ms -> prefers direct if both viable.
-     * P2P_ONLY  — ICE enabled, SDR penalty = 9999 ms -> relay only used as last resort.
-     * RELAY_ONLY — ICE disabled entirely -> always routes through Valve SDR.
+     * AUTO   - both ICE and SDR available, SDR penalty = 25 ms -> prefers direct if both viable.
+     * P2P_ONLY  - ICE enabled, SDR penalty = 9999 ms -> relay only used as last resort.
+     * RELAY_ONLY - ICE disabled entirely -> always routes through Valve SDR.
      */
     public void applyTransportMode(SteamServer.TransportMode mode) {
         try {
@@ -167,11 +169,11 @@ public final class SteamSocketsApi {
      * <p>
      * On a loopback connection there are no real bandwidth constraints, so this config:
      * <ul>
-     *   <li>Remove send-rate caps ({@code SendRateMax = Integer.MAX_VALUE}) — the OS loopback
+     *   <li>Remove send-rate caps ({@code SendRateMax = Integer.MAX_VALUE}) - the OS loopback
      *       interface is effectively unlimited.</li>
-     *   <li>Shrink the send buffer ({@code SendBufferSize = 256 KB}) — a smaller buffer means
+     *   <li>Shrink the send buffer ({@code SendBufferSize = 256 KB}) - a smaller buffer means
      *       Steam detects backpressure sooner, which reduces queuing latency.</li>
-     *   <li>Keep Nagle at 0 µs (already set globally) — confirmed per-connection here.</li>
+     *   <li>Keep Nagle at 0 µs (already set globally) - confirmed per-connection here.</li>
      * </ul>
      * Must be called after the connection reaches {@code STATE_CONNECTED}.
      *
@@ -182,7 +184,7 @@ public final class SteamSocketsApi {
         try {
             Memory val32 = new Memory(4);
 
-            // No rate limit — loopback / LAN has no real bandwidth ceiling
+            // No rate limit - loopback / LAN has no real bandwidth ceiling
             val32.setInt(0, Integer.MAX_VALUE);
             api.SteamAPI_ISteamNetworkingUtils_SetConfigValue(
                     utils, CONFIG_SEND_RATE_MAX, CONFIG_SCOPE_CONNECTION, connection, CONFIG_TYPE_INT32, val32);
@@ -370,9 +372,23 @@ public final class SteamSocketsApi {
 
     private static final ThreadLocal<Memory> sendBuffer = ThreadLocal.withInitial(() -> new Memory(65536));
 
+    /** Send a raw byte[] (used for voice/UDP tunnel). */
+    public int sendBytes(int connection, byte[] data, int flags) {
+        if (connection == 0 || data == null || data.length == 0) return 0;
+        Memory payload = sendBuffer.get();
+        if (payload.size() < data.length) {
+            payload = new Memory(data.length);
+            sendBuffer.set(payload);
+        }
+        payload.write(0, data, 0, data.length);
+        return api.SteamAPI_ISteamNetworkingSockets_SendMessageToConnection(
+                sockets, connection, payload, data.length, flags, (LongByReference) null
+        );
+    }
+
     /**
-     * Zero-copy send from a Netty ByteBuf — writes directly into the pre-allocated ThreadLocal
-     * native Memory via NIO ByteBuffer, avoiding an intermediate {@code byte[]} allocation.
+     * Zero-copy send from a Netty ByteBuf. Writes into the pre-allocated ThreadLocal
+     * native Memory via NIO ByteBuffer, avoiding an intermediate byte[] allocation.
      */
     public int sendMessageFromByteBuf(int connection, io.netty.buffer.ByteBuf data, int len, int flags) {
         if (connection == 0 || data == null || len == 0) return 0;
@@ -394,7 +410,7 @@ public final class SteamSocketsApi {
 
     /**
      * Receives up to RECV_BATCH messages in a single JNA call.
-     * Fields are read directly from native Pointer offsets — no JNA Structure allocation per message.
+     * Fields are read directly from native Pointer offsets - no JNA Structure allocation per message.
      * Returns null if no messages are available; otherwise an array (may contain null elements).
      */
     public ReceivedMessage[] receiveMessages(int connection) {
@@ -409,7 +425,7 @@ public final class SteamSocketsApi {
         for (int i = 0; i < received; i++) {
             Pointer msgPtr = recvBatchMem.getPointer((long) i * Native.POINTER_SIZE);
             if (msgPtr == null) continue;
-            // Read fields directly by offset — avoids allocating a JNA Structure per message:
+            // Read fields directly by offset - avoids allocating a JNA Structure per message:
             //   +0  m_pData  (Pointer, 8 bytes)
             //   +8  m_cbSize (int32)
             //   +12 m_conn   (int32)
@@ -425,7 +441,7 @@ public final class SteamSocketsApi {
         return results;
     }
 
-    // ThreadLocal reuse for snapshotConnection — eliminates two JNA Structure allocations per call.
+    // ThreadLocal reuse for snapshotConnection - eliminates two JNA Structure allocations per call.
     // snapshotConnection() is called from the callback thread and receive thread independently,
     // so ThreadLocal gives each thread its own private instance (safe for concurrent use).
     private static final ThreadLocal<SteamNetConnectionInfo> TL_CONN_INFO =

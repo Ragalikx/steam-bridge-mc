@@ -74,6 +74,7 @@ public class SteamClient {
             statusMsg = "Disconnected.";
         }
         connectLatch.countDown();
+        steambridge.proxy.SteamUdpProxy.getInstance().stopClient();
         SteamManager.getInstance().setActiveClient(null);
 
         if (connectionHandle != 0) {
@@ -125,6 +126,11 @@ public class SteamClient {
                 return;
             }
 
+            // Voice tunnel on virtualPort+1; start before MC login so SVC sockets are intercepted.
+            if (steambridge.SteamBridgeConfig.interceptUdp) {
+                steambridge.proxy.SteamUdpProxy.getInstance().startClient(hostSteamID);
+            }
+
             statusMsg = i18n("steambridge.status.path_ready", "Steam path ready - activating pipeline...");
             final net.minecraft.client.gui.GuiScreen screen = connectingScreen;
 
@@ -144,7 +150,7 @@ public class SteamClient {
                     if (ok2) {
                         state = State.STEAM_READY;
                         statusMsg = i18n("steambridge.status.steam_ready", "Steam path ready - waiting for Minecraft login...");
-                        SteamBridgeMod.LOG.info("[SteamClient] Loopback mode active — Steam transport is ready.");
+                        SteamBridgeMod.LOG.info("[SteamClient] Loopback mode active - Steam transport is ready.");
                     } else {
                         SteamBridgeMod.LOG.error("[SteamClient] Loopback connect to port {} failed.", finalProxyPort);
                         fail(i18n("steambridge.status.fail_proxy", "Failed to connect to loopback proxy port ") + finalProxyPort);
@@ -325,6 +331,7 @@ public class SteamClient {
         statusMsg = TextColors.RED + msg;
         alive.set(false);
         connectLatch.countDown();
+        steambridge.proxy.SteamUdpProxy.getInstance().stopClient();
         SteamManager.getInstance().setActiveClient(null);
 
         if (connectionHandle != 0) {
@@ -390,7 +397,7 @@ public class SteamClient {
                 return net.minecraft.client.resources.I18n.format(key);
             }
         } catch (Exception ignored) {
-            // Minecraft not yet fully initialised — use English fallback.
+            // Minecraft not yet fully initialised - use English fallback.
         }
         return fallback;
     }

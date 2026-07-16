@@ -57,10 +57,12 @@ public class GuiSteamHostManagement extends GuiScreen {
     public void initGui() {
         this.server = SteamManager.getInstance().getActiveServer();
         this.buttonList.clear();
-        this.buttonList.add(new GuiButton(BUTTON_BACK, this.width / 2 - 100, this.height - 30, 200, 20, net.minecraft.client.resources.I18n.format("gui.back")));
-        
+        this.buttonList.add(GuiButtons.createCentered(BUTTON_BACK, this.fontRenderer, this.width / 2, this.height - 30,
+                net.minecraft.client.resources.I18n.format("gui.back"), 100, this.width - 20));
+
         String bannedText = net.minecraft.client.resources.I18n.format("steambridge.gui.banned");
-        this.buttonList.add(new GuiButton(BUTTON_BAN_LIST, this.width - 110, 10, 100, 20, bannedText));
+        this.buttonList.add(GuiButtons.createRightAligned(BUTTON_BAN_LIST, this.fontRenderer, this.width - 8, 10,
+                bannedText, 60, 140));
 
         updatePlayerButtons();
     }
@@ -71,10 +73,14 @@ public class GuiSteamHostManagement extends GuiScreen {
             List<SteamServer.PlayerSnapshot> snaps = snapshots();
             snapshotCount = snaps.size();
             int yStart = 40;
+            String kickText = net.minecraft.client.resources.I18n.format("steambridge.gui.kick");
+            String banText = net.minecraft.client.resources.I18n.format("steambridge.gui.ban");
             for (int i = 0; i < snaps.size(); i++) {
                 int y = yStart + (i * 25);
-                this.buttonList.add(new GuiButton(100 + i, this.width / 2 + 50, y, 40, 20, net.minecraft.client.resources.I18n.format("steambridge.gui.kick")));
-                this.buttonList.add(new GuiButton(200 + i, this.width / 2 + 95, y, 40, 20, net.minecraft.client.resources.I18n.format("steambridge.gui.ban")));
+                this.buttonList.add(GuiButtons.create(100 + i, this.fontRenderer, this.width / 2 + 50, y,
+                        kickText, 40, 80));
+                this.buttonList.add(GuiButtons.createRightAligned(200 + i, this.fontRenderer, this.width - 8, y,
+                        banText, 40, 80));
             }
         }
     }
@@ -97,14 +103,14 @@ public class GuiSteamHostManagement extends GuiScreen {
         } else if (button.id == BUTTON_BAN_LIST) {
             this.mc.displayGuiScreen(new GuiSteamBanList(this, server));
         } else if (button.id >= 100 && button.id < 200) {
-            // Kick — resolve against the same cached roster the buttons were built from.
+            // Kick - resolve against the same cached roster the buttons were built from.
             int idx = button.id - 100;
             List<SteamServer.PlayerSnapshot> snaps = snapshots();
             if (idx < snaps.size()) {
                 server.kickPlayer(snaps.get(idx).getSteamId());
             }
         } else if (button.id >= 200 && button.id < 300) {
-            // Ban — resolve against the same cached roster the buttons were built from.
+            // Ban - resolve against the same cached roster the buttons were built from.
             int idx = button.id - 200;
             List<SteamServer.PlayerSnapshot> snaps = snapshots();
             if (idx < snaps.size()) {

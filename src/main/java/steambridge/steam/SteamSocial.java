@@ -36,9 +36,9 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <p>Sub-classes:
  * <ul>
- *   <li>{@link ProfileCache} — caches Steam persona names and avatar textures.</li>
- *   <li>{@link Bans}         — per-world Steam ban list.</li>
- *   <li>{@link Worlds}       — per-world host settings.</li>
+ *   <li>{@link ProfileCache} - caches Steam persona names and avatar textures.</li>
+ *   <li>{@link Bans}         - per-world Steam ban list.</li>
+ *   <li>{@link Worlds}       - per-world host settings.</li>
  * </ul>
  */
 public final class SteamSocial {
@@ -50,7 +50,7 @@ public final class SteamSocial {
 
     /**
      * Caches Steam persona names and avatar textures.
-     * Singleton — obtain via {@code SteamSocial.ProfileCache.get()}. 
+     * Singleton - obtain via {@code SteamSocial.ProfileCache.get()}. 
      */
     public static final class ProfileCache {
 
@@ -63,6 +63,7 @@ public final class SteamSocial {
 
         private final Map<Long, String> personaNameBySteamId   = new ConcurrentHashMap<>();
         private final Map<Long, String> avatarTextureBySteamId = new ConcurrentHashMap<>();
+        private final Map<Long, String> avatarIconB64BySteamId = new ConcurrentHashMap<>();
         private final Map<Long, Long>   userInfoRequestedAt    = new ConcurrentHashMap<>();
         private final Map<Long, Long>   avatarRetryAt          = new ConcurrentHashMap<>();
 
@@ -147,6 +148,10 @@ public final class SteamSocial {
                         "steambridge_avatar_" + steamId, texture);
                 String textureId = loc.toString();
                 avatarTextureBySteamId.put(steamId, textureId);
+                String b64 = encodeIconPngBase64(imageBuffer);
+                if (b64 != null) {
+                    avatarIconB64BySteamId.put(steamId, b64);
+                }
                 avatarRetryAt.remove(steamId);
 
                 return textureId;
@@ -157,16 +162,47 @@ public final class SteamSocial {
             }
         }
 
+        /**
+         * Base64 PNG for multiplayer list icons ({@link net.minecraft.client.multiplayer.ServerData}).
+         * Null until Steam has delivered the avatar (caller may retry on tick).
+         */
+        public String getAvatarIconB64(long steamId) {
+            if (steamId == 0L) return null;
+            String cached = avatarIconB64BySteamId.get(steamId);
+            if (cached != null) return cached;
+            getAvatarTexture(steamId);
+            return avatarIconB64BySteamId.get(steamId);
+        }
+
+        private static String encodeIconPngBase64(BufferedImage src) {
+            try {
+                int size = 64;
+                BufferedImage scaled = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
+                java.awt.Graphics2D g = scaled.createGraphics();
+                g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION,
+                        java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                g.drawImage(src, 0, 0, size, size, null);
+                g.dispose();
+                java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+                javax.imageio.ImageIO.write(scaled, "PNG", baos);
+                return java.util.Base64.getEncoder().encodeToString(baos.toByteArray());
+            } catch (Exception e) {
+                return null;
+            }
+        }
+
         public void invalidate(long steamId) {
             if (steamId == 0L) return;
             personaNameBySteamId.remove(steamId);
             avatarTextureBySteamId.remove(steamId);
+            avatarIconB64BySteamId.remove(steamId);
             avatarRetryAt.remove(steamId);
         }
 
         public void invalidateAvatar(long steamId) {
             if (steamId == 0L) return;
             avatarTextureBySteamId.remove(steamId);
+            avatarIconB64BySteamId.remove(steamId);
             avatarRetryAt.remove(steamId);
         }
 
@@ -198,7 +234,7 @@ public final class SteamSocial {
     /**
      * Manages the per-world Steam ban list.
      * Stored at {@code <gameDir>/steambridge/ban-cache.json}.
-     * Singleton — obtain via {@code SteamSocial.Bans.get()}. 
+     * Singleton - obtain via {@code SteamSocial.Bans.get()}. 
      */
     public static final class Bans {
 
@@ -348,7 +384,7 @@ public final class SteamSocial {
     /**
      * Persists per-world host settings across sessions.
      * Stored at {@code <gameDir>/steambridge/world-settings.json}.
-     * Singleton — obtain via {@code SteamSocial.Worlds.get()}. 
+     * Singleton - obtain via {@code SteamSocial.Worlds.get()}. 
      */
     public static final class Worlds {
 

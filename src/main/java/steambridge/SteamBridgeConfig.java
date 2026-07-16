@@ -22,10 +22,13 @@ public class SteamBridgeConfig {
     @Config.Name("Virtual Port")
     public static int virtualPort = 0;
 
+    @Config.Comment("Intercept DatagramSockets and tunnel Simple Voice Chat / Plasmo Voice over Steam P2P.")
+    @Config.Name("Intercept UDP (voice)")
+    public static boolean interceptUdp = true;
 
     // NOTE: the Steam App ID is intentionally NOT configurable. It is hardcoded to 480
-    // (Spacewar) in SteamAppIdHelper. Letting users point it at a real game's App ID —
-    // especially one with an anti-cheat (VAC/EAC) — would get their account banned and
+    // (Spacewar) in SteamAppIdHelper. Letting users point it at a real game's App ID -
+    // especially one with an anti-cheat (VAC/EAC) - would get their account banned and
     // damage the mod's reputation, so the option is removed entirely.
 
     @Mod.EventBusSubscriber(modid = SteamBridgeMod.MODID)

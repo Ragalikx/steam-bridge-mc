@@ -75,10 +75,8 @@ public class GuiSteamFriends extends GuiScreen {
 
     @Override
     public void initGui() {
-        this.buttonList.add(new GuiButton(0,
-                this.width / 2 - 100, this.height - 30,
-                200, 20,
-                net.minecraft.client.resources.I18n.format("gui.back")));
+        this.buttonList.add(GuiButtons.createCentered(0, this.fontRenderer, this.width / 2, this.height - 30,
+                net.minecraft.client.resources.I18n.format("gui.back"), 100, this.width - 20));
 
         searchField = new GuiTextField(1, this.fontRenderer,
                 this.width / 2 - 100, 35, 200, 20);

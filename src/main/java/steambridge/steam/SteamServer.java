@@ -7,7 +7,7 @@ package steambridge.steam;
 
 import steambridge.SteamBridgeMod;
 import steambridge.SteamBridgeConfig;
-// SteamSocial and SteamStorage are in same package — no import needed
+// SteamSocial and SteamStorage are in same package - no import needed
 
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
@@ -147,6 +147,7 @@ public class SteamServer {
     public void setMcPort(int port) {
         mcPort = port;
         SteamBridgeMod.LOG.info("[SteamServer] MC port updated to {}", port);
+        steambridge.proxy.SteamUdpProxy.getInstance().setHostGamePort(port);
     }
 
     public int getMcPort() {
@@ -208,6 +209,9 @@ public class SteamServer {
             return false;
         }
 
+        if (steambridge.SteamBridgeConfig.interceptUdp) {
+            steambridge.proxy.SteamUdpProxy.getInstance().startServer();
+        }
         SteamBridgeMod.LOG.info(
             "[SteamServer] Started. listenSocket={} SteamChannel (direct, no TCP) world={} access={}",
             listenSocket, worldKey, accessPolicy
@@ -223,6 +227,7 @@ public class SteamServer {
         }
 
         running = false;
+        steambridge.proxy.SteamUdpProxy.getInstance().stopServer();
         SteamManager.getInstance().setActiveServer(null);
 
         // Close all active connections
@@ -481,7 +486,7 @@ public class SteamServer {
                 );
 
                 if (!success) {
-                    SteamBridgeMod.LOG.error("[SteamServer] Loopback bridge creation failed for conn={} — closing.", connection);
+                    SteamBridgeMod.LOG.error("[SteamServer] Loopback bridge creation failed for conn={} - closing.", connection);
                     closeAndCleanup(connection, steamID, "Loopback bridge creation failed");
                     return;
                 }
@@ -492,7 +497,7 @@ public class SteamServer {
             }
 
             SteamBridgeMod.LOG.error(
-                "[SteamServer] No integrated server for conn={} steamID={} — closing connection.", connection, steamID);
+                "[SteamServer] No integrated server for conn={} steamID={} - closing connection.", connection, steamID);
             closeAndCleanup(connection, steamID, "No integrated server");
         });
     }

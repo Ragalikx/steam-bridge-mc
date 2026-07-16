@@ -208,7 +208,7 @@ public class ClientProxy extends CommonProxy {
             // Only suppress the spurious UnknownHost screen from the abandoned vanilla
             // GuiConnecting thread, which races in during the early CONNECTING window
             // before our loopback is up. Once STEAM_READY (loopback established) or later,
-            // any GuiDisconnected is a real server-side drop and must be shown — otherwise
+            // any GuiDisconnected is a real server-side drop and must be shown - otherwise
             // the player is left in limbo with an unresponsive screen.
             if (client.getState() == SteamClient.State.CONNECTING) {
                 SteamBridgeMod.LOG.info("[SteamBridge] Ignoring secondary GuiDisconnected from vanilla background thread (e.g. UnknownHost) while Steam connection is negotiating.");
