@@ -36,6 +36,8 @@
   "steambridge.status.fail_closed": "З'єднання Steam закрито: ",
   "steambridge.gui.no_bans": "Ніхто ще не заблокований.",
   "steambridge.gui.friends_short": "S",
+  "steambridge.gui.server_steam_motd": "Підключення через Steam Bridge (без TCP-ping)",
+  "steambridge.gui.server_steam_status": "Steam",
   "steambridge.gui.host_started": "Світ відкрито через Steam. Підключення доступне!",
   "steambridge.gui.host_failed": "Не вдалося відкрити світ через Steam. Перевірте, чи запущено Steam.",
   "steambridge.gui.host_steam_launching": "Steam не запущено - спробуємо запустити його автоматично. Зачекайте трохи і натисніть «Відкрити через Steam» знову.",

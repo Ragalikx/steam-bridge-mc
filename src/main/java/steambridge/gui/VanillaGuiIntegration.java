@@ -29,6 +29,7 @@ import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.multiplayer.ServerList;
 import net.minecraft.client.resources.language.I18n;
 import net.minecraft.client.server.IntegratedServer;
+import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.HttpUtil;
 import net.minecraft.world.level.GameType;
@@ -177,7 +178,43 @@ public final class VanillaGuiIntegration {
         Minecraft.getInstance().setScreen(new GuiSteamConnecting(parent, client));
     }
 
-    // -- Steam-server marking (ping suppression) -------------------------------
+    // -- Steam-server marking (ping suppression + null MOTD safety) ------------
+
+    /**
+     * Vanilla {@code OnlineServerEntry.render} does {@code font.split(serverData.motd, ...)}.
+     * MOTD/status are only filled when a TCP ping starts. We set {@code pinged=true} so Steam
+     * IDs are never pinged, but then MOTD stays null (especially after load from servers.dat)
+     * and the multiplayer list crashes every launch until the entry is deleted.
+     */
+    private static void sanitizeServerDataFields(ServerData data) {
+        if (data.motd == null) {
+            data.motd = CommonComponents.EMPTY;
+        }
+        if (data.status == null) {
+            data.status = CommonComponents.EMPTY;
+        }
+        if (data.version == null) {
+            data.version = Component.literal("???");
+        }
+        if (data.playerList == null) {
+            data.playerList = java.util.Collections.emptyList();
+        }
+    }
+
+    /** Skip TCP ping for a SteamID entry and give it safe display Components. */
+    private static void markSteamServer(ServerData data) {
+        data.pinged = true;
+        // Not -2 (vanilla "still pinging" spinner); 0 looks like a quiet live entry.
+        data.ping = 0L;
+        data.motd = Component.translatable("steambridge.gui.server_steam_motd");
+        data.status = Component.translatable("steambridge.gui.server_steam_status");
+        if (data.version == null) {
+            data.version = Component.literal("Steam");
+        }
+        if (data.playerList == null) {
+            data.playerList = java.util.Collections.emptyList();
+        }
+    }
 
     private static void markAllSteamServers(JoinMultiplayerScreen gui) {
         ServerList list = gui.getServers();
@@ -186,8 +223,11 @@ public final class VanillaGuiIntegration {
             int steamIndex = 0;
             for (int i = 0; i < list.size(); i++) {
                 ServerData data = list.get(i);
+                if (data == null) continue;
+                // Belt-and-suspenders for any corrupt list entry (null MOTD NPE).
+                sanitizeServerDataFields(data);
                 if (isSteamServerId(data.ip)) {
-                    data.pinged = true;
+                    markSteamServer(data);
                     if (i > steamIndex) list.swap(i, steamIndex);
                     steamIndex++;
                 }
