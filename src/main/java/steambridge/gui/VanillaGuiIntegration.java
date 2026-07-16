@@ -19,6 +19,7 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.events.GuiEventListener;
+import net.minecraft.client.gui.screens.ConnectScreen;
 import net.minecraft.client.gui.screens.DirectJoinServerScreen;
 import net.minecraft.client.gui.screens.EditServerScreen;
 import net.minecraft.client.gui.screens.PauseScreen;
@@ -167,15 +168,49 @@ public final class VanillaGuiIntegration {
         }
     }
 
-    /** Opens {@link GuiSteamConnecting} for a SteamID-shaped address, replacing normal vanilla connect. */
-    private static void interceptSteamConnect(Screen parent, String steamAddr) {
+    /**
+     * Starts a Steam P2P connect and returns the status screen. Does not call
+     * {@link Minecraft#setScreen} so callers can either set it themselves or inject it via
+     * {@link ScreenEvent.Opening#setNewScreen}.
+     */
+    private static GuiSteamConnecting beginSteamConnect(Screen parent, String steamAddr) {
         long steamId = Long.parseLong(extractSteamId(steamAddr));
         SteamBridgeMod.LOG.info("Intercepted connection to SteamID: {}", steamId);
         SteamClient active = SteamManager.getInstance().getActiveClient();
         if (active != null) active.disconnect();
         SteamClient client = new SteamClient();
         client.connect(com.codedisaster.steamworks.SteamID.createFromNativeHandle(steamId), parent);
-        Minecraft.getInstance().setScreen(new GuiSteamConnecting(parent, client));
+        return new GuiSteamConnecting(parent, client);
+    }
+
+    /** Opens {@link GuiSteamConnecting} for a SteamID-shaped address, replacing normal vanilla connect. */
+    private static void interceptSteamConnect(Screen parent, String steamAddr) {
+        Minecraft.getInstance().setScreen(beginSteamConnect(parent, steamAddr));
+    }
+
+    /**
+     * {@link ConnectScreen#startConnecting} always calls {@code connect()} after
+     * {@code setScreen}, even if Opening replaces the screen. Setting {@code aborted}
+     * stops the DNS/TCP thread from racing in a "Unknown host" disconnect.
+     */
+    private static void abortVanillaConnect(ConnectScreen screen) {
+        try {
+            Field f = ConnectScreen.class.getDeclaredField("aborted");
+            f.setAccessible(true);
+            f.setBoolean(screen, true);
+        } catch (Exception e) {
+            SteamBridgeMod.LOG.warn("Could not abort ConnectScreen", e);
+        }
+    }
+
+    private static Screen connectScreenParent(ConnectScreen screen) {
+        try {
+            Field f = ConnectScreen.class.getDeclaredField("parent");
+            f.setAccessible(true);
+            Object p = f.get(screen);
+            if (p instanceof Screen s) return s;
+        } catch (Exception ignored) {}
+        return Minecraft.getInstance().screen;
     }
 
     // -- Steam-server marking (ping suppression + null MOTD safety) ------------
@@ -263,6 +298,22 @@ public final class VanillaGuiIntegration {
         Screen next = event.getNewScreen();
         Minecraft mc = Minecraft.getInstance();
 
+        // Catch every path that opens ConnectScreen with a SteamID address:
+        // bottom "Join Server" button (if not already wrapped), icon Play overlay,
+        // double-click on a list row, and direct-join confirm. Button wrap alone is
+        // not enough because OnlineServerEntry.mouseClicked calls joinSelectedServer()
+        // directly without going through Button.OnPress.
+        if (next instanceof ConnectScreen connectScreen) {
+            ServerData sd = mc.getCurrentServer();
+            if (sd != null && isSteamServerId(sd.ip)) {
+                abortVanillaConnect(connectScreen);
+                Screen parent = connectScreenParent(connectScreen);
+                if (parent == null) parent = mc.screen;
+                event.setNewScreen(beginSteamConnect(parent, sd.ip));
+                return;
+            }
+        }
+
         if (next instanceof ShareToLanScreen) {
             SteamServer server = SteamManager.getInstance().getActiveServer();
             if (server != null && server.isRunning()) {
@@ -295,13 +346,10 @@ public final class VanillaGuiIntegration {
     }
 
     /**
-     * Intercepts the vanilla "Join Server" button on {@link DirectJoinServerScreen} (typed
-     * address) and {@link JoinMultiplayerScreen} (selected list entry) so a SteamID-shaped
-     * address opens {@link GuiSteamConnecting} instead of vanilla's normal TCP connect attempt.
-     * <p>
-     * {@code ConnectScreen} exposes no public accessor for the address it is about to dial, so
-     * interception has to happen one step earlier, at the button that triggers it,
-     * rather than in {@code onScreenOpening} for {@code ConnectScreen} itself.
+     * Early intercept on the bottom-bar Join / Direct-join buttons. The icon "Play" overlay
+     * and double-click go through {@link JoinMultiplayerScreen#joinSelectedServer} and are
+     * caught in {@link #onScreenOpening} when {@link ConnectScreen} opens (with abort of the
+     * leftover vanilla connector thread).
      */
     private static void injectSteamConnectIntercept(ScreenEvent.Init.Post event, Screen gui) {
         if (gui instanceof DirectJoinServerScreen) {
