@@ -10,14 +10,14 @@ import com.codedisaster.steamworks.SteamNativeHandle;
 import steambridge.SteamBridgeConfig;
 import steambridge.SteamBridgeMod;
 
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.screen.ConnectingScreen;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.screen.ConnectScreen;
 import net.minecraft.client.gui.screen.DisconnectedScreen;
-import net.minecraft.client.gui.screen.DownloadTerrainScreen;
-import net.minecraft.client.gui.screen.MainMenuScreen;
+import net.minecraft.client.gui.screen.DownloadingTerrainScreen;
+import net.minecraft.client.gui.screen.TitleScreen;
 import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.util.text.StringTextComponent;
-import net.minecraft.util.text.TranslationTextComponent;
+import net.minecraft.text.LiteralText;
+import net.minecraft.text.TranslatableText;
 
 import java.util.Locale;
 import java.util.concurrent.CountDownLatch;
@@ -156,7 +156,7 @@ public class SteamClient {
 
             // Connect Minecraft to the proxy port on the MC main thread.
             final int finalProxyPort = proxyPort;
-            Minecraft mc2 = Minecraft.getInstance();
+            MinecraftClient mc2 = MinecraftClient.getInstance();
             mc2.execute(() -> {
                 try {
                     boolean ok2 = SteamTransport.connectClientToLoopback(
@@ -356,14 +356,14 @@ public class SteamClient {
 
         connectionHandle = 0;
 
-        Minecraft mc = Minecraft.getInstance();
+        MinecraftClient mc = MinecraftClient.getInstance();
         mc.execute(() -> {
-            Screen current = mc.screen;
-            if (current instanceof DownloadTerrainScreen || current instanceof ConnectingScreen) {
-                mc.setScreen(new DisconnectedScreen(
-                    connectingScreen != null ? connectingScreen : new MainMenuScreen(),
-                    new TranslationTextComponent("connect.failed"),
-                    new StringTextComponent(msg)
+            Screen current = mc.currentScreen;
+            if (current instanceof DownloadingTerrainScreen || current instanceof ConnectScreen) {
+                mc.openScreen(new DisconnectedScreen(
+                    connectingScreen != null ? connectingScreen : new TitleScreen(),
+                    new TranslatableText("connect.failed"),
+                    new LiteralText(msg)
                 ));
             }
         });
@@ -405,8 +405,8 @@ public class SteamClient {
     /** Returns the I18n translation for {@code key}, or {@code fallback} if unavailable. */
     private static String i18n(String key, String fallback) {
         try {
-            if (net.minecraft.client.resources.I18n.exists(key)) {
-                return net.minecraft.client.resources.I18n.get(key);
+            if (net.minecraft.client.resource.language.I18n.hasTranslation(key)) {
+                return net.minecraft.client.resource.language.I18n.translate(key);
             }
         } catch (Exception ignored) {
             // Minecraft not yet fully initialised - use English fallback.

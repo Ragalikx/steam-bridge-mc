@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "id": "${mod_id}",
+  "version": "${version}",
+  "name": "${mod_name}",
+  "description": "Steam Bridge: play Minecraft with friends over Steam P2P/SDR without port-forwarding.",
+  "authors": ["Ragalikx"],
+  "contact": {
+    "homepage": "https://github.com/Ragalikx/steam-bridge-mc",
+    "sources": "https://github.com/Ragalikx/steam-bridge-mc",
+    "issues": "https://github.com/Ragalikx/steam-bridge-mc/issues"
+  },
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "steambridge.SteamBridgeMod"
+    ]
+  },
+  "mixins": [
+    "steambridge.mixins.json"
+  ],
+  "accessWidener": "steambridge.accesswidener",
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "minecraft": "1.16.5",
+    "java": ">=8",
+    "fabric": "*"
+  }
+}

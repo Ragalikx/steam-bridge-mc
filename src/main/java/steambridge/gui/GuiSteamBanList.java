@@ -7,13 +7,13 @@ package steambridge.gui;
 
 import steambridge.steam.SteamServer;
 import steambridge.steam.SteamSocial;
-import com.mojang.blaze3d.matrix.MatrixStack;
+import net.minecraft.client.util.math.MatrixStack;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.resources.I18n;
-import net.minecraft.util.ResourceLocation;
-import net.minecraft.util.text.ITextComponent;
-import net.minecraft.util.text.TranslationTextComponent;
+import net.minecraft.client.resource.language.I18n;
+import net.minecraft.util.Identifier;
+import net.minecraft.text.Text;
+import net.minecraft.text.TranslatableText;
 
 import java.util.List;
 
@@ -23,7 +23,7 @@ public class GuiSteamBanList extends Screen {
     private int banCount = -1;
 
     public GuiSteamBanList(Screen parent, SteamServer server) {
-        super(new TranslationTextComponent("steambridge.gui.banned"));
+        super(new TranslatableText("steambridge.gui.banned"));
         this.parent = parent;
         this.server = server;
     }
@@ -34,24 +34,24 @@ public class GuiSteamBanList extends Screen {
     }
 
     private void rebuild() {
-        this.init(this.minecraft, this.width, this.height);
+        this.init(this.client, this.width, this.height);
     }
 
     @Override
     protected void init() {
-        this.addButton(GuiButtons.createCentered(this.font, this.width / 2, this.height - 30,
-                new TranslationTextComponent("gui.back"),
-                b -> this.minecraft.setScreen(parent), 100, this.width - 20));
+        this.addButton(GuiButtons.createCentered(this.textRenderer, this.width / 2, this.height - 30,
+                new TranslatableText("gui.back"),
+                b -> this.client.openScreen(parent), 100, this.width - 20));
 
         if (server != null) {
             List<SteamSocial.Bans.Record> bans = server.getBanRecords();
             banCount = bans.size();
             int yStart = 40;
-            ITextComponent unbanMsg = new TranslationTextComponent("steambridge.gui.unban");
+            Text unbanMsg = new TranslatableText("steambridge.gui.unban");
             for (int i = 0; i < bans.size(); i++) {
                 int y = yStart + (i * 25);
                 final long steamId = bans.get(i).getSteamId();
-                this.addButton(GuiButtons.createRightAligned(this.font, this.width - 8, y,
+                this.addButton(GuiButtons.createRightAligned(this.textRenderer, this.width - 8, y,
                         unbanMsg,
                         b -> {
                             server.unbanPlayer(steamId);
@@ -75,14 +75,14 @@ public class GuiSteamBanList extends Screen {
     @Override
     public void render(MatrixStack matrixStack, int mouseX, int mouseY, float partialTicks) {
         this.renderBackground(matrixStack);
-        drawCenteredString(matrixStack, this.font, I18n.get("steambridge.gui.banned"), this.width / 2, 10, 16777215);
+        drawCenteredText(matrixStack, this.textRenderer, I18n.translate("steambridge.gui.banned"), this.width / 2, 10, 16777215);
 
         if (server != null) {
             List<SteamSocial.Bans.Record> bans = server.getBanRecords();
             int yStart = 40;
 
             if (bans.isEmpty()) {
-                drawCenteredString(matrixStack, this.font, I18n.get("steambridge.gui.no_bans"), this.width / 2, yStart + 10, 0xAAAAAA);
+                drawCenteredText(matrixStack, this.textRenderer, I18n.translate("steambridge.gui.no_bans"), this.width / 2, yStart + 10, 0xAAAAAA);
             } else {
                 for (int i = 0; i < bans.size(); i++) {
                     SteamSocial.Bans.Record ban = bans.get(i);
@@ -91,14 +91,14 @@ public class GuiSteamBanList extends Screen {
                     String avatar = SteamSocial.ProfileCache.get().getAvatarTexture(ban.getSteamId());
                     if (avatar != null && !avatar.isEmpty()) {
                         try {
-                            ResourceLocation loc = new ResourceLocation(avatar);
-                            this.minecraft.getTextureManager().bind(loc);
+                            Identifier loc = new Identifier(avatar);
+                            this.client.getTextureManager().bindTexture(loc);
                             RenderSystem.color4f(1.0F, 1.0F, 1.0F, 1.0F);
-                            blit(matrixStack, this.width / 2 - 170, y + 2, 0, 0, 16, 16, 16, 16);
+                            drawTexture(matrixStack, this.width / 2 - 170, y + 2, 0, 0, 16, 16, 16, 16);
                         } catch (Exception ignored) {}
                     }
 
-                    drawString(matrixStack, this.font,
+                    drawStringWithShadow(matrixStack, this.textRenderer,
                             ban.getSteamName() + " (" + ban.getMinecraftName() + ")",
                             this.width / 2 - 150, y + 6, 16777215);
                 }

@@ -1,14 +1,10 @@
 plugins {
-    id 'eclipse'
-    id 'maven-publish'
-    id 'net.minecraftforge.gradle' version '5.1.69'
+    id 'fabric-loom' version '1.6.12'
+    id 'java'
 }
 
-// -- Versioning ----------------------------------------------------------------
-// Release (cmd):        gradlew build -PmodVersion=1.145
-// Release (PowerShell): .\gradlew.bat build "-PmodVersion=1.145"
-// Result: project.version / jar / mods.toml / BuildInfo = "1.145+mc1.16.5"
-// Dev (no -P):          "0.0.0-dev+mc1.16.5"
+// Version: -PmodVersion=1.145 -> 1.145+mc1.16.5  |  no -P -> 0.0.0-dev+mc1.16.5
+// PowerShell: .\gradlew.bat build "-PmodVersion=1.145"  (quotes required)
 def rawModVersion = (findProperty('modVersion') ?: '0.0.0-dev').toString().trim()
 if (rawModVersion.isEmpty()) {
     throw new GradleException("modVersion is empty. Pass -PmodVersion=1.145 (or omit for 0.0.0-dev).")
@@ -26,21 +22,28 @@ if (rawModVersion.contains('+mc')) {
 ext.modVersionOnly = rawModVersion
 version = "${rawModVersion}+mc${minecraft_version}"
 group   = project.mod_group
-archivesBaseName = project.mod_id
 
-logger.lifecycle("Steam Bridge (Forge 1.16.5) version: {}  (modVersion={}, minecraft={})",
+logger.lifecycle("Steam Bridge (Fabric 1.16.5) version: {}  (modVersion={}, minecraft={})",
     version, rawModVersion, minecraft_version)
 
-java.toolchain.languageVersion = JavaLanguageVersion.of(8)
+base {
+    archivesName = project.mod_id
+}
 
-// -- Auto-generated BuildInfo -------------------------------------------------
-def generatedSrcDir = "${buildDir}/generated/java"
+java {
+    // 1.16.5 targets Java 8 bytecode; toolchain can be 8+.
+    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_1_8
+    withSourcesJar()
+}
+
+def generatedSrcDir = layout.buildDirectory.dir('generated/java').get().asFile
 
 sourceSets {
     main { java { srcDir generatedSrcDir } }
 }
 
-task generateBuildInfo {
+tasks.register('generateBuildInfo') {
     def verFull = project.version.toString()
     def verMod  = project.ext.modVersionOnly.toString()
     def verMc   = project.minecraft_version.toString()
@@ -53,15 +56,11 @@ task generateBuildInfo {
         f.parentFile.mkdirs()
         f.text = """\
 package steambridge;
-/** Auto-generated at build time. Do not edit or commit. */
+/** Generated at build time. */
 public final class BuildInfo {
-    /** Full release id, e.g. {@code 1.145+mc1.16.5}. */
     public static final String VERSION     = "${verFull}";
-    /** Mod-only version from {@code -PmodVersion}, e.g. {@code 1.145}. */
     public static final String MOD_VERSION = "${verMod}";
-    /** Target Minecraft version baked at build time. */
     public static final String MC_VERSION  = "${verMc}";
-    /** Embedded in bytecode - visible in hex/strings dump of the jar. */
     public static final String AUTHOR      = "Ragalikx";
     public static final String GITHUB      = "https://github.com/Ragalikx/steam-bridge-mc";
     private BuildInfo() {}
@@ -71,67 +70,108 @@ public final class BuildInfo {
 }
 
 tasks.withType(JavaCompile).configureEach {
-    dependsOn generateBuildInfo
+    dependsOn 'generateBuildInfo'
     options.encoding = 'UTF-8'
+    options.release = 8
+    options.debugOptions.debugLevel = 'source,lines'
 }
 
-minecraft {
-    mappings channel: project.mappings_channel, version: project.mappings_version
-    accessTransformer = file('src/main/resources/META-INF/accesstransformer.cfg')
+tasks.named('sourcesJar', Jar).configure {
+    dependsOn 'generateBuildInfo'
+}
 
-    runs {
-        client {
-            workingDirectory project.file('run')
-            property 'forge.logging.markers', 'REGISTRIES'
-            property 'forge.logging.console.level', 'debug'
-            mods {
-                "${project.mod_id}" {
-                    source sourceSets.main
-                }
-            }
+loom {
+    accessWidenerPath = file('src/main/resources/steambridge.accesswidener')
+
+    mods {
+        steambridge {
+            sourceSet sourceSets.main
         }
     }
 }
 
 repositories {
     mavenCentral()
+    maven { url = 'https://maven.fabricmc.net/' }
 }
 
 configurations {
     steamBundle { transitive = false }
+    jnaFull { transitive = false }
 }
 
 dependencies {
-    minecraft "net.minecraftforge:forge:${project.forge_version}"
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
+    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
 
-    // steamworks4j API is shaded flat into the mod jar (see jar task).
-    // JNA: compileOnly against the same 4.4.0 Forge already puts on the game classpath.
+    implementation("net.java.dev.jna:jna:${project.jna_version}")
+    jnaFull "net.java.dev.jna:jna:${project.jna_version}"
+
     implementation("com.code-disaster.steamworks4j:steamworks4j:${project.steamworks4j_version}") {
         exclude group: 'net.java.dev.jna'
     }
-    compileOnly "net.java.dev.jna:jna:${project.jna_version}"
-
     steamBundle "com.code-disaster.steamworks4j:steamworks4j:${project.steamworks4j_version}"
 }
 
-// -- Resource templating (mods.toml version substitution) ---------------------
+tasks.register('slimJnaJar', Zip) {
+    group = 'build'
+    description = 'JNA with only win32-x86-64 native + needed Java classes'
+    dependsOn configurations.jnaFull
+    archiveFileName = "jna-${project.jna_version}-win64.jar"
+    destinationDirectory = layout.buildDirectory.dir('generated/jna-slim')
+    from({
+        zipTree(configurations.jnaFull.singleFile)
+    }) {
+        exclude 'com/sun/jna/aix-*/**'
+        exclude 'com/sun/jna/darwin-*/**'
+        exclude 'com/sun/jna/freebsd-*/**'
+        exclude 'com/sun/jna/linux-*/**'
+        exclude 'com/sun/jna/openbsd-*/**'
+        exclude 'com/sun/jna/sunos-*/**'
+        exclude 'com/sun/jna/win32-aarch64/**'
+        exclude 'com/sun/jna/win32-x86/**'
+        exclude '**/ELFAnalyser*'
+        exclude 'com/sun/jna/win32/**'
+        exclude '**/Native$AWT*'
+        exclude '**/ptr/ShortByReference*'
+        exclude '**/ptr/DoubleByReference*'
+        exclude '**/ptr/ByteByReference*'
+        exclude '**/ptr/FloatByReference*'
+        exclude '**/ptr/IntByReference*'
+        exclude '**/ptr/NativeLongByReference*'
+        exclude '**/NativeLong.class'
+        exclude '**/WString.class'
+        exclude 'META-INF/AL2.0'
+        exclude 'META-INF/LGPL2.1'
+        exclude 'META-INF/MANIFEST.MF'
+    }
+}
+
 processResources {
-    var replaceProperties = [
-        mod_id           : project.mod_id,
-        mod_name         : project.mod_name,
-        mod_version      : project.version,
-        minecraft_version: project.minecraft_version,
-        forge_version    : project.forge_version
-    ]
-    inputs.properties replaceProperties
-    filesMatching(['META-INF/mods.toml', 'pack.mcmeta']) {
-        expand replaceProperties
+    inputs.property 'version', project.version
+    inputs.property 'mod_id', project.mod_id
+    inputs.property 'mod_name', project.mod_name
+    inputs.property 'minecraft_version', project.minecraft_version
+    inputs.property 'loader_version', project.loader_version
+
+    filesMatching('fabric.mod.json') {
+        expand([
+            version           : project.version,
+            mod_id            : project.mod_id,
+            mod_name          : project.mod_name,
+            minecraft_version : project.minecraft_version,
+            loader_version    : project.loader_version
+        ])
     }
 }
 
 jar {
-    // steamworks4j API + win64 natives at jar root
-    from({ project.configurations.steamBundle.collect { zipTree(it) } }) {
+    dependsOn configurations.steamBundle, 'slimJnaJar'
+    from({
+        configurations.steamBundle.collect { zipTree(it) }
+    }) {
         include 'com/codedisaster/**'
         include 'steam_api64.dll', 'steamworks4j64.dll'
         exclude 'com/codedisaster/steamworks/SteamController*'
@@ -146,8 +186,15 @@ jar {
         exclude 'com/codedisaster/steamworks/SteamUGC*'
         exclude 'com/codedisaster/steamworks/SteamUserStats*'
         exclude 'com/codedisaster/steamworks/SteamApps*'
+        exclude '**/*.so', '**/*.dylib', 'steam_api.dll', 'steamworks4j.dll'
+        exclude 'libsteam_api.*', 'libsteamworks4j.*'
+        exclude 'META-INF/**'
     }
-    // JNA is NOT shaded: Forge 1.16.5 already provides jna-4.4.0 on the library path.
+    from({
+        zipTree(tasks.named('slimJnaJar', Zip).get().archiveFile.get().asFile)
+    }) {
+        exclude 'META-INF/**'
+    }
     from('third_party_licenses') {
         into 'META-INF/licenses'
     }
@@ -168,5 +215,3 @@ jar {
         ])
     }
 }
-
-jar.finalizedBy('reobfJar')

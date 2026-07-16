@@ -9,15 +9,15 @@ import com.codedisaster.steamworks.SteamID;
 import com.codedisaster.steamworks.SteamFriends;
 import steambridge.steam.SteamManager;
 import steambridge.steam.SteamSocial;
-import com.mojang.blaze3d.matrix.MatrixStack;
+import net.minecraft.client.util.math.MatrixStack;
 import com.mojang.blaze3d.systems.RenderSystem;
-import net.minecraft.client.Minecraft;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.TextFieldWidget;
-import net.minecraft.client.resources.I18n;
-import net.minecraft.util.ResourceLocation;
-import net.minecraft.util.text.StringTextComponent;
-import net.minecraft.util.text.TranslationTextComponent;
+import net.minecraft.client.resource.language.I18n;
+import net.minecraft.util.Identifier;
+import net.minecraft.text.LiteralText;
+import net.minecraft.text.TranslatableText;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -49,7 +49,7 @@ public class GuiSteamFriends extends Screen {
     private int scrollOffset = 0;
 
     public GuiSteamFriends(Screen parent, TextFieldWidget targetField, Consumer<String> onSelected) {
-        super(new TranslationTextComponent("steambridge.gui.select_friend"));
+        super(new TranslatableText("steambridge.gui.select_friend"));
         this.parent      = parent;
         this.targetField = targetField;
         this.onSelected  = onSelected;
@@ -57,13 +57,13 @@ public class GuiSteamFriends extends Screen {
 
     @Override
     protected void init() {
-        this.addButton(GuiButtons.createCentered(this.font, this.width / 2, this.height - 30,
-                new TranslationTextComponent("gui.back"),
-                b -> this.minecraft.setScreen(parent), 100, this.width - 20));
+        this.addButton(GuiButtons.createCentered(this.textRenderer, this.width / 2, this.height - 30,
+                new TranslatableText("gui.back"),
+                b -> this.client.openScreen(parent), 100, this.width - 20));
 
-        searchField = new TextFieldWidget(this.font, this.width / 2 - 100, 35, 200, 20, StringTextComponent.EMPTY);
+        searchField = new TextFieldWidget(this.textRenderer, this.width / 2 - 100, 35, 200, 20, LiteralText.EMPTY);
         searchField.setMaxLength(50);
-        searchField.setResponder(s -> updateFilter());
+        searchField.setChangedListener(s -> updateFilter());
         this.children.add(searchField);
         this.setInitialFocus(searchField);
 
@@ -88,7 +88,7 @@ public class GuiSteamFriends extends Screen {
 
     private void updateFilter() {
         filteredFriends.clear();
-        String query = searchField != null ? searchField.getValue().toLowerCase() : "";
+        String query = searchField != null ? searchField.getText().toLowerCase() : "";
         for (FriendItem f : cachedFriends) {
             if (f.name.toLowerCase().contains(query)) {
                 filteredFriends.add(f);
@@ -137,8 +137,8 @@ public class GuiSteamFriends extends Screen {
     @Override
     public void render(MatrixStack matrixStack, int mouseX, int mouseY, float partialTicks) {
         this.renderBackground(matrixStack);
-        drawCenteredString(matrixStack, this.font,
-                I18n.get("steambridge.gui.select_friend"),
+        drawCenteredText(matrixStack, this.textRenderer,
+                I18n.translate("steambridge.gui.select_friend"),
                 this.width / 2, 15, 0xFFFFFF);
 
         drawFriendPanel(matrixStack, mouseX, mouseY);
@@ -176,7 +176,7 @@ public class GuiSteamFriends extends Screen {
             drawAvatar(matrixStack, friend.steamId, this.width / 2 - LIST_HALF_WIDTH + 1, y + 4);
 
             int nameX = this.width / 2 - LIST_HALF_WIDTH + AVATAR_SIZE + 4;
-            drawString(matrixStack, this.font, friend.name, nameX, y + 8, 0xFFFFFF);
+            drawStringWithShadow(matrixStack, this.textRenderer, friend.name, nameX, y + 8, 0xFFFFFF);
         }
     }
 
@@ -185,10 +185,10 @@ public class GuiSteamFriends extends Screen {
         if (texturePath == null || texturePath.isEmpty()) return;
 
         try {
-            ResourceLocation loc = new ResourceLocation(texturePath);
-            this.minecraft.getTextureManager().bind(loc);
+            Identifier loc = new Identifier(texturePath);
+            this.client.getTextureManager().bindTexture(loc);
             RenderSystem.color4f(1.0F, 1.0F, 1.0F, 1.0F);
-            blit(matrixStack, x, y, 0, 0, AVATAR_SIZE, AVATAR_SIZE, AVATAR_SIZE, AVATAR_SIZE);
+            drawTexture(matrixStack, x, y, 0, 0, AVATAR_SIZE, AVATAR_SIZE, AVATAR_SIZE, AVATAR_SIZE);
         } catch (Exception ignored) {}
     }
 
@@ -203,7 +203,7 @@ public class GuiSteamFriends extends Screen {
     private void selectFriend(FriendItem friend) {
         String steamIdStr = String.valueOf(friend.steamId);
         if (onSelected != null)  onSelected.accept(steamIdStr);
-        if (targetField != null) targetField.setValue(steamIdStr);
-        Minecraft.getInstance().setScreen(parent);
+        if (targetField != null) targetField.setText(steamIdStr);
+        MinecraftClient.getInstance().openScreen(parent);
     }
 }

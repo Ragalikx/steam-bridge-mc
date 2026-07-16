@@ -1,0 +1,11 @@
+{
+  "required": true,
+  "package": "steambridge.mixin",
+  "compatibilityLevel": "JAVA_8",
+  "client": [
+    "MinecraftMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

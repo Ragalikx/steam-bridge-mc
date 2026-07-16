@@ -9,14 +9,14 @@ import steambridge.steam.SteamConnectionStatus;
 import steambridge.steam.SteamManager;
 import steambridge.steam.SteamServer;
 import steambridge.steam.SteamSocial;
-import com.mojang.blaze3d.matrix.MatrixStack;
+import net.minecraft.client.util.math.MatrixStack;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.button.Button;
-import net.minecraft.client.resources.I18n;
-import net.minecraft.util.ResourceLocation;
-import net.minecraft.util.text.ITextComponent;
-import net.minecraft.util.text.TranslationTextComponent;
+import net.minecraft.client.gui.widget.ButtonWidget;
+import net.minecraft.client.resource.language.I18n;
+import net.minecraft.util.Identifier;
+import net.minecraft.text.Text;
+import net.minecraft.text.TranslatableText;
 
 import java.util.List;
 
@@ -43,7 +43,7 @@ public class GuiSteamHostManagement extends Screen {
     }
 
     public GuiSteamHostManagement(Screen parent) {
-        super(new TranslationTextComponent("steambridge.gui.management"));
+        super(new TranslatableText("steambridge.gui.management"));
         this.parent = parent;
     }
 
@@ -53,35 +53,35 @@ public class GuiSteamHostManagement extends Screen {
     }
 
     private void rebuild() {
-        this.init(this.minecraft, this.width, this.height);
+        this.init(this.client, this.width, this.height);
     }
 
     @Override
     protected void init() {
         this.server = SteamManager.getInstance().getActiveServer();
 
-        this.addButton(GuiButtons.createCentered(this.font, this.width / 2, this.height - 30,
-                new TranslationTextComponent("gui.back"),
-                b -> this.minecraft.setScreen(parent), 100, this.width - 20));
+        this.addButton(GuiButtons.createCentered(this.textRenderer, this.width / 2, this.height - 30,
+                new TranslatableText("gui.back"),
+                b -> this.client.openScreen(parent), 100, this.width - 20));
 
-        this.addButton(GuiButtons.createRightAligned(this.font, this.width - 8, 10,
-                new TranslationTextComponent("steambridge.gui.banned"),
-                b -> this.minecraft.setScreen(new GuiSteamBanList(this, server)),
+        this.addButton(GuiButtons.createRightAligned(this.textRenderer, this.width - 8, 10,
+                new TranslatableText("steambridge.gui.banned"),
+                b -> this.client.openScreen(new GuiSteamBanList(this, server)),
                 40, this.width - 16));
 
         if (server != null && server.isRunning()) {
             List<SteamServer.PlayerSnapshot> snaps = snapshots();
             snapshotCount = snaps.size();
             int yStart = 40;
-            ITextComponent kickMsg = new TranslationTextComponent("steambridge.gui.kick");
-            ITextComponent banMsg  = new TranslationTextComponent("steambridge.gui.ban");
+            Text kickMsg = new TranslatableText("steambridge.gui.kick");
+            Text banMsg  = new TranslatableText("steambridge.gui.ban");
             int gap = 4;
             for (int i = 0; i < snaps.size(); i++) {
                 int y = yStart + (i * 25);
                 final long steamId = snaps.get(i).getSteamId();
-                Button ban = GuiButtons.createRightAligned(this.font, this.width - 8, y, banMsg,
+                ButtonWidget ban = GuiButtons.createRightAligned(this.textRenderer, this.width - 8, y, banMsg,
                         b -> { server.banPlayer(steamId); rebuild(); }, 30, 120);
-                Button kick = GuiButtons.createRightAligned(this.font, ban.x - gap, y, kickMsg,
+                ButtonWidget kick = GuiButtons.createRightAligned(this.textRenderer, ban.x - gap, y, kickMsg,
                         b -> { server.kickPlayer(steamId); rebuild(); }, 30, 120);
                 this.addButton(kick);
                 this.addButton(ban);
@@ -103,14 +103,14 @@ public class GuiSteamHostManagement extends Screen {
     @Override
     public void render(MatrixStack matrixStack, int mouseX, int mouseY, float partialTicks) {
         this.renderBackground(matrixStack);
-        drawCenteredString(matrixStack, this.font, I18n.get("steambridge.gui.management"), this.width / 2, 10, 16777215);
+        drawCenteredText(matrixStack, this.textRenderer, I18n.translate("steambridge.gui.management"), this.width / 2, 10, 16777215);
 
         if (server != null && server.isRunning()) {
             List<SteamServer.PlayerSnapshot> snaps = snapshots();
             int yStart = 40;
 
             if (snaps.isEmpty()) {
-                drawCenteredString(matrixStack, this.font, I18n.get("steambridge.gui.no_players"), this.width / 2, yStart + 10, 0xAAAAAA);
+                drawCenteredText(matrixStack, this.textRenderer, I18n.translate("steambridge.gui.no_players"), this.width / 2, yStart + 10, 0xAAAAAA);
             } else {
                 for (int i = 0; i < snaps.size(); i++) {
                     SteamServer.PlayerSnapshot snap = snaps.get(i);
@@ -119,10 +119,10 @@ public class GuiSteamHostManagement extends Screen {
                     String avatar = SteamSocial.ProfileCache.get().getAvatarTexture(snap.getSteamId());
                     if (avatar != null && !avatar.isEmpty()) {
                         try {
-                            ResourceLocation loc = new ResourceLocation(avatar);
-                            this.minecraft.getTextureManager().bind(loc);
+                            Identifier loc = new Identifier(avatar);
+                            this.client.getTextureManager().bindTexture(loc);
                             RenderSystem.color4f(1.0F, 1.0F, 1.0F, 1.0F);
-                            blit(matrixStack, this.width / 2 - 170, y + 2, 0, 0, 16, 16, 16, 16);
+                            drawTexture(matrixStack, this.width / 2 - 170, y + 2, 0, 0, 16, 16, 16, 16);
                         } catch (Exception ignored) {}
                     }
 
@@ -130,17 +130,17 @@ public class GuiSteamHostManagement extends Screen {
                     String pingStr  = (status != null && status.getPingMs() >= 0) ? status.getPingMs() + "ms" : "~";
                     String connType = (status != null && status.isConnectionActive())
                             ? (status.isUsingRelay()
-                                ? I18n.get("steambridge.gui.conn_relay")
-                                : I18n.get("steambridge.gui.conn_p2p"))
+                                ? I18n.translate("steambridge.gui.conn_relay")
+                                : I18n.translate("steambridge.gui.conn_p2p"))
                             : "?";
-                    drawString(matrixStack, this.font,
+                    drawStringWithShadow(matrixStack, this.textRenderer,
                             snap.getSteamName() + " (" + snap.getMinecraftName() + ") "
                             + pingStr + " [" + connType + "]",
                             this.width / 2 - 150, y + 6, 16777215);
                 }
             }
         } else {
-            drawCenteredString(matrixStack, this.font, I18n.get("steambridge.gui.not_running"), this.width / 2, 50, 16733525);
+            drawCenteredText(matrixStack, this.textRenderer, I18n.translate("steambridge.gui.not_running"), this.width / 2, 50, 16733525);
         }
 
         super.render(matrixStack, mouseX, mouseY, partialTicks);

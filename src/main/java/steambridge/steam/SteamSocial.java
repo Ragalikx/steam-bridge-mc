@@ -11,11 +11,11 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import steambridge.SteamBridgeConfig;
 import steambridge.SteamBridgeMod;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.texture.DynamicTexture;
-import net.minecraft.client.renderer.texture.NativeImage;
-import net.minecraft.util.ResourceLocation;
-import net.minecraft.world.GameType;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.texture.NativeImageBackedTexture;
+import net.minecraft.client.texture.NativeImage;
+import net.minecraft.util.Identifier;
+import net.minecraft.world.GameMode;
 
 import java.io.File;
 import java.io.Reader;
@@ -64,7 +64,7 @@ public final class SteamSocial {
 
         private final Map<Long, String> personaNameBySteamId   = new ConcurrentHashMap<>();
         private final Map<Long, String> avatarTextureBySteamId = new ConcurrentHashMap<>();
-        /** 64x64 PNG base64 for multiplayer-list server icons ({@link net.minecraft.client.multiplayer.ServerData#setIconB64}). */
+        /** 64x64 PNG base64 for multiplayer-list server icons ({@link net.minecraft.client.network.ServerInfo#setIconB64}). */
         private final Map<Long, String> avatarIconB64BySteamId = new ConcurrentHashMap<>();
         private final Map<Long, Long>   userInfoRequestedAt    = new ConcurrentHashMap<>();
         private final Map<Long, Long>   avatarRetryAt          = new ConcurrentHashMap<>();
@@ -101,7 +101,7 @@ public final class SteamSocial {
             NativeImage nativeImage = loadAvatarNativeImage(steamId);
             if (nativeImage == null) return "";
 
-            Minecraft mc = Minecraft.getInstance();
+            MinecraftClient mc = MinecraftClient.getInstance();
             if (mc == null) {
                 nativeImage.close();
                 return "";
@@ -109,8 +109,8 @@ public final class SteamSocial {
 
             try {
                 cacheServerIconB64(steamId, nativeImage);
-                DynamicTexture texture = new DynamicTexture(nativeImage);
-                ResourceLocation loc = mc.getTextureManager().register(
+                NativeImageBackedTexture texture = new NativeImageBackedTexture(nativeImage);
+                Identifier loc = mc.getTextureManager().registerDynamicTexture(
                         "steambridge_avatar_" + steamId, texture);
                 String textureId = loc.toString();
                 avatarTextureBySteamId.put(steamId, textureId);
@@ -131,14 +131,14 @@ public final class SteamSocial {
             if (steamId == 0L) return null;
             String cached = avatarIconB64BySteamId.get(steamId);
             if (cached != null) return cached;
-            // Load once; also warms the DynamicTexture cache used by friends GUI.
+            // Load once; also warms the NativeImageBackedTexture cache used by friends GUI.
             getAvatarTexture(steamId);
             return avatarIconB64BySteamId.get(steamId);
         }
 
         /**
          * Fetches the Steam avatar into a {@link NativeImage}, or null if not ready / failed.
-         * Caller owns the image if non-null (except when passed into {@link DynamicTexture}).
+         * Caller owns the image if non-null (except when passed into {@link NativeImageBackedTexture}).
          */
         private NativeImage loadAvatarNativeImage(long steamId) {
             long now = System.currentTimeMillis();
@@ -195,7 +195,7 @@ public final class SteamSocial {
                         int b = data[i + 2] & 0xFF;
                         int a = data[i + 3] & 0xFF;
                         int abgr = (a << 24) | (b << 16) | (g << 8) | r;
-                        nativeImage.setPixelRGBA(x, y, abgr);
+                        nativeImage.setPixelColor(x, y, abgr);
                     }
                 }
 
@@ -220,7 +220,7 @@ public final class SteamSocial {
                     scaled = new NativeImage(64, 64, false);
                     src.resizeSubRectTo(0, 0, src.getWidth(), src.getHeight(), scaled);
                 }
-                byte[] png = scaled.asByteArray();
+                byte[] png = scaled.getBytes();
                 if (png != null && png.length > 0) {
                     avatarIconB64BySteamId.put(steamId, Base64.getEncoder().encodeToString(png));
                 }
@@ -411,8 +411,8 @@ public final class SteamSocial {
 
         private static File resolveStorageFile() {
             try {
-                Minecraft mc = Minecraft.getInstance();
-                File gameDir = mc != null ? mc.gameDirectory : null;
+                MinecraftClient mc = MinecraftClient.getInstance();
+                File gameDir = mc != null ? mc.runDirectory : null;
                 if (gameDir != null) return new File(gameDir, "steambridge/ban-cache.json");
             } catch (Exception ignored) {}
             return new File("steambridge-ban-cache.json");
@@ -432,7 +432,7 @@ public final class SteamSocial {
 
         /** Per-world host settings data object. */
         public static final class Settings {
-            public String  gametype         = GameType.SURVIVAL.name();
+            public String  gametype         = GameMode.SURVIVAL.name();
             public boolean allowCommands    = false;
             public String  accessPolicy     = SteamServer.AccessPolicy.EVERYONE.name();
             public String  transportMode    = SteamServer.TransportMode.AUTO.name();
@@ -456,20 +456,20 @@ public final class SteamSocial {
             ensureLoaded();
             Settings saved = store.worlds.get(normalizeKey(worldKey));
             if (saved == null) return new Settings();
-            if (saved.gametype      == null) saved.gametype      = GameType.SURVIVAL.name();
+            if (saved.gametype      == null) saved.gametype      = GameMode.SURVIVAL.name();
             if (saved.accessPolicy  == null) saved.accessPolicy  = SteamServer.AccessPolicy.EVERYONE.name();
             if (saved.transportMode == null) saved.transportMode = SteamServer.TransportMode.AUTO.name();
             return saved;
         }
 
         /** Saves the current settings for the given world key. */
-        public synchronized void save(String worldKey, GameType gameType,
+        public synchronized void save(String worldKey, GameMode gameType,
                                       boolean allowCommands,
                                       SteamServer.AccessPolicy accessPolicy,
                                       SteamServer.TransportMode transportMode) {
             ensureLoaded();
             Settings s = new Settings();
-            s.gametype         = gameType      != null ? gameType.name()      : GameType.SURVIVAL.name();
+            s.gametype         = gameType      != null ? gameType.name()      : GameMode.SURVIVAL.name();
             s.allowCommands    = allowCommands;
             s.accessPolicy     = accessPolicy  != null ? accessPolicy.name()  : SteamServer.AccessPolicy.EVERYONE.name();
             s.transportMode    = transportMode != null ? transportMode.name() : SteamServer.TransportMode.AUTO.name();
@@ -477,9 +477,9 @@ public final class SteamSocial {
             persist();
         }
 
-        public static GameType parseGameType(String value) {
-            if (value == null) return GameType.SURVIVAL;
-            try { return GameType.valueOf(value); } catch (IllegalArgumentException ignored) { return GameType.SURVIVAL; }
+        public static GameMode parseGameType(String value) {
+            if (value == null) return GameMode.SURVIVAL;
+            try { return GameMode.valueOf(value); } catch (IllegalArgumentException ignored) { return GameMode.SURVIVAL; }
         }
 
         public static SteamServer.AccessPolicy parseAccessPolicy(String value) {
@@ -528,9 +528,9 @@ public final class SteamSocial {
 
         private static File resolveFile() {
             try {
-                Minecraft mc = Minecraft.getInstance();
-                if (mc != null && mc.gameDirectory != null)
-                    return new File(mc.gameDirectory, "steambridge/world-settings.json");
+                MinecraftClient mc = MinecraftClient.getInstance();
+                if (mc != null && mc.runDirectory != null)
+                    return new File(mc.runDirectory, "steambridge/world-settings.json");
             } catch (Exception ignored) {}
             return new File("steambridge-world-settings.json");
         }

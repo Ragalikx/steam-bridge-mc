@@ -14,16 +14,15 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.screen.MainMenuScreen;
-import net.minecraft.client.gui.screen.MultiplayerScreen;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.screen.TitleScreen;
+import net.minecraft.client.gui.screen.multiplayer.MultiplayerScreen;
 import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.network.login.ClientLoginNetHandler;
-import net.minecraft.network.NetworkManager;
-import net.minecraft.network.ProtocolType;
-import net.minecraft.network.handshake.client.CHandshakePacket;
-import net.minecraft.network.login.client.CLoginStartPacket;
-import net.minecraftforge.fml.network.FMLNetworkConstants;
+import net.minecraft.client.network.ClientLoginNetworkHandler;
+import net.minecraft.network.ClientConnection;
+import net.minecraft.network.NetworkState;
+import net.minecraft.network.packet.c2s.handshake.HandshakeC2SPacket;
+import net.minecraft.network.packet.c2s.login.LoginHelloC2SPacket;
 
 import java.net.InetSocketAddress;
 import java.util.concurrent.ThreadFactory;
@@ -116,23 +115,21 @@ public final class SteamTransport {
             Screen currentScreen
     ) {
         try {
-            Minecraft mc = Minecraft.getInstance();
+            MinecraftClient mc = MinecraftClient.getInstance();
 
             // Fresh multiplayer list as the disconnect "Back" target.
-            final Screen returnScreen = new MultiplayerScreen(new MainMenuScreen());
+            final Screen returnScreen = new MultiplayerScreen(new TitleScreen());
 
-            NetworkManager connection = NetworkManager.connectToServer(
+            ClientConnection connection = ClientConnection.connect(
                     java.net.InetAddress.getByName("127.0.0.1"),
                     proxyPort,
-                    mc.options.useNativeTransport());
+                    mc.options.shouldUseNativeTransport());
 
-            connection.setListener(new ClientLoginNetHandler(
+            connection.setPacketListener(new ClientLoginNetworkHandler(
                     connection, mc, returnScreen, status -> {}));
 
-            // Intention hostname carries the Forge modded-connection marker.
-            String hostName = "SteamRelay\0" + FMLNetworkConstants.NETVERSION + "\0";
-            connection.send(new CHandshakePacket(hostName, 25565, ProtocolType.LOGIN));
-            connection.send(new CLoginStartPacket(mc.getUser().getGameProfile()));
+            connection.send(new HandshakeC2SPacket("127.0.0.1", proxyPort, NetworkState.LOGIN));
+            connection.send(new LoginHelloC2SPacket(mc.getSession().getProfile()));
 
             SteamBridgeMod.LOG.info("[LoopbackBridge][Client] Connected to loopback proxy. proxyPort={} conn={} steamID={}",
                 proxyPort, connectionHandle, remoteSteamID);
