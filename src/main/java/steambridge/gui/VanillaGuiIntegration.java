@@ -62,46 +62,32 @@ public class VanillaGuiIntegration {
      */
     private static boolean pendingConnectEnable = false;
 
-    // -- Reflected fields ------------------------------------------------------
-
-    private static Field fSavedServerList;
     private static Field fAddServerData;
     private static Field fAddServerIpField;
-    private static Field fAddServerNameField;   // GuiScreenAddServer.serverNameField
+    private static Field fAddServerNameField;
     private static Field fShareToLanGameMode;
     private static Field fShareToLanAllowCommands;
-    /** GuiConnecting.previousGuiScreen -> used to restore parent when the connect event is intercepted. */
+    /** GuiConnecting.previousGuiScreen (SRG field_146374_i). */
     private static Field fConnectingPreviousScreen;
 
     static {
+        fAddServerData = resolveField(GuiScreenAddServer.class, "serverData", "field_146311_h");
+        fAddServerIpField = resolveField(GuiScreenAddServer.class, "serverIPField", "field_146308_f");
+        fAddServerNameField = resolveField(GuiScreenAddServer.class, "serverNameField", "field_146309_g");
+        fShareToLanGameMode = resolveField(GuiShareToLan.class, "gameMode", "field_146599_h");
+        fShareToLanAllowCommands = resolveField(GuiShareToLan.class, "allowCommands", "field_146600_i");
+        fConnectingPreviousScreen = resolveField(GuiConnecting.class, "previousGuiScreen", "field_146374_i");
+    }
+
+    private static Field resolveField(Class<?> owner, String... names) {
         try {
-            fSavedServerList = ReflectionHelper.findField(GuiMultiplayer.class, "savedServerList", "field_146799_f");
-            fSavedServerList.setAccessible(true);
-        } catch (Exception e) { SteamBridgeMod.LOG.warn("fSavedServerList not found", e); }
-        try {
-            fAddServerData = ReflectionHelper.findField(GuiScreenAddServer.class, "serverData", "field_146311_h");
-            fAddServerData.setAccessible(true);
-        } catch (Exception e) { SteamBridgeMod.LOG.warn("fAddServerData not found", e); }
-        try {
-            fAddServerIpField = ReflectionHelper.findField(GuiScreenAddServer.class, "serverIPField", "field_146308_f");
-            fAddServerIpField.setAccessible(true);
-        } catch (Exception e) { SteamBridgeMod.LOG.warn("fAddServerIpField not found", e); }
-        try {
-            fAddServerNameField = ReflectionHelper.findField(GuiScreenAddServer.class, "serverNameField", "field_146309_g");
-            fAddServerNameField.setAccessible(true);
-        } catch (Exception e) { SteamBridgeMod.LOG.warn("fAddServerNameField not found", e); }
-        try {
-            fShareToLanGameMode = ReflectionHelper.findField(GuiShareToLan.class, "gameMode", "field_146599_h");
-            fShareToLanGameMode.setAccessible(true);
-        } catch (Exception e) { SteamBridgeMod.LOG.warn("fShareToLanGameMode not found", e); }
-        try {
-            fShareToLanAllowCommands = ReflectionHelper.findField(GuiShareToLan.class, "allowCommands", "field_146600_i");
-            fShareToLanAllowCommands.setAccessible(true);
-        } catch (Exception e) { SteamBridgeMod.LOG.warn("fShareToLanAllowCommands not found", e); }
-        try {
-            fConnectingPreviousScreen = ReflectionHelper.findField(GuiConnecting.class, "previousGuiScreen", "field_146545_a");
-            fConnectingPreviousScreen.setAccessible(true);
-        } catch (Exception e) { SteamBridgeMod.LOG.warn("fConnectingPreviousScreen not found", e); }
+            Field f = ReflectionHelper.findField(owner, names);
+            f.setAccessible(true);
+            return f;
+        } catch (Exception e) {
+            SteamBridgeMod.LOG.warn("Reflection field not found on {}: {}", owner.getSimpleName(), names[0], e);
+            return null;
+        }
     }
 
     // -- Helpers ---------------------------------------------------------------
@@ -148,6 +134,7 @@ public class VanillaGuiIntegration {
 
     /**
      * Skip TCP ping for a SteamID entry and set safe list display fields + avatar when ready.
+     * Sets {@code pinged=true} so ServerPinger never does DNS on a Steam64 host.
      */
     private static void markSteamServer(ServerData data) {
         data.pinged = true;
@@ -161,7 +148,8 @@ public class VanillaGuiIntegration {
             String sid = extractSteamId(data.serverIP);
             long steamId = Long.parseLong(sid);
             String iconB64 = steambridge.steam.SteamSocial.ProfileCache.get().getAvatarIconB64(steamId);
-            if (iconB64 != null && !iconB64.isEmpty()) {
+            if (iconB64 != null && !iconB64.isEmpty()
+                    && !iconB64.equals(data.getBase64EncodedIconData())) {
                 data.setBase64EncodedIconData(iconB64);
             }
         } catch (Exception ignored) {
@@ -169,15 +157,25 @@ public class VanillaGuiIntegration {
         }
     }
 
+    /** Public {@link GuiMultiplayer#getServerList()} (same role as getServers() on 1.16+). */
+    private static ServerList getSavedServerList(GuiScreen gui) {
+        if (!(gui instanceof GuiMultiplayer)) return null;
+        try {
+            return ((GuiMultiplayer) gui).getServerList();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     /** Iterates the saved server list of {@code gui} and marks all Steam entries. */
     private static void markAllSteamServers(GuiScreen gui) {
-        if (fSavedServerList == null) return;
         try {
-            ServerList list = (ServerList) fSavedServerList.get(gui);
+            ServerList list = getSavedServerList(gui);
             if (list == null) return;
             int steamIndex = 0;
             for (int i = 0; i < list.countServers(); i++) {
                 ServerData data = list.getServerData(i);
+                if (data == null) continue;
                 if (isSteamServerId(data.serverIP)) {
                     markSteamServer(data);
                     if (i > steamIndex) list.swapServers(i, steamIndex);
@@ -520,11 +518,30 @@ public class VanillaGuiIntegration {
                         pendingAccessPolicy,
                         pendingTransportMode);
 
-                String port = mc.getIntegratedServer().shareToLAN(gameType, ac);
+                String port;
+                try {
+                    port = mc.getIntegratedServer().shareToLAN(gameType, ac);
+                    SteamBridgeMod.LOG.info("[SteamHost] shareToLAN returned port={}", port);
+                } catch (Exception e) {
+                    SteamBridgeMod.LOG.error("[SteamHost] shareToLAN failed", e);
+                    mc.ingameGUI.getChatGUI().printChatMessage(new net.minecraft.util.text.TextComponentString(
+                            "\u00A7c" + net.minecraft.client.resources.I18n.format("steambridge.gui.host_failed")));
+                    return;
+                }
+
                 SteamServer server = new SteamServer(pendingAccessPolicy, worldKey, "World");
                 server.setTransportMode(pendingTransportMode);
-                if (port != null) { try { server.setMcPort(Integer.parseInt(port)); } catch (NumberFormatException ignored) {} }
-                boolean started = server.start();
+                if (port != null) {
+                    try { server.setMcPort(Integer.parseInt(port)); }
+                    catch (NumberFormatException ignored) {}
+                }
+                boolean started;
+                try {
+                    started = server.start();
+                } catch (Exception e) {
+                    SteamBridgeMod.LOG.error("[SteamHost] SteamServer.start failed", e);
+                    started = false;
+                }
 
                 if (started) {
                     mc.getSoundHandler().playSound(PositionedSoundRecord.getMasterRecord(SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, 1.0F));

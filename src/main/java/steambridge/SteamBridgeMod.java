@@ -61,19 +61,19 @@ public class SteamBridgeMod {
 
     @Mod.EventHandler
     public void preInit(FMLPreInitializationEvent event) {
-        LOG.info("=== SteamBridge pre-init (v{}) ===", VERSION);
+        LOG.info("=== Steam Bridge pre-init (Forge {}) v{} ===", BuildInfo.MC_VERSION, VERSION);
         proxy.preInit(event);
     }
 
     @Mod.EventHandler
     public void init(FMLInitializationEvent event) {
-        LOG.info("=== SteamBridge init ===");
+        LOG.info("=== SteamBridge init (v{}) ===", VERSION);
         proxy.init(event);
     }
 
     @Mod.EventHandler
     public void postInit(FMLPostInitializationEvent event) {
-        LOG.info("=== SteamBridge postInit - initializing Steam... ===");
+        LOG.info("=== SteamBridge postInit (v{}) - initializing Steam... ===", VERSION);
 
         // DatagramSocketImplFactory is one-shot for the whole JVM. Install before voice mods open sockets.
         if (SteamBridgeConfig.interceptUdp) {

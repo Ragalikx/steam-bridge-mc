@@ -14,9 +14,10 @@ apply plugin: 'java'
 // -- Versioning ----------------------------------------------------------------
 // Release (cmd):        gradlew build -PmodVersion=1.145
 // Release (PowerShell): .\gradlew.bat build "-PmodVersion=1.145"
-// Result: project.version / jar / mcmod.info = "1.145"
-// Dev (no -P):          "0.0.0-dev"
+// Result: project.version / jar / mcmod.info / BuildInfo = "1.145+mc1.12.2"
+// Dev (no -P):          "0.0.0-dev+mc1.12.2"
 // Optional leading "v" is stripped (CI: -PmodVersion=v1.145).
+ext.minecraft_version = '1.12.2'
 def rawModVersion = (findProperty('modVersion') ?: '0.0.0-dev').toString().trim()
 if (rawModVersion.isEmpty()) {
     throw new GradleException("modVersion is empty. Pass -PmodVersion=1.145 (or omit for 0.0.0-dev).")
@@ -24,12 +25,19 @@ if (rawModVersion.isEmpty()) {
 if (rawModVersion.startsWith('v') || rawModVersion.startsWith('V')) {
     rawModVersion = rawModVersion.substring(1)
 }
+if (rawModVersion.contains('+mc')) {
+    throw new GradleException(
+        "modVersion must be the mod release only (e.g. 1.145), not '${rawModVersion}'. " +
+        "Minecraft is appended automatically as +mc${minecraft_version}."
+    )
+}
 ext.modVersionOnly = rawModVersion
-version          = rawModVersion
+version          = "${rawModVersion}+mc${minecraft_version}"
 group            = 'steambridge'
 archivesBaseName = 'steambridge'
 
-logger.lifecycle("Steam Bridge version: {}  (modVersion={})", version, rawModVersion)
+logger.lifecycle("Steam Bridge (Forge 1.12.2) version: {}  (modVersion={}, minecraft={})",
+    version, rawModVersion, minecraft_version)
 
 sourceCompatibility = JavaVersion.VERSION_1_8
 targetCompatibility = JavaVersion.VERSION_1_8
@@ -41,9 +49,12 @@ sourceSets {
 }
 
 task generateBuildInfo {
-    def verMod = project.ext.modVersionOnly.toString()
-    inputs.property('version', project.version)
+    def verFull = project.version.toString()
+    def verMod  = project.ext.modVersionOnly.toString()
+    def verMc   = project.ext.minecraft_version.toString()
+    inputs.property('version', verFull)
     inputs.property('modVersion', verMod)
+    inputs.property('minecraftVersion', verMc)
     outputs.dir(generatedSrcDir)
     doFirst {
         def f = new File("${generatedSrcDir}/steambridge/BuildInfo.java")
@@ -52,9 +63,12 @@ task generateBuildInfo {
 package steambridge;
 /** Auto-generated at build time. Do not edit or commit. */
 public final class BuildInfo {
-    public static final String VERSION     = "${project.version}";
+    /** Full release id, e.g. {@code 1.145+mc1.12.2}. */
+    public static final String VERSION     = "${verFull}";
+    /** Mod-only version from {@code -PmodVersion}, e.g. {@code 1.145}. */
     public static final String MOD_VERSION = "${verMod}";
-    public static final String MC_VERSION  = "1.12.2";
+    /** Target Minecraft version baked at build time. */
+    public static final String MC_VERSION  = "${verMc}";
     /** Embedded in bytecode - visible in hex/strings dump of the jar. */
     public static final String AUTHOR      = "Ragalikx";
     public static final String GITHUB      = "https://github.com/Ragalikx/steam-bridge-mc";
@@ -161,9 +175,28 @@ jar {
 
 processResources {
     inputs.property 'version', project.version
+    inputs.property 'mcversion', project.ext.minecraft_version
     from(sourceSets.main.resources.srcDirs) {
         include 'mcmod.info'
-        expand 'version': project.version, 'mcversion': '1.12.2'
+        expand 'version': project.version, 'mcversion': project.ext.minecraft_version
     }
     from(sourceSets.main.resources.srcDirs) { exclude 'mcmod.info' }
+}
+
+tasks.matching { it.name == 'build' }.configureEach {
+    doLast {
+        def libs = file("${buildDir}/libs")
+        def jars = libs.exists()
+            ? libs.listFiles({ d, n -> n.endsWith('.jar') && !n.endsWith('-sources.jar') } as FilenameFilter)
+            : null
+        logger.lifecycle("------------------------------------------------------------")
+        logger.lifecycle(" Steam Bridge (Forge {})  version = {}", project.ext.minecraft_version, project.version)
+        logger.lifecycle(" BuildInfo.VERSION / mcmod.info / jar Implementation-Version")
+        if (jars != null) {
+            jars.sort { a, b -> a.name <=> b.name }.each { j ->
+                logger.lifecycle(" Artifact: {}", j.absolutePath)
+            }
+        }
+        logger.lifecycle("------------------------------------------------------------")
+    }
 }

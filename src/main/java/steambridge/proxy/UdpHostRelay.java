@@ -8,18 +8,23 @@ package steambridge.proxy;
 import steambridge.SteamBridgeMod;
 import steambridge.steam.SteamManager;
 
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.SocketAddress;
+import java.nio.ByteBuffer;
+import java.nio.channels.ClosedChannelException;
+import java.nio.channels.DatagramChannel;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Host-side per-client UDP relay.
  *
- * Binds an ephemeral local UDP socket and acts as a fake local client talking to whatever
- * voice service is running on this machine (Simple Voice Chat, Plasmo Voice, etc.).
- * The target port is resolved via {@link SteamUdpProxy#resolveVoiceTargetPort()}
- * (detected explicit bind тЖТ host game port тЖТ 24454).
+ * Binds an ephemeral local UDP socket and acts as a fake local client talking to
+ * the voice service on this machine. Target port:
+ * {@link SteamUdpProxy#resolveVoiceTargetPort()}.
+ *
+ * <p>Uses {@link DatagramChannel} so traffic bypasses {@link UdpInterceptFactory}
+ * (relay must not share the client voice intercept path).
  */
 final class UdpHostRelay {
 
@@ -27,7 +32,7 @@ final class UdpHostRelay {
 
     private final int steamConn;
     private final long steamID;
-    private volatile DatagramSocket socket;
+    private volatile DatagramChannel channel;
     private volatile Thread thread;
     private volatile boolean running;
 
@@ -44,25 +49,37 @@ final class UdpHostRelay {
     void start() {
         running = true;
         try {
-            socket = new DatagramSocket();
+            DatagramChannel ch = DatagramChannel.open();
+            ch.configureBlocking(true);
+            ch.bind(new InetSocketAddress(0));
+            channel = ch;
         } catch (Exception e) {
-            SteamBridgeMod.LOG.error("[UdpRelay] Failed to open socket for conn={}: {}", steamConn, e.getMessage());
+            SteamBridgeMod.LOG.error("[UdpRelay] Failed to open socket for conn={}: {}", steamConn, e.toString());
             running = false;
             return;
         }
         thread = new Thread(this::receiveLoop, "SteamBridge-UdpRelay-" + steamConn);
         thread.setDaemon(true);
         thread.start();
+        int localPort = -1;
+        try {
+            SocketAddress local = channel.getLocalAddress();
+            if (local instanceof InetSocketAddress) {
+                localPort = ((InetSocketAddress) local).getPort();
+            }
+        } catch (Exception ignored) {}
         SteamBridgeMod.LOG.info(
             "[UdpRelay] Ready conn={} steamID={} localEphemeral={} voiceTarget={}",
-            steamConn, steamID, socket.getLocalPort(), SteamUdpProxy.getInstance().describeVoiceTarget()
+            steamConn, steamID, localPort, SteamUdpProxy.getInstance().describeVoiceTarget()
         );
     }
 
     void stop() {
         running = false;
-        DatagramSocket s = socket;
-        if (s != null) s.close();
+        DatagramChannel ch = channel;
+        if (ch != null) {
+            try { ch.close(); } catch (Exception ignored) {}
+        }
         Thread t = thread;
         if (t != null) t.interrupt();
     }
@@ -71,8 +88,8 @@ final class UdpHostRelay {
     long packetsToSteam() { return toSteam.get(); }
 
     void forwardToLocalService(byte[] data) {
-        DatagramSocket s = socket;
-        if (s == null || s.isClosed()) return;
+        DatagramChannel ch = channel;
+        if (ch == null || !ch.isOpen() || data == null || data.length == 0) return;
         try {
             SteamUdpProxy proxy = SteamUdpProxy.getInstance();
             int port = proxy.resolveVoiceTargetPort();
@@ -80,46 +97,60 @@ final class UdpHostRelay {
                 loggedFirstForward = true;
                 lastTargetPort = port;
                 SteamBridgeMod.LOG.info(
-                    "[UdpRelay] Forward steamтЖТsvc conn={} steamID={} target={} bytes={}",
-                    steamConn, steamID, proxy.describeVoiceTarget(), data != null ? data.length : 0
+                    "[UdpRelay] Forward steam->svc conn={} steamID={} target={} bytes={}",
+                    steamConn, steamID, proxy.describeVoiceTarget(), data.length
                 );
             }
             fromSteam.incrementAndGet();
-            s.send(new DatagramPacket(data, data.length, InetAddress.getLoopbackAddress(), port));
+            ch.send(ByteBuffer.wrap(data), new InetSocketAddress(InetAddress.getLoopbackAddress(), port));
         } catch (Exception e) {
             if (running) {
                 SteamBridgeMod.LOG.warn(
                     "[UdpRelay] Forward to service failed conn={} target={}: {}",
-                    steamConn, SteamUdpProxy.getInstance().describeVoiceTarget(), e.getMessage()
+                    steamConn, SteamUdpProxy.getInstance().describeVoiceTarget(), e.toString()
                 );
             }
         }
     }
 
     private void receiveLoop() {
-        byte[] buf = new byte[BUF_SIZE];
-        DatagramPacket packet = new DatagramPacket(buf, buf.length);
+        ByteBuffer buf = ByteBuffer.allocate(BUF_SIZE);
         while (running) {
+            DatagramChannel ch = channel;
+            if (ch == null || !ch.isOpen()) break;
             try {
-                socket.receive(packet);
-                byte[] data = new byte[packet.getLength()];
-                System.arraycopy(packet.getData(), packet.getOffset(), data, 0, packet.getLength());
+                buf.clear();
+                SocketAddress src = ch.receive(buf);
+                if (src == null) continue;
+                buf.flip();
+                int len = buf.remaining();
+                if (len <= 0) continue;
+                byte[] data = new byte[len];
+                buf.get(data);
                 long n = toSteam.incrementAndGet();
                 SteamUdpProxy.getInstance().noteServerVoiceOut();
                 if (n == 1) {
                     SteamBridgeMod.LOG.info(
-                        "[UdpRelay] First svcтЖТsteam reply conn={} steamID={} bytes={}",
+                        "[UdpRelay] First svc->steam reply conn={} steamID={} bytes={}",
                         steamConn, steamID, data.length
                     );
                 }
                 SteamManager.getInstance().sendVoiceBytes(steamConn, data);
+            } catch (ClosedChannelException e) {
+                break;
             } catch (java.net.SocketException e) {
                 break;
             } catch (Exception e) {
-                if (running) SteamBridgeMod.LOG.warn("[UdpRelay] Recv error conn={}: {}", steamConn, e.getMessage());
+                if (running) {
+                    SteamBridgeMod.LOG.warn(
+                        "[UdpRelay] Recv error conn={}: {}", steamConn, e.toString()
+                    );
+                }
             }
         }
-        DatagramSocket s = socket;
-        if (s != null && !s.isClosed()) s.close();
+        DatagramChannel ch = channel;
+        if (ch != null && ch.isOpen()) {
+            try { ch.close(); } catch (Exception ignored) {}
+        }
     }
 }

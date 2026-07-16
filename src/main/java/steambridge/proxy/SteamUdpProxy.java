@@ -28,7 +28,7 @@ import java.util.concurrent.atomic.AtomicLong;
  *   <li>Host side: when a voice mod binds an <b>explicit</b> UDP port (e.g. SVC
  *       {@code changePort(gamePort)} / dedicated config), {@link #registerBoundPort} records it
  *       for {@link UdpHostRelay}. OS-assigned {@code bind(0)} is ignored (client sockets,
- *       relay sockets). Fallback chain: detected bind тЖТ host game/LAN port тЖТ 24454.</li>
+ *       relay sockets). Fallback chain: detected bind -> host game/LAN port -> 24454.</li>
  *   <li>Client side: when SVC sends its first packet to {@code 127.0.0.1:<voicePort>},
  *       {@link SteamAwareDatagramImpl} switches to steam mode, records the server port
  *       via {@link #setServerVoicePort}, and registers itself as the active receive sink.</li>
@@ -41,7 +41,8 @@ public final class SteamUdpProxy {
 
     public static SteamUdpProxy getInstance() { return INSTANCE; }
 
-    // тФАтФА Server side тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА
+    // -- Server state ----------------------------------------------------------
+
     private volatile int udpListenSocket = 0;
     private final Map<Integer, UdpHostRelay> relayByConn = new ConcurrentHashMap<>();
     private final Set<Integer> acceptedConns = ConcurrentHashMap.newKeySet();
@@ -56,7 +57,8 @@ public final class SteamUdpProxy {
     private final AtomicLong clientVoicePacketsIn = new AtomicLong();
     private final AtomicLong clientVoicePacketsOut = new AtomicLong();
 
-    // тФАтФА Client side тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА
+    // -- Client state ----------------------------------------------------------
+
     private volatile int udpClientConn = 0;
     private volatile SteamAwareDatagramImpl activeClientImpl;
     private volatile int serverVoicePort = 0;
@@ -65,7 +67,7 @@ public final class SteamUdpProxy {
 
     private SteamUdpProxy() {}
 
-    // тФАтФА Server-side API тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА
+    // -- Server-side API -------------------------------------------------------
 
     public void startServer() {
         int udpVirtualPort = SteamBridgeConfig.virtualPort + 1;
@@ -148,7 +150,7 @@ public final class SteamUdpProxy {
                 long out = relay.packetsToSteam();
                 relay.stop();
                 SteamBridgeMod.LOG.info(
-                    "[UdpProxy] Relay stopped conn={} steamID={} reason={} voicePkts steamтЖТsvc={} svcтЖТsteam={}",
+                    "[UdpProxy] Relay stopped conn={} steamID={} reason={} voicePkts steam->svc={} svc->steam={}",
                     conn, steamID, status.describeState(), in, out
                 );
             }
@@ -204,7 +206,7 @@ public final class SteamUdpProxy {
 
     /**
      * Target for host-side voice relay:
-     * detected explicit bind тЖТ host game/LAN port тЖТ SVC default 24454.
+     * detected explicit bind -> host game/LAN port -> SVC default 24454.
      */
     public int resolveVoiceTargetPort() {
         int known = knownVoiceServerPort.get();
@@ -225,7 +227,7 @@ public final class SteamUdpProxy {
         return resolved + " (" + source + ", detected=" + known + ", gamePort=" + game + ")";
     }
 
-    // тФАтФА Client-side API тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА
+    // -- Client-side API -------------------------------------------------------
 
     public void startClient(SteamID hostId) {
         if (udpClientConn != 0) return;
@@ -321,7 +323,7 @@ public final class SteamUdpProxy {
         serverVoicePacketsOut.incrementAndGet();
     }
 
-    // тФАтФА Package-internal: called by SteamAwareDatagramImpl тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА
+    // -- Package-internal (SteamAwareDatagramImpl) -----------------------------
 
     void setServerVoicePort(int port) {
         serverVoicePort = port;
