@@ -802,17 +802,17 @@ public class SteamManager {
                     if (wasClient && mc.level != null) {
                         // Was a client inside a Steam-hosted world - kick to main menu with a friendly screen.
                         mc.clearLevel();
-                        mc.setScreen(new net.minecraft.client.gui.screens.DisconnectedScreen(
-                            new net.minecraft.client.gui.screens.TitleScreen(),
-                            net.minecraft.network.chat.Component.translatable("disconnect.lost"),
-                            net.minecraft.network.chat.Component.translatable("steambridge.error.steam_shutdown")
+                        mc.setScreen(new net.minecraft.client.gui.screen.DisconnectedScreen(
+                            new net.minecraft.client.gui.screen.MainMenuScreen(),
+                            new net.minecraft.util.text.TranslationTextComponent("disconnect.lost"),
+                            new net.minecraft.util.text.TranslationTextComponent("steambridge.error.steam_shutdown")
                         ));
                     } else if (wasHost && mc.player != null) {
                         // Was the host - Steam bridge died but the local world keeps running.
                         // Just warn the host in chat; they are NOT kicked.
                         mc.player.displayClientMessage(
-                            net.minecraft.network.chat.Component.translatable("steambridge.error.host_steam_shutdown")
-                                .withStyle(net.minecraft.ChatFormatting.RED),
+                            new net.minecraft.util.text.TranslationTextComponent("steambridge.error.host_steam_shutdown")
+                                .withStyle(net.minecraft.util.text.TextFormatting.RED),
                             false
                         );
                     }

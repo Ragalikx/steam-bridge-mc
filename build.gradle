@@ -1,16 +1,14 @@
 plugins {
-    id 'java'
-    id 'net.neoforged.moddev.legacyforge' version '2.0.141'
+    id 'eclipse'
+    id 'maven-publish'
+    id 'net.minecraftforge.gradle' version '5.1.69'
 }
 
 // -- Versioning ----------------------------------------------------------------
 // Release (cmd):        gradlew build -PmodVersion=1.145
-// Release (PowerShell): .\gradlew.bat build "-PmodVersion=1.145"   // quotes required:
-//                       bare 1.145 is split so Gradle sees task ".145"
-// Result: project.version / jar / mods.toml / BuildInfo = "1.145+mc1.19.2"
-// Dev (no -P):          "0.0.0-dev+mc1.19.2"
-// Optional leading "v" is stripped (CI: -PmodVersion=v1.145).
-// Do NOT use positional "gradlew build 1.145" - Gradle treats that as a task name.
+// Release (PowerShell): .\gradlew.bat build "-PmodVersion=1.145"
+// Result: project.version / jar / mods.toml / BuildInfo = "1.145+mc1.16.5"
+// Dev (no -P):          "0.0.0-dev+mc1.16.5"
 def rawModVersion = (findProperty('modVersion') ?: '0.0.0-dev').toString().trim()
 if (rawModVersion.isEmpty()) {
     throw new GradleException("modVersion is empty. Pass -PmodVersion=1.145 (or omit for 0.0.0-dev).")
@@ -18,7 +16,6 @@ if (rawModVersion.isEmpty()) {
 if (rawModVersion.startsWith('v') || rawModVersion.startsWith('V')) {
     rawModVersion = rawModVersion.substring(1)
 }
-// Reject accidental full strings that already contain +mc (avoid double suffix).
 if (rawModVersion.contains('+mc')) {
     throw new GradleException(
         "modVersion must be the mod release only (e.g. 1.145), not '${rawModVersion}'. " +
@@ -29,26 +26,21 @@ if (rawModVersion.contains('+mc')) {
 ext.modVersionOnly = rawModVersion
 version = "${rawModVersion}+mc${minecraft_version}"
 group   = project.mod_group
+archivesBaseName = project.mod_id
 
-logger.lifecycle("Steam Bridge (Forge 1.19.2) version: {}  (modVersion={}, minecraft={})",
+logger.lifecycle("Steam Bridge (Forge 1.16.5) version: {}  (modVersion={}, minecraft={})",
     version, rawModVersion, minecraft_version)
 
-base {
-    archivesName = project.mod_id
-}
+java.toolchain.languageVersion = JavaLanguageVersion.of(8)
 
-java {
-    toolchain.languageVersion = JavaLanguageVersion.of(17)
-}
-
-// -- Auto-generated BuildInfo (author/version stamped into bytecode) -----------
-def generatedSrcDir = layout.buildDirectory.dir('generated/java').get().asFile
+// -- Auto-generated BuildInfo -------------------------------------------------
+def generatedSrcDir = "${buildDir}/generated/java"
 
 sourceSets {
     main { java { srcDir generatedSrcDir } }
 }
 
-tasks.register('generateBuildInfo') {
+task generateBuildInfo {
     def verFull = project.version.toString()
     def verMod  = project.ext.modVersionOnly.toString()
     def verMc   = project.minecraft_version.toString()
@@ -63,7 +55,7 @@ tasks.register('generateBuildInfo') {
 package steambridge;
 /** Auto-generated at build time. Do not edit or commit. */
 public final class BuildInfo {
-    /** Full release id, e.g. {@code 1.145+mc1.19.2}. */
+    /** Full release id, e.g. {@code 1.145+mc1.16.5}. */
     public static final String VERSION     = "${verFull}";
     /** Mod-only version from {@code -PmodVersion}, e.g. {@code 1.145}. */
     public static final String MOD_VERSION = "${verMod}";
@@ -79,29 +71,24 @@ public final class BuildInfo {
 }
 
 tasks.withType(JavaCompile).configureEach {
-    dependsOn 'generateBuildInfo'
+    dependsOn generateBuildInfo
     options.encoding = 'UTF-8'
 }
 
-// -- MinecraftForge 1.19.2 via MDG legacyforge ---------------------------------
-// version= resolves net.minecraftforge:forge (MinecraftForge), not NeoForge.
-// Reobfuscation (official -> SRG) is wired for the jar task automatically.
-legacyForge {
-    version = project.forge_version
+minecraft {
+    mappings channel: project.mappings_channel, version: project.mappings_version
+    accessTransformer = file('src/main/resources/META-INF/accesstransformer.cfg')
 
     runs {
         client {
-            client()
-        }
-        configureEach {
-            systemProperty 'forge.logging.markers', 'REGISTRIES'
-            systemProperty 'forge.logging.console.level', 'debug'
-        }
-    }
-
-    mods {
-        "${project.mod_id}" {
-            sourceSet sourceSets.main
+            workingDirectory project.file('run')
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.console.level', 'debug'
+            mods {
+                "${project.mod_id}" {
+                    source sourceSets.main
+                }
+            }
         }
     }
 }
@@ -110,54 +97,26 @@ repositories {
     mavenCentral()
 }
 
-// Resolved (transitive-free) copy of the steamworks4j artifact, used only to pull its Java
-// API classes + win64 native DLLs into the mod jar (see the jar task). It is NOT a classpath
-// config - compilation/dev-runtime get steamworks4j via `implementation` below.
 configurations {
     steamBundle { transitive = false }
+    jnaBundle  { transitive = false }
 }
 
-// -- Steam bridge native deps ---------------------------------------------------------
-//
-// steamworks4j: its Java API classes are shaded FLAT into the mod jar (see the jar task),
-// exactly as the 1.12.2 build did. `com.codedisaster.steamworks` is a package no other mod
-// or the loader provides, so there is no split-package/module clash; the classes just ride
-// along in the steambridge automatic module and reach JNA (a named module the loader always
-// ships) through the implicit reads every automatic module gets. This is both smaller and
-// simpler than Jar-in-Jar, which nested the *entire* upstream jar - including ~2.3 MB of
-// macOS/Linux/32-bit natives this Windows-only mod never loads.
-//
-// JNA: NOT bundled at all - three approaches were tried for that and all failed:
-//  1. shadowJar + relocate(com.sun.jna -> steambridge.shaded.com.sun.jna): breaks JNA's
-//     native bootstrap (jnidispatch.dll's exported symbols are compiled against the
-//     original `com.sun.jna.Native` class name -> UnsatisfiedLinkError at class-init).
-//  2. shadowJar without relocation: NeoForge's production launch resolves JNA as a real
-//     Java *module* on the module path (`-p ...jna-5.12.1.jar`); our mod jar becomes an
-//     automatic module that also exports the unrelocated `com.sun.jna` package, and the
-//     JPMS module resolver refuses two modules exporting the same package
-//     (`ResolutionException: Modules steambridge and com.sun.jna export package
-//     com.sun.jna to module forge`).
-//  3. jarJar-embedding our own JNA copy: NeoForge's loader *also* exposes jar-in-jar
-//     GAMELIBRARY dependencies as real modules on the same layer, so our embedded
-//     jna-5.14.0 and the loader's own jna-5.12.1 both register as a module named
-//     "com.sun.jna" -> `ResolutionException: Module steambridge reads more than one
-//     module named com.sun.jna`.
-// Compile against JNA; do not bundle a second copy if the loader already ships one.
-// If client launch fails with ClassNotFound for com.sun.jna, switch to shade/slim later.
 dependencies {
-    compileOnly "net.java.dev.jna:jna:${project.jna_version}"
+    minecraft "net.minecraftforge:forge:${project.forge_version}"
 
-    // Compile + dev-runtime classpath for the steamworks4j API. Not auto-bundled by the
-    // default `jar` task - we copy its classes in ourselves.
+    // Compile + shade: steamworks4j + slim JNA (1.16.5 loader does not ship JNA as a module).
     implementation("com.code-disaster.steamworks4j:steamworks4j:${project.steamworks4j_version}") {
         exclude group: 'net.java.dev.jna'
     }
+    implementation "net.java.dev.jna:jna:${project.jna_version}"
 
     steamBundle "com.code-disaster.steamworks4j:steamworks4j:${project.steamworks4j_version}"
+    jnaBundle  "net.java.dev.jna:jna:${project.jna_version}"
 }
 
 // -- Resource templating (mods.toml version substitution) ---------------------
-tasks.named('processResources', ProcessResources).configure {
+processResources {
     var replaceProperties = [
         mod_id           : project.mod_id,
         mod_name         : project.mod_name,
@@ -172,15 +131,10 @@ tasks.named('processResources', ProcessResources).configure {
 }
 
 jar {
-    // Shade steamworks4j's Java API classes flat into the mod jar, and lay the win64 Steam
-    // native binaries FLAT at the jar root (steam_api64.dll / steamworks4j64.dll).
-    // SteamManager's loader reads the DLLs via getClass().getResourceAsStream("/steam_api64.dll")
-    // - getClass() belongs to THIS mod jar, so the DLLs must be resolvable from the mod jar's
-    // own classloader at its root. Everything else in the upstream artifact is dropped:
-    // the macOS/Linux natives (unsupported) and the 32-bit DLLs (1.19.2 requires 64-bit Java).
+    // steamworks4j API + win64 natives at jar root
     from({ project.configurations.steamBundle.collect { zipTree(it) } }) {
-        include 'com/codedisaster/**'                    // steamworks4j Java API
-        include 'steam_api64.dll', 'steamworks4j64.dll'  // win64 natives only, at the jar root
+        include 'com/codedisaster/**'
+        include 'steam_api64.dll', 'steamworks4j64.dll'
         exclude 'com/codedisaster/steamworks/SteamController*'
         exclude 'com/codedisaster/steamworks/SteamHTTP*'
         exclude 'com/codedisaster/steamworks/SteamLeaderboard*'
@@ -193,6 +147,21 @@ jar {
         exclude 'com/codedisaster/steamworks/SteamUGC*'
         exclude 'com/codedisaster/steamworks/SteamUserStats*'
         exclude 'com/codedisaster/steamworks/SteamApps*'
+    }
+    // Slim JNA: win64 jnidispatch only (same idea as 1.12.2 branch)
+    from({ project.configurations.jnaBundle.collect { zipTree(it) } }) {
+        include 'com/sun/jna/**'
+        include 'com/sun/jna/win32-x86-64/**'
+        exclude 'com/sun/jna/darwin*/**'
+        exclude 'com/sun/jna/linux*/**'
+        exclude 'com/sun/jna/sunos*/**'
+        exclude 'com/sun/jna/freebsd*/**'
+        exclude 'com/sun/jna/openbsd*/**'
+        exclude 'com/sun/jna/aix*/**'
+        exclude 'com/sun/jna/win32-x86/**'
+        exclude 'com/sun/jna/win32-aarch64/**'
+        exclude 'module-info.class'
+        exclude 'META-INF/versions/**'
     }
     from('third_party_licenses') {
         into 'META-INF/licenses'
@@ -214,3 +183,5 @@ jar {
         ])
     }
 }
+
+jar.finalizedBy('reobfJar')

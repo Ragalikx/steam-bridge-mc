@@ -11,12 +11,13 @@ import steambridge.SteamBridgeConfig;
 import steambridge.SteamBridgeMod;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.screens.ConnectScreen;
-import net.minecraft.client.gui.screens.DisconnectedScreen;
-import net.minecraft.client.gui.screens.ReceivingLevelScreen;
-import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.gui.screens.TitleScreen;
-import net.minecraft.network.chat.Component;
+import net.minecraft.client.gui.screen.ConnectingScreen;
+import net.minecraft.client.gui.screen.DisconnectedScreen;
+import net.minecraft.client.gui.screen.DownloadTerrainScreen;
+import net.minecraft.client.gui.screen.MainMenuScreen;
+import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.util.text.StringTextComponent;
+import net.minecraft.util.text.TranslationTextComponent;
 
 import java.util.Locale;
 import java.util.concurrent.CountDownLatch;
@@ -358,11 +359,11 @@ public class SteamClient {
         Minecraft mc = Minecraft.getInstance();
         mc.execute(() -> {
             Screen current = mc.screen;
-            if (current instanceof ReceivingLevelScreen || current instanceof ConnectScreen) {
+            if (current instanceof DownloadTerrainScreen || current instanceof ConnectingScreen) {
                 mc.setScreen(new DisconnectedScreen(
-                    connectingScreen != null ? connectingScreen : new TitleScreen(),
-                    Component.translatable("connect.failed"),
-                    Component.literal(msg)
+                    connectingScreen != null ? connectingScreen : new MainMenuScreen(),
+                    new TranslationTextComponent("connect.failed"),
+                    new StringTextComponent(msg)
                 ));
             }
         });
@@ -404,8 +405,8 @@ public class SteamClient {
     /** Returns the I18n translation for {@code key}, or {@code fallback} if unavailable. */
     private static String i18n(String key, String fallback) {
         try {
-            if (net.minecraft.client.resources.language.I18n.exists(key)) {
-                return net.minecraft.client.resources.language.I18n.get(key);
+            if (net.minecraft.client.resources.I18n.exists(key)) {
+                return net.minecraft.client.resources.I18n.get(key);
             }
         } catch (Exception ignored) {
             // Minecraft not yet fully initialised - use English fallback.

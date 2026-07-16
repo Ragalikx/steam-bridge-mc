@@ -11,11 +11,11 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import steambridge.SteamBridgeConfig;
 import steambridge.SteamBridgeMod;
-import com.mojang.blaze3d.platform.NativeImage;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.level.GameType;
+import net.minecraft.client.renderer.texture.NativeImage;
+import net.minecraft.util.ResourceLocation;
+import net.minecraft.world.GameType;
 
 import java.io.File;
 import java.io.Reader;

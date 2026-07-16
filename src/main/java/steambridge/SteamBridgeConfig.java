@@ -6,10 +6,10 @@
 package steambridge;
 
 import net.minecraftforge.common.ForgeConfigSpec;
-import net.minecraftforge.fml.event.config.ModConfigEvent;
+import net.minecraftforge.fml.config.ModConfig;
 
 /**
- * Client config (Forge 1.19.2, {@link ForgeConfigSpec}).
+ * Client config (Forge 1.16.5, {@link ForgeConfigSpec}).
  *
  * <p>The {@code virtualPort} / {@code allowWithoutAuth} static fields are plain mirrors of
  * the spec values so the rest of the codebase can read them directly. They are refreshed
@@ -19,25 +19,14 @@ public final class SteamBridgeConfig {
 
     private SteamBridgeConfig() {}
 
-    // -- Live mirror values (read throughout the mod) --------------------------
-    // NOTE: the Steam App ID is intentionally NOT configurable. It is hardcoded to 480
-    // (Spacewar) in SteamAppIdHelper. Letting users point it at a real game's App ID -
-    // especially one with an anti-cheat (VAC/EAC) - would get their account banned.
     public static boolean allowWithoutAuth = true;
     public static int     virtualPort      = 0;
     /**
      * Whether to install a JVM-wide {@link java.net.DatagramSocketImplFactory} that intercepts
-     * UDP sockets so voice-chat mods (Simple Voice Chat, Plasmo Voice, etc.) can be tunnelled
-     * through Steam alongside Minecraft traffic.
-     *
-     * <p>Setting this to {@code false} disables the interception - voice mods will stop working
-     * through Steam Bridge, but no DatagramSocket factory will be installed and no UDP port will
-     * be hijacked. The setting takes effect only at launch; changing it mid-session has no effect
-     * because the factory is a one-time JVM-lifetime operation.</p>
+     * UDP sockets so voice-chat mods can be tunnelled through Steam alongside Minecraft traffic.
      */
     public static boolean interceptUdp    = true;
 
-    // -- Spec definition -------------------------------------------------------
     public static final ForgeConfigSpec SPEC;
     private static final ForgeConfigSpec.BooleanValue ALLOW_WITHOUT_AUTH;
     private static final ForgeConfigSpec.IntValue     VIRTUAL_PORT;
@@ -66,20 +55,19 @@ public final class SteamBridgeConfig {
         SPEC = b.build();
     }
 
-    /** Refreshes the mirror fields from the spec. Call after the config is loaded/reloaded. */
     public static void bake() {
         allowWithoutAuth = ALLOW_WITHOUT_AUTH.get();
         virtualPort      = VIRTUAL_PORT.get();
         interceptUdp     = INTERCEPT_UDP.get();
     }
 
-    public static void onLoad(ModConfigEvent.Loading event) {
+    public static void onLoad(final ModConfig.Loading event) {
         if (event.getConfig().getSpec() == SPEC) {
             bake();
         }
     }
 
-    public static void onReload(ModConfigEvent.Reloading event) {
+    public static void onReload(final ModConfig.Reloading event) {
         if (event.getConfig().getSpec() == SPEC) {
             bake();
         }

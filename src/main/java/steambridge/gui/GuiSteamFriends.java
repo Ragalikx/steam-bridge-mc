@@ -9,15 +9,15 @@ import com.codedisaster.steamworks.SteamID;
 import com.codedisaster.steamworks.SteamFriends;
 import steambridge.steam.SteamManager;
 import steambridge.steam.SteamSocial;
+import com.mojang.blaze3d.matrix.MatrixStack;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.renderer.GameRenderer;
-import net.minecraft.client.resources.language.I18n;
-import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.gui.widget.TextFieldWidget;
+import net.minecraft.client.resources.I18n;
+import net.minecraft.util.ResourceLocation;
+import net.minecraft.util.text.StringTextComponent;
+import net.minecraft.util.text.TranslationTextComponent;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -33,10 +33,10 @@ public class GuiSteamFriends extends Screen {
     private static final int LIST_Y_START = 65;
 
     private final Screen           parent;
-    private final EditBox          targetField;
+    private final TextFieldWidget  targetField;
     private final Consumer<String> onSelected;
 
-    private EditBox searchField;
+    private TextFieldWidget searchField;
 
     private static final class FriendItem {
         long   steamId;
@@ -48,8 +48,8 @@ public class GuiSteamFriends extends Screen {
 
     private int scrollOffset = 0;
 
-    public GuiSteamFriends(Screen parent, EditBox targetField, Consumer<String> onSelected) {
-        super(Component.translatable("steambridge.gui.select_friend"));
+    public GuiSteamFriends(Screen parent, TextFieldWidget targetField, Consumer<String> onSelected) {
+        super(new TranslationTextComponent("steambridge.gui.select_friend"));
         this.parent      = parent;
         this.targetField = targetField;
         this.onSelected  = onSelected;
@@ -57,14 +57,14 @@ public class GuiSteamFriends extends Screen {
 
     @Override
     protected void init() {
-        this.addRenderableWidget(GuiButtons.createCentered(this.font, this.width / 2, this.height - 30,
-                Component.translatable("gui.back"),
+        this.addButton(GuiButtons.createCentered(this.font, this.width / 2, this.height - 30,
+                new TranslationTextComponent("gui.back"),
                 b -> this.minecraft.setScreen(parent), 100, this.width - 20));
 
-        searchField = new EditBox(this.font, this.width / 2 - 100, 35, 200, 20, Component.empty());
+        searchField = new TextFieldWidget(this.font, this.width / 2 - 100, 35, 200, 20, StringTextComponent.EMPTY);
         searchField.setMaxLength(50);
         searchField.setResponder(s -> updateFilter());
-        this.addRenderableWidget(searchField);
+        this.children.add(searchField);
         this.setInitialFocus(searchField);
 
         loadFriends();
@@ -135,24 +135,25 @@ public class GuiSteamFriends extends Screen {
     }
 
     @Override
-    public void render(PoseStack poseStack, int mouseX, int mouseY, float partialTicks) {
-        this.renderBackground(poseStack);
-        drawCenteredString(poseStack, this.font,
+    public void render(MatrixStack matrixStack, int mouseX, int mouseY, float partialTicks) {
+        this.renderBackground(matrixStack);
+        drawCenteredString(matrixStack, this.font,
                 I18n.get("steambridge.gui.select_friend"),
                 this.width / 2, 15, 0xFFFFFF);
 
-        drawFriendPanel(poseStack, mouseX, mouseY);
+        drawFriendPanel(matrixStack, mouseX, mouseY);
 
-        super.render(poseStack, mouseX, mouseY, partialTicks);
+        searchField.render(matrixStack, mouseX, mouseY, partialTicks);
+        super.render(matrixStack, mouseX, mouseY, partialTicks);
     }
 
-    private void drawFriendPanel(PoseStack poseStack, int mouseX, int mouseY) {
+    private void drawFriendPanel(MatrixStack matrixStack, int mouseX, int mouseY) {
         int panelLeft   = this.width / 2 - PANEL_HALF_WIDTH;
         int panelRight  = this.width / 2 + PANEL_HALF_WIDTH;
         int panelBottom = listPanelBottom();
         int maxVisible  = maxVisibleRows();
 
-        fill(poseStack, panelLeft, LIST_Y_START - PANEL_PADDING, panelRight, panelBottom, 0x88000000);
+        fill(matrixStack, panelLeft, LIST_Y_START - PANEL_PADDING, panelRight, panelBottom, 0x88000000);
 
         for (int i = 0; i < maxVisible; i++) {
             int friendIdx = scrollOffset + i;
@@ -167,28 +168,27 @@ public class GuiSteamFriends extends Screen {
                          && mouseY > y
                          && mouseY < y + ROW_HEIGHT;
             if (hover) {
-                fill(poseStack, this.width / 2 - LIST_HALF_WIDTH, y,
+                fill(matrixStack, this.width / 2 - LIST_HALF_WIDTH, y,
                         this.width / 2 + LIST_HALF_WIDTH, y + ROW_HEIGHT,
                         0x55FFFFFF);
             }
 
-            drawAvatar(poseStack, friend.steamId, this.width / 2 - LIST_HALF_WIDTH + 1, y + 4);
+            drawAvatar(matrixStack, friend.steamId, this.width / 2 - LIST_HALF_WIDTH + 1, y + 4);
 
             int nameX = this.width / 2 - LIST_HALF_WIDTH + AVATAR_SIZE + 4;
-            drawString(poseStack, this.font, friend.name, nameX, y + 8, 0xFFFFFF);
+            drawString(matrixStack, this.font, friend.name, nameX, y + 8, 0xFFFFFF);
         }
     }
 
-    private void drawAvatar(PoseStack poseStack, long steamId, int x, int y) {
+    private void drawAvatar(MatrixStack matrixStack, long steamId, int x, int y) {
         String texturePath = SteamSocial.ProfileCache.get().getAvatarTexture(steamId);
         if (texturePath == null || texturePath.isEmpty()) return;
 
         try {
             ResourceLocation loc = new ResourceLocation(texturePath);
-            RenderSystem.setShader(GameRenderer::getPositionTexShader);
-            RenderSystem.setShaderTexture(0, loc);
-            RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
-            blit(poseStack, x, y, 0, 0, AVATAR_SIZE, AVATAR_SIZE, AVATAR_SIZE, AVATAR_SIZE);
+            this.minecraft.getTextureManager().bind(loc);
+            RenderSystem.color4f(1.0F, 1.0F, 1.0F, 1.0F);
+            blit(matrixStack, x, y, 0, 0, AVATAR_SIZE, AVATAR_SIZE, AVATAR_SIZE, AVATAR_SIZE);
         } catch (Exception ignored) {}
     }
 

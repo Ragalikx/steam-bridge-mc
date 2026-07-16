@@ -8,11 +8,12 @@ package steambridge.gui;
 import steambridge.SteamAppIdHelper;
 import steambridge.SteamBridgeMod;
 import steambridge.steam.SteamManager;
-import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.matrix.MatrixStack;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.resources.language.I18n;
-import net.minecraft.network.chat.Component;
+import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.resources.I18n;
+import net.minecraft.util.text.StringTextComponent;
+import net.minecraft.util.text.TranslationTextComponent;
 
 import java.util.function.Consumer;
 
@@ -40,19 +41,19 @@ public class GuiSteamResync extends Screen {
     private int nextCheckTick = POLL_INTERVAL_TICKS;
 
     public GuiSteamResync(Screen parent, Consumer<String> onSteamIdSelected) {
-        super(Component.empty());
+        super(StringTextComponent.EMPTY);
         this.parent = parent;
         this.onSteamIdSelected = onSteamIdSelected;
     }
 
     @Override
     protected void init() {
-        this.addRenderableWidget(GuiButtons.createCentered(this.font, this.width / 2, this.height - 40,
-                Component.translatable("gui.cancel"),
+        this.addButton(GuiButtons.createCentered(this.font, this.width / 2, this.height - 40,
+                new TranslationTextComponent("gui.cancel"),
                 b -> this.minecraft.setScreen(parent), 100, this.width - 20));
 
         if (state == State.LAUNCHING) {
-            statusLine1 = "§e" + I18n.get("steambridge.gui.resync_launching");
+            statusLine1 = "\u00a7e" + I18n.get("steambridge.gui.resync_launching");
             statusLine2 = "";
             launchAndScheduleRetry();
         }
@@ -63,8 +64,8 @@ public class GuiSteamResync extends Screen {
             SteamAppIdHelper.ensureAppId(Minecraft.getInstance().gameDirectory);
             SteamAppIdHelper.launchSteam();
             state = State.WAITING;
-            statusLine1 = "§e" + I18n.get("steambridge.gui.resync_starting");
-            statusLine2 = "§7" + I18n.get("steambridge.gui.resync_starting_hint");
+            statusLine1 = "\u00a7e" + I18n.get("steambridge.gui.resync_starting");
+            statusLine2 = "\u00a77" + I18n.get("steambridge.gui.resync_starting_hint");
         } catch (Exception e) {
             SteamBridgeMod.LOG.warn("[Resync] Failed to launch Steam: {}", e.getMessage());
             state = State.WAITING;
@@ -91,8 +92,8 @@ public class GuiSteamResync extends Screen {
             boolean ok = SteamManager.getInstance().reinit();
             if (ok) {
                 state = State.SUCCESS;
-                statusLine1 = "§a" + I18n.get("steambridge.gui.resync_success");
-                statusLine2 = "§7" + I18n.get("steambridge.gui.resync_success_hint");
+                statusLine1 = "\u00a7a" + I18n.get("steambridge.gui.resync_success");
+                statusLine2 = "\u00a77" + I18n.get("steambridge.gui.resync_success_hint");
                 Minecraft.getInstance().execute(() ->
                         Minecraft.getInstance().setScreen(
                                 new GuiSteamFriends(parent, null, onSteamIdSelected)));
@@ -102,34 +103,34 @@ public class GuiSteamResync extends Screen {
 
         if (remaining <= 0) {
             state = State.FAILED;
-            statusLine1 = "§c" + I18n.get("steambridge.gui.resync_timeout");
-            statusLine2 = "§7" + I18n.get("steambridge.gui.resync_timeout_hint");
+            statusLine1 = "\u00a7c" + I18n.get("steambridge.gui.resync_timeout");
+            statusLine2 = "\u00a77" + I18n.get("steambridge.gui.resync_timeout_hint");
             return;
         }
 
-        statusLine1 = "§e" + I18n.get("steambridge.gui.resync_countdown", remaining);
+        statusLine1 = "\u00a7e" + I18n.get("steambridge.gui.resync_countdown", remaining);
         statusLine2 = "";
     }
 
     @Override
-    public void render(PoseStack poseStack, int mouseX, int mouseY, float partialTicks) {
-        this.renderBackground(poseStack);
+    public void render(MatrixStack matrixStack, int mouseX, int mouseY, float partialTicks) {
+        this.renderBackground(matrixStack);
 
-        String title = "§b" + I18n.get("steambridge.gui.resync_title");
-        drawCenteredString(poseStack, this.font, title, this.width / 2, this.height / 2 - 50, 0xFFFFFF);
-        drawCenteredString(poseStack, this.font, statusLine1, this.width / 2, this.height / 2 - 20, 0xFFFFFF);
+        String title = "\u00a7b" + I18n.get("steambridge.gui.resync_title");
+        drawCenteredString(matrixStack, this.font, title, this.width / 2, this.height / 2 - 50, 0xFFFFFF);
+        drawCenteredString(matrixStack, this.font, statusLine1, this.width / 2, this.height / 2 - 20, 0xFFFFFF);
         if (!statusLine2.isEmpty()) {
-            drawCenteredString(poseStack, this.font, statusLine2, this.width / 2, this.height / 2, 0xAAAAAA);
+            drawCenteredString(matrixStack, this.font, statusLine2, this.width / 2, this.height / 2, 0xAAAAAA);
         }
 
         if (state == State.WAITING) {
             int dots = (ticksElapsed / 8) % 4;
-            StringBuilder sb = new StringBuilder("§7");
+            StringBuilder sb = new StringBuilder("\u00a77");
             for (int i = 0; i < dots; i++) sb.append('.');
-            drawCenteredString(poseStack, this.font, sb.toString(), this.width / 2, this.height / 2 + 16, 0xFFFFFF);
+            drawCenteredString(matrixStack, this.font, sb.toString(), this.width / 2, this.height / 2 + 16, 0xFFFFFF);
         }
 
-        super.render(poseStack, mouseX, mouseY, partialTicks);
+        super.render(matrixStack, mouseX, mouseY, partialTicks);
     }
 
     @Override

@@ -1,5 +1,5 @@
 modLoader="javafml"
-loaderVersion="[43,)"
+loaderVersion="[36,)"
 license="MIT"
 issueTrackerURL="https://github.com/Ragalikx/steam-bridge-mc/issues"
 
@@ -10,7 +10,6 @@ displayName="${mod_name}"
 authors="Ragalikx"
 credits="Ragalikx - author; Valve - Steam SDK (DatagramSockets relay); Daniel Ludwig (code-disaster) - steamworks4j; java-native-access - JNA"
 
-displayTest="IGNORE_ALL_VERSION"
 description='''
 Steam Bridge - play Minecraft with friends without a public IP.
 
@@ -22,13 +21,13 @@ Requires Steam (AppID 480 - Spacewar) to be running.'''
 [[dependencies.${mod_id}]]
     modId="forge"
     mandatory=true
-    versionRange="[43.5.0,)"
+    versionRange="[36.2,)"
     ordering="NONE"
     side="CLIENT"
 
 [[dependencies.${mod_id}]]
     modId="minecraft"
     mandatory=true
-    versionRange="[1.19.2,1.20)"
+    versionRange="[1.16.5,1.17)"
     ordering="NONE"
     side="CLIENT"

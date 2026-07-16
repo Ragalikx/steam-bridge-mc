@@ -239,11 +239,23 @@ final class SteamAwareDatagramImpl extends DatagramSocketImpl {
     @Override
     public void setOption(int optID, Object value) throws SocketException {
         switch (optID) {
-            case SocketOptions.SO_TIMEOUT   -> soTimeout   = toInt(value);
-            case SocketOptions.SO_REUSEADDR -> soReuseAddr = toBool(value);
-            case SocketOptions.SO_RCVBUF    -> soRcvBuf    = toInt(value);
-            case SocketOptions.SO_SNDBUF    -> soSndbuf    = toInt(value);
-            case SocketOptions.SO_BROADCAST -> soBroadcast = toBool(value);
+            case SocketOptions.SO_TIMEOUT:
+                soTimeout = toInt(value);
+                break;
+            case SocketOptions.SO_REUSEADDR:
+                soReuseAddr = toBool(value);
+                break;
+            case SocketOptions.SO_RCVBUF:
+                soRcvBuf = toInt(value);
+                break;
+            case SocketOptions.SO_SNDBUF:
+                soSndbuf = toInt(value);
+                break;
+            case SocketOptions.SO_BROADCAST:
+                soBroadcast = toBool(value);
+                break;
+            default:
+                break;
         }
         DatagramChannel ch = channel;
         if (ch != null && ch.isOpen()) {
@@ -257,13 +269,18 @@ final class SteamAwareDatagramImpl extends DatagramSocketImpl {
         DatagramChannel ch = channel;
         if (ch == null || !ch.isOpen()) return null;
         try {
-            return switch (optID) {
-                case SocketOptions.SO_RCVBUF    -> ch.getOption(StandardSocketOptions.SO_RCVBUF);
-                case SocketOptions.SO_SNDBUF    -> ch.getOption(StandardSocketOptions.SO_SNDBUF);
-                case SocketOptions.SO_REUSEADDR -> ch.getOption(StandardSocketOptions.SO_REUSEADDR);
-                case SocketOptions.SO_BROADCAST -> ch.getOption(StandardSocketOptions.SO_BROADCAST);
-                default                         -> null;
-            };
+            switch (optID) {
+                case SocketOptions.SO_RCVBUF:
+                    return ch.getOption(StandardSocketOptions.SO_RCVBUF);
+                case SocketOptions.SO_SNDBUF:
+                    return ch.getOption(StandardSocketOptions.SO_SNDBUF);
+                case SocketOptions.SO_REUSEADDR:
+                    return ch.getOption(StandardSocketOptions.SO_REUSEADDR);
+                case SocketOptions.SO_BROADCAST:
+                    return ch.getOption(StandardSocketOptions.SO_BROADCAST);
+                default:
+                    return null;
+            }
         } catch (IOException e) {
             throw new SocketException(e.getMessage());
         }
@@ -271,10 +288,20 @@ final class SteamAwareDatagramImpl extends DatagramSocketImpl {
 
     private static void applyOption(DatagramChannel ch, int optID, Object value) throws IOException {
         switch (optID) {
-            case SocketOptions.SO_RCVBUF    -> ch.setOption(StandardSocketOptions.SO_RCVBUF,    (Integer) value);
-            case SocketOptions.SO_SNDBUF    -> ch.setOption(StandardSocketOptions.SO_SNDBUF,    (Integer) value);
-            case SocketOptions.SO_REUSEADDR -> ch.setOption(StandardSocketOptions.SO_REUSEADDR, (Boolean) value);
-            case SocketOptions.SO_BROADCAST -> ch.setOption(StandardSocketOptions.SO_BROADCAST, (Boolean) value);
+            case SocketOptions.SO_RCVBUF:
+                ch.setOption(StandardSocketOptions.SO_RCVBUF, (Integer) value);
+                break;
+            case SocketOptions.SO_SNDBUF:
+                ch.setOption(StandardSocketOptions.SO_SNDBUF, (Integer) value);
+                break;
+            case SocketOptions.SO_REUSEADDR:
+                ch.setOption(StandardSocketOptions.SO_REUSEADDR, (Boolean) value);
+                break;
+            case SocketOptions.SO_BROADCAST:
+                ch.setOption(StandardSocketOptions.SO_BROADCAST, (Boolean) value);
+                break;
+            default:
+                break;
         }
     }
 
@@ -308,11 +335,11 @@ final class SteamAwareDatagramImpl extends DatagramSocketImpl {
     }
 
     private static int toInt(Object v) {
-        return v instanceof Integer i ? i : 0;
+        return v instanceof Integer ? ((Integer) v).intValue() : 0;
     }
 
     private static boolean toBool(Object v) {
-        return v instanceof Boolean b && b;
+        return v instanceof Boolean && ((Boolean) v).booleanValue();
     }
 
     // ──────────────────────── Multicast stubs (voice mods don't use multicast)

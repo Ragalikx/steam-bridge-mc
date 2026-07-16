@@ -6,7 +6,6 @@
 package steambridge.steam;
 
 import steambridge.SteamBridgeMod;
-import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
@@ -16,18 +15,17 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.gui.screens.TitleScreen;
-import net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen;
-import net.minecraft.client.multiplayer.ClientHandshakePacketListenerImpl;
-import net.minecraft.network.Connection;
-import net.minecraft.network.ConnectionProtocol;
-import net.minecraft.network.protocol.handshake.ClientIntentionPacket;
-import net.minecraft.network.protocol.login.ServerboundHelloPacket;
-import net.minecraftforge.network.NetworkConstants;
+import net.minecraft.client.gui.screen.MainMenuScreen;
+import net.minecraft.client.gui.screen.MultiplayerScreen;
+import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.network.login.ClientLoginNetHandler;
+import net.minecraft.network.NetworkManager;
+import net.minecraft.network.ProtocolType;
+import net.minecraft.network.handshake.client.CHandshakePacket;
+import net.minecraft.network.login.client.CLoginStartPacket;
+import net.minecraftforge.fml.network.FMLNetworkConstants;
 
 import java.net.InetSocketAddress;
-import java.util.Optional;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.IntConsumer;
@@ -120,28 +118,21 @@ public final class SteamTransport {
         try {
             Minecraft mc = Minecraft.getInstance();
 
-            // The screen we hand to the net handler becomes DisconnectedScreen's parent
-            // when the server later drops us. Re-showing the stale connect/add-server
-            // screen the player launched from leaves its buttons unresponsive, so use a
-            // fresh multiplayer list instead (same fallback vanilla uses when it has
-            // no origin screen). This is the "Back to server list" target after a kick.
-            final Screen returnScreen = new JoinMultiplayerScreen(new TitleScreen());
+            // Fresh multiplayer list as the disconnect "Back" target.
+            final Screen returnScreen = new MultiplayerScreen(new MainMenuScreen());
 
-            // 1.19.2: Connection.connectToServer builds the vanilla pipeline and connects.
-            InetSocketAddress addr = new InetSocketAddress("127.0.0.1", proxyPort);
-            Connection connection = Connection.connectToServer(addr, false);
+            NetworkManager connection = NetworkManager.connectToServer(
+                    java.net.InetAddress.getByName("127.0.0.1"),
+                    proxyPort,
+                    mc.options.useNativeTransport());
 
-            connection.setListener(new ClientHandshakePacketListenerImpl(
+            connection.setListener(new ClientLoginNetHandler(
                     connection, mc, returnScreen, status -> {}));
 
-            // Intention hostname carries the Forge modded-connection marker so the host
-            // runs the Forge login handshake instead of treating us as vanilla.
-            String hostName = "SteamRelay\0" + NetworkConstants.NETVERSION + "\0";
-            connection.send(new ClientIntentionPacket(hostName, 25565, ConnectionProtocol.LOGIN));
-            connection.send(new ServerboundHelloPacket(
-                    mc.getUser().getName(),
-                    Optional.empty(),
-                    Optional.ofNullable(mc.getUser().getProfileId())));
+            // Intention hostname carries the Forge modded-connection marker.
+            String hostName = "SteamRelay\0" + FMLNetworkConstants.NETVERSION + "\0";
+            connection.send(new CHandshakePacket(hostName, 25565, ProtocolType.LOGIN));
+            connection.send(new CLoginStartPacket(mc.getUser().getGameProfile()));
 
             SteamBridgeMod.LOG.info("[LoopbackBridge][Client] Connected to loopback proxy. proxyPort={} conn={} steamID={}",
                 proxyPort, connectionHandle, remoteSteamID);
@@ -163,9 +154,6 @@ final class LoopbackBridge extends io.netty.channel.ChannelInboundHandlerAdapter
     private final java.util.concurrent.ConcurrentLinkedQueue<byte[]> preActivateQueue = new java.util.concurrent.ConcurrentLinkedQueue<>();
     private volatile boolean closed = false;
 
-    // Backpressure queue. A plain LinkedList is safe here only because Netty guarantees every
-    // call into a channel's handlers (read, write, flush) runs on that channel's single event-loop
-    // thread. If this queue is ever touched from outside the event loop, this needs to change.
     private final java.util.Queue<io.netty.buffer.ByteBuf> pendingOutbound = new java.util.LinkedList<>();
     private final int STEAM_MAX_CHUNK = 256 * 1024; // 256KB safe max
 
@@ -216,14 +204,12 @@ final class LoopbackBridge extends io.netty.channel.ChannelInboundHandlerAdapter
 
             int r = SteamManager.getInstance().sendMessageFromByteBuf(connectionHandle, buf, toSend);
             if (r == SteamSocketsApi.RESULT_OK) {
-                // Buffer space was directly read by Steam natively! No Java byte array needed!
                 buf.skipBytes(toSend);
                 if (!buf.isReadable()) {
                     buf.release();
                     pendingOutbound.poll();
                 }
             } else if (r == SteamSocketsApi.RESULT_LIMIT_EXCEEDED) {
-                // Buffer full. Pause TCP reads (Natural Backpressure)
                 if (ctx.channel().config().isAutoRead()) {
                     ctx.channel().config().setAutoRead(false);
                     flowConfigured = true;
@@ -237,10 +223,9 @@ final class LoopbackBridge extends io.netty.channel.ChannelInboundHandlerAdapter
             }
         }
 
-        // Output drained. Resume TCP reads
         if (!flowConfigured && !ctx.channel().config().isAutoRead()) {
             ctx.channel().config().setAutoRead(true);
-            ctx.read(); // Request a read immediately
+            ctx.read();
         }
     }
 
@@ -252,12 +237,6 @@ final class LoopbackBridge extends io.netty.channel.ChannelInboundHandlerAdapter
         close();
     }
 
-    /**
-     * Delivers a whole receive-batch (all for this connection) to the Netty channel in a
-     * single event-loop hop: queue every message with write(), then one flush(). This
-     * collapses N per-message flushes (one syscall each) into one, and allocates one
-     * Runnable instead of N. This is the gameplay hot path during chunk streaming.
-     */
     void deliverBatchFromSteam(SteamSocketsApi.ReceivedMessage[] batch) {
         if (closed || batch == null) return;
         io.netty.channel.ChannelHandlerContext c = ctx;
@@ -271,8 +250,6 @@ final class LoopbackBridge extends io.netty.channel.ChannelInboundHandlerAdapter
                 c.flush();
             });
         } else {
-            // Pre-activation window (brief, during connect): arrays from receiveMessages
-            // are freshly allocated and never reused, so no defensive copy is needed.
             for (SteamSocketsApi.ReceivedMessage m : batch) {
                 if (m != null && m.getData().length > 0) {
                     preActivateQueue.add(m.getData());

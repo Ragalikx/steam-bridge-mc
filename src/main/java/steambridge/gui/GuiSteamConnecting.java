@@ -6,12 +6,13 @@
 package steambridge.gui;
 
 import steambridge.steam.SteamClient;
-import com.mojang.blaze3d.vertex.PoseStack;
-import net.minecraft.client.gui.screens.DisconnectedScreen;
-import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.gui.screens.TitleScreen;
-import net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen;
-import net.minecraft.network.chat.Component;
+import com.mojang.blaze3d.matrix.MatrixStack;
+import net.minecraft.client.gui.screen.DisconnectedScreen;
+import net.minecraft.client.gui.screen.MainMenuScreen;
+import net.minecraft.client.gui.screen.MultiplayerScreen;
+import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.util.text.StringTextComponent;
+import net.minecraft.util.text.TranslationTextComponent;
 
 public class GuiSteamConnecting extends Screen {
 
@@ -20,16 +21,16 @@ public class GuiSteamConnecting extends Screen {
     private boolean failHandled = false;
 
     public GuiSteamConnecting(Screen parent, SteamClient client) {
-        super(Component.empty());
+        super(StringTextComponent.EMPTY);
         this.previousGuiScreen = parent;
         this.client            = client;
     }
 
     @Override
     protected void init() {
-        this.addRenderableWidget(GuiButtons.createCentered(this.font, this.width / 2,
+        this.addButton(GuiButtons.createCentered(this.font, this.width / 2,
                 this.height / 4 + 120 + 12,
-                Component.translatable("gui.cancel"),
+                new TranslationTextComponent("gui.cancel"),
                 b -> {
                     client.disconnect();
                     this.minecraft.setScreen(buildServerListScreen());
@@ -43,33 +44,33 @@ public class GuiSteamConnecting extends Screen {
             failHandled = true;
             this.minecraft.setScreen(new DisconnectedScreen(
                     buildServerListScreen(),
-                    Component.translatable("connect.failed"),
-                    Component.literal(client.getStatusMsg())));
+                    new TranslationTextComponent("connect.failed"),
+                    new StringTextComponent(client.getStatusMsg())));
         }
     }
 
     @Override
-    public void render(PoseStack poseStack, int mouseX, int mouseY, float partialTick) {
-        this.renderBackground(poseStack);
+    public void render(MatrixStack matrixStack, int mouseX, int mouseY, float partialTick) {
+        this.renderBackground(matrixStack);
 
         if (client != null) {
-            drawCenteredString(poseStack, this.font,
+            drawCenteredString(matrixStack, this.font,
                     client.getStatusMsg(),
                     this.width / 2, this.height / 2 - 50,
                     0xFFFFFF);
         }
 
-        super.render(poseStack, mouseX, mouseY, partialTick);
+        super.render(matrixStack, mouseX, mouseY, partialTick);
     }
 
     /**
      * Returns the previous screen if it is a server list, or a fresh
-     * {@link JoinMultiplayerScreen} to avoid landing on a dead DirectConnect screen.
+     * {@link MultiplayerScreen} to avoid landing on a dead DirectConnect screen.
      */
     private Screen buildServerListScreen() {
-        if (previousGuiScreen instanceof JoinMultiplayerScreen) {
+        if (previousGuiScreen instanceof MultiplayerScreen) {
             return previousGuiScreen;
         }
-        return new JoinMultiplayerScreen(new TitleScreen());
+        return new MultiplayerScreen(new MainMenuScreen());
     }
 }
