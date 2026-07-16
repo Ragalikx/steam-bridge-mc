@@ -264,10 +264,46 @@ public final class VanillaGuiIntegration {
         }
     }
 
-    private static void markAllSteamServers(MultiplayerScreen gui) {
+    
+    /**
+     * Steam multiplayer-list polish throttle.
+     * Immediate when the SteamID set changes; otherwise at most every 5s (avatars).
+     */
+    private static final long STEAM_LIST_MARK_INTERVAL_MS = 5000L;
+    private static long lastSteamListMarkMs = 0L;
+    private static String lastSteamListFingerprint = "";
+
+    private static String steamListFingerprint(ServerList list) {
+        if (list == null) return "";
+        StringBuilder sb = new StringBuilder(64);
+        try {
+            for (int i = 0; i < list.size(); i++) {
+                ServerData data = list.get(i);
+                if (data == null || !isSteamServerId(data.ip)) continue;
+                sb.append(extractSteamId(data.ip)).append('\n');
+            }
+        } catch (Exception ignored) {}
+        return sb.toString();
+    }
+
+private static void markAllSteamServers(MultiplayerScreen gui) {
+        markAllSteamServers(gui, false);
+    }
+
+    private static void markAllSteamServers(MultiplayerScreen gui, boolean force) {
         ServerList list = gui.getServers();
         if (list == null) return;
         try {
+            String fingerprint = steamListFingerprint(list);
+            long now = System.currentTimeMillis();
+            boolean steamSetChanged = !fingerprint.equals(lastSteamListFingerprint);
+            if (!force && !steamSetChanged
+                    && (now - lastSteamListMarkMs) < STEAM_LIST_MARK_INTERVAL_MS) {
+                return;
+            }
+            lastSteamListFingerprint = fingerprint;
+            lastSteamListMarkMs = now;
+
             int steamIndex = 0;
             for (int i = 0; i < list.size(); i++) {
                 ServerData data = list.get(i);
@@ -339,7 +375,7 @@ public final class VanillaGuiIntegration {
         injectFriendsButton(event, gui);
         injectSteamConnectIntercept(event, gui);
         if (gui instanceof MultiplayerScreen) {
-            markAllSteamServers((MultiplayerScreen) gui);
+            markAllSteamServers((MultiplayerScreen) gui, true);
         }
         injectPauseMenuControl(event, gui);
     }
