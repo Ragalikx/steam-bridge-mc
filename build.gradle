@@ -99,20 +99,19 @@ repositories {
 
 configurations {
     steamBundle { transitive = false }
-    jnaBundle  { transitive = false }
 }
 
 dependencies {
     minecraft "net.minecraftforge:forge:${project.forge_version}"
 
-    // Compile + shade: steamworks4j + slim JNA (1.16.5 loader does not ship JNA as a module).
+    // steamworks4j API is shaded flat into the mod jar (see jar task).
+    // JNA: compileOnly against the same 4.4.0 Forge already puts on the game classpath.
     implementation("com.code-disaster.steamworks4j:steamworks4j:${project.steamworks4j_version}") {
         exclude group: 'net.java.dev.jna'
     }
-    implementation "net.java.dev.jna:jna:${project.jna_version}"
+    compileOnly "net.java.dev.jna:jna:${project.jna_version}"
 
     steamBundle "com.code-disaster.steamworks4j:steamworks4j:${project.steamworks4j_version}"
-    jnaBundle  "net.java.dev.jna:jna:${project.jna_version}"
 }
 
 // -- Resource templating (mods.toml version substitution) ---------------------
@@ -148,21 +147,7 @@ jar {
         exclude 'com/codedisaster/steamworks/SteamUserStats*'
         exclude 'com/codedisaster/steamworks/SteamApps*'
     }
-    // Slim JNA: win64 jnidispatch only (same idea as 1.12.2 branch)
-    from({ project.configurations.jnaBundle.collect { zipTree(it) } }) {
-        include 'com/sun/jna/**'
-        include 'com/sun/jna/win32-x86-64/**'
-        exclude 'com/sun/jna/darwin*/**'
-        exclude 'com/sun/jna/linux*/**'
-        exclude 'com/sun/jna/sunos*/**'
-        exclude 'com/sun/jna/freebsd*/**'
-        exclude 'com/sun/jna/openbsd*/**'
-        exclude 'com/sun/jna/aix*/**'
-        exclude 'com/sun/jna/win32-x86/**'
-        exclude 'com/sun/jna/win32-aarch64/**'
-        exclude 'module-info.class'
-        exclude 'META-INF/versions/**'
-    }
+    // JNA is NOT shaded: Forge 1.16.5 already provides jna-4.4.0 on the library path.
     from('third_party_licenses') {
         into 'META-INF/licenses'
     }

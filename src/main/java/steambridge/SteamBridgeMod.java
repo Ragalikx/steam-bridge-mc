@@ -34,6 +34,16 @@ public class SteamBridgeMod {
 
     public static final Logger LOG = LogManager.getLogger(MODID);
 
+    static {
+        // Forge 1.16.5 puts JNA 4.4.0 on the game library path. If a newer/mismatched
+        // jnidispatch was left in %TEMP% (or on PATH) from another MC version, Native
+        // clinit fails with "incompatible JNA native library" and Steam never starts.
+        // nosys forces JNA to use only the native bundled with the classpath jar.
+        if (System.getProperty("jna.nosys") == null) {
+            System.setProperty("jna.nosys", "true");
+        }
+    }
+
     public SteamBridgeMod() {
         LOG.info("=== Steam Bridge pre-init (Forge 1.16.5) v{} ===", VERSION);
 

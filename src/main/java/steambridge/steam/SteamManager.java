@@ -154,7 +154,21 @@ public class SteamManager {
             socketsApi.configureForGameTraffic(steambridge.SteamBridgeConfig.allowWithoutAuth);
             socketsApi.initRelayNetworkAccess();
         } catch (Throwable t) {
-            SteamBridgeMod.LOG.error("[SteamManager] Failed to initialize SteamNetworkingSockets: {}", t.getMessage(), t);
+            Throwable root = t;
+            while (root.getCause() != null && root.getCause() != root) {
+                root = root.getCause();
+            }
+            SteamBridgeMod.LOG.error(
+                    "[SteamManager] Failed to initialize SteamNetworkingSockets: {} (root: {})",
+                    t.getMessage(), root.getMessage(), t);
+            if (t instanceof ExceptionInInitializerError
+                    || (t.getMessage() != null && t.getMessage().contains("com.sun.jna.Native"))
+                    || (root.getMessage() != null && root.getMessage().contains("JNA"))) {
+                SteamBridgeMod.LOG.error(
+                        "[SteamManager] JNA failed to load. Forge 1.16.5 uses JNA 4.4.0; "
+                                + "delete stale %%TEMP%%\\jna-* folders and restart the game "
+                                + "(jna.nosys should be true). SteamAPI may have been OK - this is not SpaceWar.");
+            }
             if (steamUser != null) {
                 steamUser.dispose();
                 steamUser = null;
