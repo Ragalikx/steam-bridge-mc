@@ -25,6 +25,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -63,6 +64,8 @@ public final class SteamSocial {
 
         private final Map<Long, String> personaNameBySteamId   = new ConcurrentHashMap<>();
         private final Map<Long, String> avatarTextureBySteamId = new ConcurrentHashMap<>();
+        /** 64x64 PNG base64 for multiplayer-list server icons ({@link net.minecraft.client.multiplayer.ServerData#setIconB64}). */
+        private final Map<Long, String> avatarIconB64BySteamId = new ConcurrentHashMap<>();
         private final Map<Long, Long>   userInfoRequestedAt    = new ConcurrentHashMap<>();
         private final Map<Long, Long>   avatarRetryAt          = new ConcurrentHashMap<>();
 
@@ -95,36 +98,87 @@ public final class SteamSocial {
             String cached = avatarTextureBySteamId.get(steamId);
             if (cached != null) return cached;
 
+            NativeImage nativeImage = loadAvatarNativeImage(steamId);
+            if (nativeImage == null) return "";
+
+            Minecraft mc = Minecraft.getInstance();
+            if (mc == null) {
+                nativeImage.close();
+                return "";
+            }
+
+            try {
+                cacheServerIconB64(steamId, nativeImage);
+                DynamicTexture texture = new DynamicTexture(nativeImage);
+                ResourceLocation loc = mc.getTextureManager().register(
+                        "steambridge_avatar_" + steamId, texture);
+                String textureId = loc.toString();
+                avatarTextureBySteamId.put(steamId, textureId);
+                return textureId;
+            } catch (Exception e) {
+                nativeImage.close();
+                avatarRetryAt.put(steamId, System.currentTimeMillis() + AVATAR_RETRY_MS);
+                SteamBridgeMod.LOG.warn("[ProfileCache] Avatar texture register failed for {}: {}", steamId, e.getMessage());
+                return "";
+            }
+        }
+
+        /**
+         * Raw 64x64 PNG as Base64 for the multiplayer server-list favicon slot.
+         * Returns null until Steam has the avatar ready (caller may retry next tick).
+         */
+        public String getAvatarIconB64(long steamId) {
+            if (steamId == 0L) return null;
+            String cached = avatarIconB64BySteamId.get(steamId);
+            if (cached != null) return cached;
+            // Load once; also warms the DynamicTexture cache used by friends GUI.
+            getAvatarTexture(steamId);
+            return avatarIconB64BySteamId.get(steamId);
+        }
+
+        /**
+         * Fetches the Steam avatar into a {@link NativeImage}, or null if not ready / failed.
+         * Caller owns the image if non-null (except when passed into {@link DynamicTexture}).
+         */
+        private NativeImage loadAvatarNativeImage(long steamId) {
             long now = System.currentTimeMillis();
             Long retryAt = avatarRetryAt.get(steamId);
-            if (retryAt != null && retryAt > now) return "";
+            if (retryAt != null && retryAt > now) return null;
 
             com.codedisaster.steamworks.SteamFriends friends = SteamManager.getInstance().getFriends();
             SteamUtils utils = SteamManager.getInstance().getUtils();
-            Minecraft mc = Minecraft.getInstance();
-            if (friends == null || utils == null || mc == null) return "";
+            if (friends == null || utils == null) return null;
 
             requestUserInfoIfNeeded(steamId);
 
             try {
                 SteamID id = SteamID.createFromNativeHandle(steamId);
+                // Prefer medium (often 64x64 - exact size for server list icons).
                 int image = friends.getMediumFriendAvatar(id);
                 if (image <= 0) image = friends.getSmallFriendAvatar(id);
                 if (image <= 0) image = friends.getLargeFriendAvatar(id);
-                if (image <= 0) { avatarRetryAt.put(steamId, now + AVATAR_RETRY_MS); return ""; }
+                if (image <= 0) {
+                    avatarRetryAt.put(steamId, now + AVATAR_RETRY_MS);
+                    return null;
+                }
 
                 int[] dims = new int[2];
-                if (!utils.getImageSize(image, dims)) { avatarRetryAt.put(steamId, now + AVATAR_RETRY_MS); return ""; }
+                if (!utils.getImageSize(image, dims)) {
+                    avatarRetryAt.put(steamId, now + AVATAR_RETRY_MS);
+                    return null;
+                }
 
                 int width = dims[0], height = dims[1];
-                // Sanity bound: Steam avatars are at most 184x184. Reject absurd sizes so that
-                // width * height * 4 can never overflow int and allocate a mismatched buffer.
                 if (width <= 0 || height <= 0 || width > 1024 || height > 1024) {
-                    avatarRetryAt.put(steamId, now + AVATAR_RETRY_MS); return "";
+                    avatarRetryAt.put(steamId, now + AVATAR_RETRY_MS);
+                    return null;
                 }
 
                 ByteBuffer rgba = ByteBuffer.allocateDirect(width * height * 4);
-                if (!utils.getImageRGBA(image, rgba)) { avatarRetryAt.put(steamId, now + AVATAR_RETRY_MS); return ""; }
+                if (!utils.getImageRGBA(image, rgba)) {
+                    avatarRetryAt.put(steamId, now + AVATAR_RETRY_MS);
+                    return null;
+                }
 
                 byte[] data = new byte[width * height * 4];
                 rgba.position(0);
@@ -145,18 +199,37 @@ public final class SteamSocial {
                     }
                 }
 
-                DynamicTexture texture  = new DynamicTexture(nativeImage);
-                ResourceLocation loc    = mc.getTextureManager().register(
-                        "steambridge_avatar_" + steamId, texture);
-                String textureId = loc.toString();
-                avatarTextureBySteamId.put(steamId, textureId);
                 avatarRetryAt.remove(steamId);
-
-                return textureId;
+                return nativeImage;
             } catch (Exception e) {
                 avatarRetryAt.put(steamId, now + AVATAR_RETRY_MS);
                 SteamBridgeMod.LOG.warn("[ProfileCache] Avatar load failed for {}: {}", steamId, e.getMessage());
-                return "";
+                return null;
+            }
+        }
+
+        /** Encode a copy scaled to 64x64 PNG base64 (vanilla multiplayer icon size). */
+        private void cacheServerIconB64(long steamId, NativeImage src) {
+            if (avatarIconB64BySteamId.containsKey(steamId) || src == null) return;
+            NativeImage scaled = null;
+            try {
+                if (src.getWidth() == 64 && src.getHeight() == 64) {
+                    scaled = new NativeImage(64, 64, false);
+                    scaled.copyFrom(src);
+                } else {
+                    scaled = new NativeImage(64, 64, false);
+                    src.resizeSubRectTo(0, 0, src.getWidth(), src.getHeight(), scaled);
+                }
+                byte[] png = scaled.asByteArray();
+                if (png != null && png.length > 0) {
+                    avatarIconB64BySteamId.put(steamId, Base64.getEncoder().encodeToString(png));
+                }
+            } catch (Exception e) {
+                SteamBridgeMod.LOG.warn("[ProfileCache] Avatar iconB64 encode failed for {}: {}", steamId, e.getMessage());
+            } finally {
+                if (scaled != null) {
+                    scaled.close();
+                }
             }
         }
 
@@ -164,12 +237,14 @@ public final class SteamSocial {
             if (steamId == 0L) return;
             personaNameBySteamId.remove(steamId);
             avatarTextureBySteamId.remove(steamId);
+            avatarIconB64BySteamId.remove(steamId);
             avatarRetryAt.remove(steamId);
         }
 
         public void invalidateAvatar(long steamId) {
             if (steamId == 0L) return;
             avatarTextureBySteamId.remove(steamId);
+            avatarIconB64BySteamId.remove(steamId);
             avatarRetryAt.remove(steamId);
         }
 

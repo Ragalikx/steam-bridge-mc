@@ -201,7 +201,7 @@ public final class VanillaGuiIntegration {
         }
     }
 
-    /** Skip TCP ping for a SteamID entry and give it safe display Components. */
+    /** Skip TCP ping for a SteamID entry and give it safe display Components + avatar icon. */
     private static void markSteamServer(ServerData data) {
         data.pinged = true;
         // Not -2 (vanilla "still pinging" spinner); 0 looks like a quiet live entry.
@@ -213,6 +213,18 @@ public final class VanillaGuiIntegration {
         }
         if (data.playerList == null) {
             data.playerList = java.util.Collections.emptyList();
+        }
+
+        // Prefer the friend's Steam avatar over the default unknown-server tile.
+        try {
+            long steamId = Long.parseLong(extractSteamId(data.ip));
+            String iconB64 = SteamSocial.ProfileCache.get().getAvatarIconB64(steamId);
+            if (iconB64 != null && !iconB64.isEmpty()
+                    && !iconB64.equals(data.getIconB64())) {
+                data.setIconB64(iconB64);
+            }
+        } catch (Exception ignored) {
+            // keep default icon until Steam has the avatar ready
         }
     }
 

@@ -36,7 +36,7 @@
   "steambridge.status.fail_closed": "Соединение Steam закрыто: ",
   "steambridge.gui.no_bans": "Никто ещё не заблокирован.",
   "steambridge.gui.friends_short": "S",
-  "steambridge.gui.server_steam_motd": "Подключение через Steam Bridge (без TCP-ping)",
+  "steambridge.gui.server_steam_motd": "Подключение через Steam Bridge",
   "steambridge.gui.server_steam_status": "Steam",
   "steambridge.gui.host_started": "Мир открыт через Steam. Подключение доступно!",
   "steambridge.gui.host_failed": "Не удалось открыть мир через Steam. Проверьте, запущен ли Steam.",

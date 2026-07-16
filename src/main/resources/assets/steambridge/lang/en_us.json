@@ -36,7 +36,7 @@
   "steambridge.gui.steam_settings": "Steam session settings",
   "steambridge.gui.no_bans": "Nobody has been banned yet.",
   "steambridge.gui.friends_short": "S",
-  "steambridge.gui.server_steam_motd": "Connects via Steam Bridge (no TCP ping)",
+  "steambridge.gui.server_steam_motd": "Connects via Steam Bridge",
   "steambridge.gui.server_steam_status": "Steam",
   "steambridge.gui.host_started": "World is now open via Steam. Connection is available!",
   "steambridge.gui.host_failed": "Could not open the world via Steam. Make sure Steam is running.",
