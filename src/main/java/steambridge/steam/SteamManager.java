@@ -456,13 +456,15 @@ public class SteamManager {
         rememberStatus(status);
 
         // --- Loopback detection ----------------------------------------------
-        // When STATE_CONNECTED is reached and ping is very low (< 5 ms) the link is a
-        // same-machine / same-LAN link. Enable fast-path (no packet coalescing) and
-        // apply relaxed per-connection Steam configs (no rate caps, smaller buffer).
+        // Same-machine / LAN links get a lighter Steam config, but only AFTER the
+        // Minecraft login has a LoopbackBridge registered. Applying Buffer=256KB at
+        // STATE_CONNECTED (before MC handshake) correlated with the client TCP leg
+        // dying immediately after LoginStart on Fabric 1.16.5 dual-box tests (3ms ping).
         if (status.getState() == SteamSocketsApi.STATE_CONNECTED
                 && !loopbackConnections.contains(connection)
                 && status.getPingMs() >= 0
-                && status.getPingMs() < LOOPBACK_PING_THRESHOLD_MS) {
+                && status.getPingMs() < LOOPBACK_PING_THRESHOLD_MS
+                && loopbackByConnection.containsKey(connection)) {
 
             loopbackConnections.add(connection);
             SteamBridgeMod.LOG.info(

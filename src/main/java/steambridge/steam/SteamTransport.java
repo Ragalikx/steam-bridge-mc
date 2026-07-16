@@ -175,9 +175,6 @@ public final class SteamTransport {
             connection.send(new HandshakeC2SPacket("127.0.0.1", proxyPort, NetworkState.LOGIN));
             connection.send(new LoginHelloC2SPacket(mc.getSession().getProfile()));
 
-            // Kick the send queue once immediately (ConnectScreen relies on its own tick).
-            connection.tick();
-
             SteamBridgeMod.LOG.info(
                 "[LoopbackBridge][Client] Connected to loopback proxy. proxyPort={} conn={} steamID={} open={}",
                 proxyPort, connectionHandle, remoteSteamID, connection.isOpen());

@@ -193,28 +193,38 @@ public class SteamClient {
                 return;
             }
 
-            // Connect Minecraft to the proxy port on the MC main thread.
+            SteamBridgeMod.LOG.info("[SteamClient] Loopback proxy ready: conn={} steamID={} port={}",
+                    conn, remoteSteamID, proxyPort);
+
+            // Vanilla ConnectScreen does connect + handshake on a worker thread, not the
+            // render/main thread. Doing it on main (mc.execute) was closing the TCP leg
+            // immediately after LoginStart on Fabric 1.16.5.
             final int finalProxyPort = proxyPort;
-            MinecraftClient mc2 = MinecraftClient.getInstance();
-            mc2.execute(() -> {
+            final Screen finalScreen = screen;
+            Thread mcConnect = new Thread(() -> {
                 try {
                     boolean ok2 = SteamTransport.connectClientToLoopback(
-                            conn, remoteSteamID, finalProxyPort, screen, SteamClient.this);
+                            conn, remoteSteamID, finalProxyPort, finalScreen, SteamClient.this);
                     if (ok2) {
                         state = State.STEAM_READY;
-                        statusMsg = i18n("steambridge.status.steam_ready", "Steam path ready - waiting for Minecraft login...");
-                        SteamBridgeMod.LOG.info("[SteamClient] Loopback mode active - Steam transport is ready.");
+                        statusMsg = i18n("steambridge.status.steam_ready",
+                                "Steam path ready - waiting for Minecraft login...");
+                        SteamBridgeMod.LOG.info(
+                                "[SteamClient] Loopback mode active - Steam transport is ready.");
                     } else {
-                        SteamBridgeMod.LOG.error("[SteamClient] Loopback connect to port {} failed.", finalProxyPort);
-                        fail(i18n("steambridge.status.fail_proxy", "Failed to connect to loopback proxy port ") + finalProxyPort);
+                        SteamBridgeMod.LOG.error(
+                                "[SteamClient] Loopback connect to port {} failed.", finalProxyPort);
+                        fail(i18n("steambridge.status.fail_proxy",
+                                "Failed to connect to loopback proxy port ") + finalProxyPort);
                     }
                 } catch (Exception e) {
-                    SteamBridgeMod.LOG.error("[SteamClient] Loopback connect failed: {}", e.getMessage(), e);
+                    SteamBridgeMod.LOG.error(
+                            "[SteamClient] Loopback connect failed: {}", e.getMessage(), e);
                     fail("Loopback connect error: " + e.getMessage());
                 }
-            });
-
-            SteamBridgeMod.LOG.info("[SteamClient] Loopback proxy ready: conn={} steamID={}", conn, remoteSteamID);
+            }, "SteamBridge-MC-Connect");
+            mcConnect.setDaemon(true);
+            mcConnect.start();
 
         } catch (Exception e) {
             if (alive.get()) {
