@@ -128,8 +128,19 @@ public class GuiSteamResync extends Screen {
 
         if (remaining <= 0) {
             state = State.FAILED;
-            statusLine1 = "§c" + I18n.get("steambridge.gui.resync_timeout");
-            statusLine2 = "§7" + I18n.get("steambridge.gui.resync_timeout_hint");
+            // Prefer the last Steam init diagnosis (Spacewar / Family View / client down)
+            // over a generic "Steam did not start" timeout when reinit already failed.
+            SteamManager.InitFailure fail = SteamManager.getInstance().getLastInitFailure();
+            if (fail != null && fail != SteamManager.InitFailure.NONE) {
+                statusLine1 = "§c" + I18n.get(SteamManager.getInstance().getLastInitFailureKey());
+                String hintKey = SteamManager.getInstance().getLastInitFailureHintKey();
+                statusLine2 = hintKey.isEmpty()
+                        ? "§7" + I18n.get("steambridge.gui.resync_timeout_hint")
+                        : "§7" + I18n.get(hintKey);
+            } else {
+                statusLine1 = "§c" + I18n.get("steambridge.gui.resync_timeout");
+                statusLine2 = "§7" + I18n.get("steambridge.gui.resync_timeout_hint");
+            }
             return;
         }
 
