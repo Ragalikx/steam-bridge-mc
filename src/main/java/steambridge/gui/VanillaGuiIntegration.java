@@ -13,6 +13,7 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.events.GuiEventListener;
+import net.minecraft.client.gui.screens.ConnectScreen;
 import net.minecraft.client.gui.screens.DirectJoinServerScreen;
 import net.minecraft.client.gui.screens.EditServerScreen;
 import net.minecraft.client.gui.screens.PauseScreen;
@@ -70,6 +71,30 @@ public final class VanillaGuiIntegration {
      */
     public static Screen onSetScreen(Screen next) {
         Minecraft mc = Minecraft.getInstance();
+
+        // Catch every path that opens ConnectScreen with a SteamID address:
+        // bottom Join/Connect, icon Play overlay, double-click, direct-join confirm.
+        // Button wrap alone is not enough (list rows call joinSelectedServer() directly).
+        if (next instanceof ConnectScreen connectScreen) {
+            ServerData sd = mc.getCurrentServer();
+            if (sd != null && isSteamServerId(sd.ip)) {
+                abortVanillaConnect(connectScreen);
+                Screen parent = connectScreenParent(connectScreen);
+                if (parent == null) parent = mc.screen;
+                final Screen p = parent;
+                final String addr = sd.ip;
+                if (!SteamManager.getInstance().isInitialized()
+                        && !SteamManager.getInstance().reinit()) {
+                    SteamBridgeMod.LOG.info(
+                            "Steam not running; opening launch screen before connect to {}", addr);
+                    return new GuiSteamResync(
+                            p,
+                            () -> Minecraft.getInstance().setScreen(beginSteamConnect(p, addr)),
+                            "steambridge.gui.resync_success_hint_connect");
+                }
+                return beginSteamConnect(p, addr);
+            }
+        }
 
         if (next instanceof ShareToLanScreen) {
             if (isSteamHostSessionActive(mc)) {
@@ -237,22 +262,92 @@ public final class VanillaGuiIntegration {
                         "Steam not running; opening launch screen before connect to {}", steamAddr);
                 mc.setScreen(new GuiSteamResync(
                         parent,
-                        () -> beginSteamConnect(parent, steamAddr),
+                        () -> Minecraft.getInstance().setScreen(beginSteamConnect(parent, steamAddr)),
                         "steambridge.gui.resync_success_hint_connect"));
                 return;
             }
         }
-        beginSteamConnect(parent, steamAddr);
+        mc.setScreen(beginSteamConnect(parent, steamAddr));
     }
 
-    private static void beginSteamConnect(Screen parent, String steamAddr) {
+    /**
+     * Tear down any leftover Steam client and open {@link GuiSteamConnecting}.
+     * Returns the connecting screen so {@link #onSetScreen} can replace ConnectScreen cleanly.
+     */
+    private static GuiSteamConnecting beginSteamConnect(Screen parent, String steamAddr) {
         long steamId = Long.parseLong(extractSteamId(steamAddr));
         SteamBridgeMod.LOG.info("Intercepted connection to SteamID: {}", steamId);
         SteamClient active = SteamManager.getInstance().getActiveClient();
-        if (active != null) active.disconnect();
+        if (active != null) {
+            try {
+                active.disconnect();
+            } catch (Exception e) {
+                SteamBridgeMod.LOG.warn("[SteamClient] disconnect before reconnect: {}", e.getMessage());
+            }
+        }
+        SteamManager.getInstance().setActiveClient(null);
+        steambridge.proxy.SteamUdpProxy.getInstance().stopClient();
         SteamClient client = new SteamClient();
         client.connect(com.codedisaster.steamworks.SteamID.createFromNativeHandle(steamId), parent);
-        Minecraft.getInstance().setScreen(new GuiSteamConnecting(parent, client));
+        return new GuiSteamConnecting(parent, client);
+    }
+
+    /** Stop vanilla DNS/TCP thread when we replace ConnectScreen with Steam connect. */
+    private static void abortVanillaConnect(ConnectScreen screen) {
+        boolean set = false;
+        for (Field f : ConnectScreen.class.getDeclaredFields()) {
+            if (f.getType() != boolean.class && f.getType() != Boolean.class) continue;
+            try {
+                f.setAccessible(true);
+                f.setBoolean(screen, true);
+                set = true;
+            } catch (Exception ignored) {}
+        }
+        if (!set) {
+            SteamBridgeMod.LOG.warn("Could not abort ConnectScreen (no boolean field found)");
+        }
+    }
+
+    private static Screen connectScreenParent(ConnectScreen screen) {
+        for (Field f : ConnectScreen.class.getDeclaredFields()) {
+            if (!Screen.class.isAssignableFrom(f.getType())) continue;
+            try {
+                f.setAccessible(true);
+                Object p = f.get(screen);
+                if (p instanceof Screen s) return s;
+            } catch (Exception ignored) {}
+        }
+        return Minecraft.getInstance().screen;
+    }
+
+    /** Selected list entry (not {@code editingServer}, which findByType may hit first). */
+    private static ServerData resolveSelectedServer(JoinMultiplayerScreen jms) {
+        try {
+            for (Field f : JoinMultiplayerScreen.class.getDeclaredFields()) {
+                Class<?> ft = f.getType();
+                if (!ft.getName().contains("ServerSelectionList")) continue;
+                f.setAccessible(true);
+                Object list = f.get(jms);
+                if (list == null) continue;
+                Object entry = null;
+                for (Class<?> c = list.getClass(); c != null && entry == null; c = c.getSuperclass()) {
+                    try {
+                        java.lang.reflect.Method gm = c.getDeclaredMethod("getSelected");
+                        gm.setAccessible(true);
+                        entry = gm.invoke(list);
+                    } catch (NoSuchMethodException ignored) {}
+                }
+                if (entry == null) continue;
+                try {
+                    java.lang.reflect.Method gsd = entry.getClass().getMethod("getServerData");
+                    Object sd = gsd.invoke(entry);
+                    if (sd instanceof ServerData data) return data;
+                } catch (NoSuchMethodException ignored) {}
+            }
+        } catch (Exception e) {
+            SteamBridgeMod.LOG.debug("resolveSelectedServer failed: {}", e.toString());
+        }
+        return null;
     }
 
     private static void markSteamServer(ServerData data) {
@@ -339,10 +434,11 @@ private static void markAllSteamServers(JoinMultiplayerScreen gui) {
                 }
             });
         } else if (gui instanceof JoinMultiplayerScreen jms) {
+            // Bottom-bar Join/Connect. Play + double-click: onSetScreen ConnectScreen intercept.
             Button join = findButtonByMessage(gui, "selectServer.select");
             if (join == null) return;
             wrapOnPress(join, original -> b -> {
-                ServerData selected = findByType(gui, ServerData.class);
+                ServerData selected = resolveSelectedServer(jms);
                 if (selected != null && isSteamServerId(selected.ip)) {
                     interceptSteamConnect(jms, selected.ip);
                 } else {
