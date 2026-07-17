@@ -19,7 +19,7 @@ steambridge.gui.no_bans=Ніхто ще не заблокований.
 steambridge.gui.friends_short=S
 steambridge.gui.host_started=Світ відкрито через Steam. Підключення доступне!
 steambridge.gui.host_failed=Не вдалося відкрити світ через Steam. Перевірте, чи запущено Steam.
-steambridge.gui.host_steam_launching=Steam не запущено. Спробуємо запустити його автоматично. Зачекайте трохи і натисніть Відкрити через Steam знову.
+steambridge.gui.host_steam_launching=§eSteam не запущено; пробуємо запустити його автоматично. §eЗачекайте трохи і натисніть «Відкрити для Steam» знову.
 steambridge.gui.conn_relay=relay
 steambridge.gui.conn_p2p=p2p
 
@@ -58,13 +58,3 @@ steambridge.gui.resync_countdown=Очікуємо Steam... (%s сек)
 
 steambridge.gui.server_steam_motd=Steam P2P / Relay
 steambridge.gui.server_steam_status=Steam
-steambridge.error.native_load=Не вдалося завантажити нативні бібліотеки Steam.
-steambridge.error.no_steam_client=Клієнт Steam не запущено.
-steambridge.error.no_steam_client_hint=Запустіть Steam і спробуйте знову.
-steambridge.error.steam_version=Версія клієнта Steam несумісна з цим модом.
-steambridge.error.spacewar_failed=Steam запущено, але Spacewar (AppID 480) не вдалося стартувати.
-steambridge.error.spacewar_failed_hint=Перевірте Family View, обмеження сімейної бібліотеки або закрийте інші ігри Steam.
-steambridge.error.wrong_appid=Steam підключився з неправильним AppID (потрібен Spacewar 480).
-steambridge.error.family_or_license=Цей акаунт Steam не може використовувати Spacewar (ліцензія / Family View / сімейна бібліотека).
-steambridge.error.family_or_license_hint=Зніміть обмеження Family View для Spacewar або використайте інший акаунт.
-steambridge.error.steam_init_failed=Не вдалося ініціалізувати Steam.
