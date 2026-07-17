@@ -576,7 +576,7 @@ public class VanillaGuiIntegration {
                             SteamBridgeMod.LOG.warn("[SteamHost] Failed to launch Steam: {}", e.getMessage());
                         }
                         mc.ingameGUI.getChatGUI().printChatMessage(new net.minecraft.util.ChatComponentText(
-                                "\u00A7e" + net.minecraft.client.resources.I18n.format("steambridge.gui.host_steam_launching")));
+                                net.minecraft.client.resources.I18n.format("steambridge.gui.host_steam_launching")));
                         return;
                     }
                 }
