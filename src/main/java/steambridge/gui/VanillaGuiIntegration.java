@@ -190,6 +190,22 @@ public final class VanillaGuiIntegration {
     }
 
     private static void interceptSteamConnect(Screen parent, String steamAddr) {
+        Minecraft mc = Minecraft.getInstance();
+        if (!SteamManager.getInstance().isInitialized()) {
+            if (!SteamManager.getInstance().reinit()) {
+                SteamBridgeMod.LOG.info(
+                        "Steam not running; opening launch screen before connect to {}", steamAddr);
+                mc.setScreen(new GuiSteamResync(
+                        parent,
+                        () -> beginSteamConnect(parent, steamAddr),
+                        "steambridge.gui.resync_success_hint_connect"));
+                return;
+            }
+        }
+        beginSteamConnect(parent, steamAddr);
+    }
+
+    private static void beginSteamConnect(Screen parent, String steamAddr) {
         long steamId = Long.parseLong(extractSteamId(steamAddr));
         SteamBridgeMod.LOG.info("Intercepted connection to SteamID: {}", steamId);
         SteamClient active = SteamManager.getInstance().getActiveClient();
