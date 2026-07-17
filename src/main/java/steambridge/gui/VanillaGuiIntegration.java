@@ -74,23 +74,28 @@ public final class VanillaGuiIntegration {
         // and direct-join confirm. Button wrap alone is not enough because list entries
         // call joinSelectedServer() -> ConnectScreen.startConnecting without Button.OnPress.
         if (next instanceof ConnectScreen connectScreen) {
-            ServerData sd = mc.getCurrentServer();
-            if (sd != null && isSteamServerId(sd.ip)) {
+            // getCurrentServer() is usually null here — use list selection / direct-join field.
+            // During setScreen HEAD, mc.screen is still the previous multiplayer/direct GUI.
+            String addr = resolveSteamConnectAddress(mc.screen, mc);
+            if (addr != null) {
                 abortVanillaConnect(connectScreen);
                 Screen parent = connectScreenParent(connectScreen);
                 if (parent == null) parent = mc.screen;
                 final Screen p = parent;
-                final String addr = sd.ip;
+                final String steamAddr = addr;
+                SteamBridgeMod.LOG.info(
+                        "Rewriting ConnectScreen -> Steam for {} (previous={})",
+                        steamAddr, mc.screen != null ? mc.screen.getClass().getSimpleName() : "null");
                 if (!SteamManager.getInstance().isInitialized()
                         && !SteamManager.getInstance().reinit()) {
                     SteamBridgeMod.LOG.info(
-                            "Steam not running; opening launch screen before connect to {}", addr);
+                            "Steam not running; opening launch screen before connect to {}", steamAddr);
                     return new GuiSteamResync(
                             p,
-                            () -> Minecraft.getInstance().setScreen(beginSteamConnect(p, addr)),
+                            () -> Minecraft.getInstance().setScreen(beginSteamConnect(p, steamAddr)),
                             "steambridge.gui.resync_success_hint_connect");
                 }
-                return beginSteamConnect(p, addr);
+                return beginSteamConnect(p, steamAddr);
             }
         }
 
