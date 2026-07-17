@@ -82,7 +82,18 @@ public final class VanillaGuiIntegration {
                 abortVanillaConnect(connectScreen);
                 Screen parent = connectScreenParent(connectScreen);
                 if (parent == null) parent = mc.screen;
-                return beginSteamConnect(parent, sd.ip);
+                final Screen p = parent;
+                final String addr = sd.ip;
+                if (!SteamManager.getInstance().isInitialized()
+                        && !SteamManager.getInstance().reinit()) {
+                    SteamBridgeMod.LOG.info(
+                            "Steam not running; opening launch screen before connect to {}", addr);
+                    return new GuiSteamResync(
+                            p,
+                            () -> Minecraft.getInstance().setScreen(beginSteamConnect(p, addr)),
+                            "steambridge.gui.resync_success_hint_connect");
+                }
+                return beginSteamConnect(p, addr);
             }
         }
 
