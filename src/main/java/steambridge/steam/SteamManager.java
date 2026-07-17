@@ -6,6 +6,8 @@
 package steambridge.steam;
 
 import com.codedisaster.steamworks.SteamAPI;
+import com.codedisaster.steamworks.SteamAPI.InitResult;
+import com.codedisaster.steamworks.SteamApps;
 import com.codedisaster.steamworks.SteamAuth;
 import com.codedisaster.steamworks.SteamAuthTicket;
 import com.codedisaster.steamworks.SteamException;
@@ -18,6 +20,7 @@ import com.codedisaster.steamworks.SteamUser;
 import com.codedisaster.steamworks.SteamUserCallback;
 import com.codedisaster.steamworks.SteamUtils;
 import com.codedisaster.steamworks.SteamUtilsCallback;
+import steambridge.SteamAppIdHelper;
 import steambridge.SteamBridgeMod;
 import steambridge.steam.SteamOffsets.SteamNetConnectionStatusChangedCallback;
 
@@ -33,7 +36,20 @@ public class SteamManager {
         return INSTANCE;
     }
 
+    
+    public enum InitFailure {
+        NONE,
+        NATIVE_LOAD,
+        NO_STEAM_CLIENT,
+        VERSION_MISMATCH,
+        SPACEWAR_FAILED,
+        WRONG_APP_ID,
+        FAMILY_OR_LICENSE,
+        UNKNOWN
+    }
+
     private volatile boolean initialized = false;
+    private volatile InitFailure lastInitFailure = InitFailure.NONE;
     private final AtomicBoolean running = new AtomicBoolean(false);
 
     private static java.io.File nativeTempDir;
@@ -77,8 +93,11 @@ public class SteamManager {
     public boolean init() {
         if (initialized) {
             SteamBridgeMod.LOG.warn("[SteamManager] init() called but already initialized.");
+            lastInitFailure = InitFailure.NONE;
             return true;
         }
+
+        lastInitFailure = InitFailure.NONE;
 
         SteamBridgeMod.LOG.info("[SteamManager] Loading Steam native libraries...");
         boolean loaded = com.codedisaster.steamworks.SteamAPI.loadLibraries(new com.codedisaster.steamworks.SteamLibraryLoader() {
@@ -119,19 +138,21 @@ public class SteamManager {
         });
         if (!loaded) {
             SteamBridgeMod.LOG.error("[SteamManager] Failed to load Steam native libraries.");
+            lastInitFailure = InitFailure.NATIVE_LOAD;
             return false;
         }
 
-        SteamBridgeMod.LOG.info("[SteamManager] Calling SteamAPI.init()...");
+                SteamBridgeMod.LOG.info("[SteamManager] Calling SteamAPI.initEx() (Spacewar appid={})...",
+                SteamAppIdHelper.APP_ID);
         try {
-            if (!SteamAPI.init()) {
-                SteamBridgeMod.LOG.error(
-                        "[SteamManager] SteamAPI.init() returned false. Check Steam and steam_appid.txt."
-                );
+            InitResult result = SteamAPI.initEx();
+            if (result != InitResult.OK) {
+                diagnoseInitFailure(result);
                 return false;
             }
         } catch (SteamException e) {
-            SteamBridgeMod.LOG.error("[SteamManager] SteamAPI.init() threw: {}", e.getMessage());
+            lastInitFailure = InitFailure.UNKNOWN;
+            SteamBridgeMod.LOG.error("[SteamManager] SteamAPI.initEx() threw: {}", e.getMessage());
             return false;
         }
 
@@ -145,6 +166,13 @@ public class SteamManager {
             steamFriends = new SteamFriends(new SteamFriendsCallbackAdapter());
             steamUtils = new SteamUtils(new SteamUtilsCallbackAdapter());
             mySteamID = steamUser.getSteamID();
+
+            if (!verifySpacewarContext()) {
+                disposeSteamInterfaces();
+                SteamAPI.shutdown();
+                return false;
+            }
+
             socketsApi = SteamSocketsApi.load();
             socketsApi.installConnectionStatusCallback(this::onConnectionStatusChanged);
             // IMPORTANT: configureForGameTraffic() MUST be called BEFORE initRelayNetworkAccess().
@@ -172,6 +200,7 @@ public class SteamManager {
         }
 
         initialized = true;
+        lastInitFailure = InitFailure.NONE;
         running.set(true);
         startCallbackThread();
         startReceiveThread();
