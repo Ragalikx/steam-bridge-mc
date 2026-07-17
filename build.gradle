@@ -149,7 +149,6 @@ jar {
     exclude 'com/codedisaster/steamworks/SteamServer*'
     exclude 'com/codedisaster/steamworks/SteamUGC*'
     exclude 'com/codedisaster/steamworks/SteamUserStats*'
-    exclude 'com/codedisaster/steamworks/SteamApps*'
 
     manifest {
         attributes([
