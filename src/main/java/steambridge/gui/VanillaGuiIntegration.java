@@ -73,7 +73,7 @@ public final class VanillaGuiIntegration {
     /**
      * SteamID for an upcoming vanilla connect. getCurrentServer() is often still null when
      * ConnectScreen opens (set only inside connect() after setScreen). Fall back to the selected
-     * multiplayer-list row or Direct Join IP field — mc.screen is still the previous GUI.
+     * multiplayer-list row or Direct Join IP field вЂ” mc.screen is still the previous GUI.
      */
     private static String resolveSteamConnectAddress(Screen previousScreen, Minecraft mc) {
         try {
@@ -107,7 +107,7 @@ public final class VanillaGuiIntegration {
         // bottom Join/Connect, icon Play overlay, double-click, direct-join confirm.
         // Button wrap alone is not enough (list rows call joinSelectedServer() directly).
         if (next instanceof ConnectScreen connectScreen) {
-            // getCurrentServer() is usually null here — use list selection / direct-join field.
+            // getCurrentServer() is usually null here вЂ” use list selection / direct-join field.
             // During setScreen HEAD, mc.screen is still the previous multiplayer/direct GUI.
             String addr = resolveSteamConnectAddress(mc.screen, mc);
             if (addr != null) {
@@ -288,6 +288,20 @@ public final class VanillaGuiIntegration {
 
     private static void addButton(Screen gui, Button button) {
         Screens.getButtons(gui).add(button);
+    }
+
+
+    /**
+     * Called from ConnectScreenMixin (remapped ServerData — not reflection).
+     * @return true if Steam connect started (caller cancels vanilla).
+     */
+    public static boolean trySteamConnectFromServerData(Screen parent, ServerData data) {
+        if (data == null || data.ip == null || !isSteamServerId(data.ip)) {
+            return false;
+        }
+        Screen p = parent != null ? parent : Minecraft.getInstance().screen;
+        interceptSteamConnect(p, data.ip);
+        return true;
     }
 
     private static void interceptSteamConnect(Screen parent, String steamAddr) {

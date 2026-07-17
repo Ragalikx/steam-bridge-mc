@@ -4,7 +4,8 @@
   "compatibilityLevel": "JAVA_17",
   "client": [
     "MinecraftMixin",
-    "MinecraftAccessor"
+    "MinecraftAccessor",
+    "ConnectScreenMixin"
   ],
   "injectors": {
     "defaultRequire": 1
