@@ -350,23 +350,27 @@ private static void markAllSteamServers(JoinMultiplayerScreen gui) {
         // Catch every path that opens ConnectScreen with a SteamID address:
         // bottom Join/Connect, icon Play overlay, double-click, direct-join confirm.
         if (next instanceof ConnectScreen connectScreen) {
-            ServerData sd = mc.getCurrentServer();
-            if (sd != null && isSteamServerId(sd.ip)) {
+            // getCurrentServer() is usually null here — use list selection / direct-join field.
+            String addr = resolveSteamConnectAddress(mc.screen, mc);
+            if (addr != null) {
                 abortVanillaConnect(connectScreen);
                 Screen parent = connectScreenParent(connectScreen);
                 if (parent == null) parent = mc.screen;
                 final Screen p = parent;
-                final String addr = sd.ip;
+                final String steamAddr = addr;
+                SteamBridgeMod.LOG.info(
+                        "Rewriting ConnectScreen -> Steam for {} (previous={})",
+                        steamAddr, mc.screen != null ? mc.screen.getClass().getSimpleName() : "null");
                 if (!SteamManager.getInstance().isInitialized()
                         && !SteamManager.getInstance().reinit()) {
                     SteamBridgeMod.LOG.info(
-                            "Steam not running; opening launch screen before connect to {}", addr);
+                            "Steam not running; opening launch screen before connect to {}", steamAddr);
                     event.setNewScreen(new GuiSteamResync(
                             p,
-                            () -> Minecraft.getInstance().setScreen(beginSteamConnect(p, addr)),
+                            () -> Minecraft.getInstance().setScreen(beginSteamConnect(p, steamAddr)),
                             "steambridge.gui.resync_success_hint_connect"));
                 } else {
-                    event.setNewScreen(beginSteamConnect(p, addr));
+                    event.setNewScreen(beginSteamConnect(p, steamAddr));
                 }
                 return;
             }
