@@ -164,6 +164,19 @@ public final class VanillaGuiIntegration {
      * Join a SteamID-shaped address. If Steam is not up, show {@link GuiSteamResync}
      * ("Launching Steam...") instead of failing later with a confusing relay error.
      */
+    /**
+     * Called from ConnectScreenMixin (remapped ServerData — not reflection).
+     * @return true if Steam connect started (caller cancels vanilla).
+     */
+    public static boolean trySteamConnectFromServerData(Screen parent, ServerData data) {
+        if (data == null || data.ip == null || !isSteamServerId(data.ip)) {
+            return false;
+        }
+        Screen p = parent != null ? parent : Minecraft.getInstance().screen;
+        interceptSteamConnect(p, data.ip);
+        return true;
+    }
+
     private static void interceptSteamConnect(Screen parent, String steamAddr) {
         Minecraft mc = Minecraft.getInstance();
         if (!SteamManager.getInstance().isInitialized()) {
