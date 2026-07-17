@@ -271,6 +271,12 @@ public class SteamManager {
      *
      * @return {@code true} if re-initialization succeeded
      */
+
+    /**
+     * Shuts down and re-initializes Steam. Used by the "resync Steam" button in GUI.
+     *
+     * @return {@code true} if re-initialization succeeded
+     */
     private void disposeSteamInterfaces() {
         if (steamUser != null) {
             steamUser.dispose();
@@ -397,65 +403,6 @@ public class SteamManager {
         }
     }
 
-    public void shutdown() {
-        if (!initialized) {
-            return;
-        }
-
-        SteamBridgeMod.LOG.info("[SteamManager] Shutting down...");
-        running.set(false);
-        signalReceiveWake(); // unblock the receive thread if it is parked waiting for connections
-
-        // Wait for both background threads to actually exit their loop before freeing any native
-        // Steam resources below. Without this, a thread can still be inside a native JNA call
-        // (e.g. SteamAPI.runCallbacks()) when SteamAPI.shutdown() frees the SDK underneath it.
-        joinBackgroundThread(callbackThread);
-        joinBackgroundThread(receiveThread);
-        callbackThread = null;
-        receiveThread = null;
-
-        SteamServer server = activeServer;
-        if (server != null) {
-            server.stop();
-        }
-
-        SteamClient client = activeClient;
-        if (client != null) {
-            client.disconnect();
-        }
-
-        statusByConnection.clear();
-        connectionBySteamId.clear();
-        loopbackByConnection.clear();
-
-        if (socketsApi != null) {
-            socketsApi.dispose();
-            socketsApi = null;
-        }
-
-        if (steamUser != null) {
-            steamUser.dispose();
-            steamUser = null;
-        }
-        if (steamFriends != null) {
-            steamFriends.dispose();
-            steamFriends = null;
-        }
-        if (steamUtils != null) {
-            steamUtils.dispose();
-            steamUtils = null;
-        }
-
-        SteamAPI.shutdown();
-        initialized = false;
-        SteamBridgeMod.LOG.info("[SteamManager] Shutdown complete.");
-    }
-
-    /**
-     * Shuts down and re-initializes Steam. Used by the "resync Steam" button in GUI.
-     *
-     * @return {@code true} if re-initialization succeeded
-     */
     public boolean reinit() {
         SteamBridgeMod.LOG.info("[SteamManager] reinit() requested.");
         shutdown();
