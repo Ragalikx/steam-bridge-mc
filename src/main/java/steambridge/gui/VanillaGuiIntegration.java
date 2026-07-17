@@ -185,7 +185,19 @@ public final class VanillaGuiIntegration {
 
     /** Opens {@link GuiSteamConnecting} for a SteamID-shaped address, replacing normal vanilla connect. */
     private static void interceptSteamConnect(Screen parent, String steamAddr) {
-        Minecraft.getInstance().setScreen(beginSteamConnect(parent, steamAddr));
+        Minecraft mc = Minecraft.getInstance();
+        if (!SteamManager.getInstance().isInitialized()) {
+            if (!SteamManager.getInstance().reinit()) {
+                SteamBridgeMod.LOG.info(
+                        "Steam not running; opening launch screen before connect to {}", steamAddr);
+                mc.setScreen(new GuiSteamResync(
+                        parent,
+                        () -> mc.setScreen(beginSteamConnect(parent, steamAddr)),
+                        "steambridge.gui.resync_success_hint_connect"));
+                return;
+            }
+        }
+        mc.setScreen(beginSteamConnect(parent, steamAddr));
     }
 
     /**
