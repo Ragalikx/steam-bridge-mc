@@ -252,6 +252,20 @@ public final class VanillaGuiIntegration {
         Screens.getButtons(gui).add(button);
     }
 
+
+    /**
+     * Called from ConnectScreenMixin (remapped ServerData — not reflection).
+     * @return true if Steam connect started (caller cancels vanilla).
+     */
+    public static boolean trySteamConnectFromServerData(Screen parent, ServerData data) {
+        if (data == null || data.ip == null || !isSteamServerId(data.ip)) {
+            return false;
+        }
+        Screen p = parent != null ? parent : Minecraft.getInstance().screen;
+        interceptSteamConnect(p, data.ip);
+        return true;
+    }
+
     private static void interceptSteamConnect(Screen parent, String steamAddr) {
         Minecraft mc = Minecraft.getInstance();
         if (!SteamManager.getInstance().isInitialized()) {

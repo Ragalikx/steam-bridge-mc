@@ -3,7 +3,8 @@
   "package": "steambridge.mixin",
   "compatibilityLevel": "JAVA_21",
   "client": [
-    "MinecraftMixin"
+    "MinecraftMixin",
+    "ConnectScreenMixin"
   ],
   "injectors": {
     "defaultRequire": 1
