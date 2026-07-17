@@ -166,6 +166,19 @@ public final class VanillaGuiIntegration {
         }
     }
 
+    /**
+     * Called from {@code ConnectScreenMixin} (remapped ServerData param — not reflection).
+     * @return true if this was a Steam address and connect was handed off (cancel vanilla).
+     */
+    public static boolean trySteamConnectFromServerData(Screen parent, ServerData data) {
+        if (data == null || data.ip == null || !isSteamServerId(data.ip)) {
+            return false;
+        }
+        Screen p = parent != null ? parent : Minecraft.getInstance().screen;
+        interceptSteamConnect(p, data.ip);
+        return true;
+    }
+
     /** Opens {@link GuiSteamConnecting} for a SteamID-shaped address, replacing normal vanilla connect. */
     private static void interceptSteamConnect(Screen parent, String steamAddr) {
         Minecraft mc = Minecraft.getInstance();

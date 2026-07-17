@@ -1,0 +1,13 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "steambridge.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "refmap": "steambridge.refmap.json",
+  "client": [
+    "ConnectScreenMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

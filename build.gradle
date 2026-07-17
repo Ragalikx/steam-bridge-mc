@@ -161,6 +161,15 @@ dependencies {
     }
 
     steamBundle "com.code-disaster.steamworks4j:steamworks4j:${project.steamworks4j_version}"
+
+    // Mixin AP generates steambridge.refmap.json (SRG names for production).
+    annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
+}
+
+// Mixin refmap wiring (ModDevGradle legacy + Sponge Mixin AP).
+mixin {
+    add sourceSets.main, 'steambridge.refmap.json'
+    config 'steambridge.mixins.json'
 }
 
 // -- Resource templating (mods.toml version substitution) ---------------------
@@ -217,7 +226,8 @@ jar {
             'Implementation-Version': project.version,
             'Implementation-Vendor' : 'Ragalikx',
             'Implementation-URL'    : 'https://github.com/Ragalikx/steam-bridge-mc',
-            'Built-By'              : 'Ragalikx'
+            'Built-By'              : 'Ragalikx',
+            'MixinConfigs'          : 'steambridge.mixins.json'
         ])
     }
 }

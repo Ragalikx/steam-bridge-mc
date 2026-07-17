@@ -32,3 +32,6 @@ Requires Steam (AppID 480 - Spacewar) to be running.'''
     versionRange="[1.20.1,1.21)"
     ordering="NONE"
     side="CLIENT"
+
+[[mixins]]
+config="steambridge.mixins.json"
