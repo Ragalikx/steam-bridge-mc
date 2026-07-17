@@ -364,12 +364,24 @@ private static void markAllSteamServers(JoinMultiplayerScreen gui) {
         if (next instanceof ConnectScreen connectScreen) {
             ServerData sd = mc.getCurrentServer();
             if (sd != null && isSteamServerId(sd.ip)) {
-                abortVanillaConnect(connectScreen);
-                Screen parent = connectScreenParent(connectScreen);
-                if (parent == null) parent = mc.screen;
-                event.setNewScreen(beginSteamConnect(parent, sd.ip));
-                return;
-            }
+                    abortVanillaConnect(connectScreen);
+                    Screen parent = connectScreenParent(connectScreen);
+                    if (parent == null) parent = mc.screen;
+                    final Screen p = parent;
+                    final String addr = sd.ip;
+                    if (!SteamManager.getInstance().isInitialized()
+                            && !SteamManager.getInstance().reinit()) {
+                        SteamBridgeMod.LOG.info(
+                                "Steam not running; opening launch screen before connect to {}", addr);
+                        event.setNewScreen(new GuiSteamResync(
+                                p,
+                                () -> Minecraft.getInstance().setScreen(beginSteamConnect(p, addr)),
+                                "steambridge.gui.resync_success_hint_connect"));
+                    } else {
+                        event.setNewScreen(beginSteamConnect(p, addr));
+                    }
+                    return;
+                }
         }
 
         if (next instanceof ShareToLanScreen) {
