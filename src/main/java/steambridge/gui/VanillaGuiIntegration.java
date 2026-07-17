@@ -342,6 +342,37 @@ private static void markAllSteamServers(JoinMultiplayerScreen gui) {
         }
     }
 
+
+    /**
+     * SteamID for an upcoming vanilla connect. getCurrentServer() is often still null when
+     * ConnectScreen opens (set only inside connect() after setScreen). Fall back to the selected
+     * multiplayer-list row or Direct Join IP field — mc.screen is still the previous GUI.
+     */
+    private static String resolveSteamConnectAddress(Screen previousScreen, Minecraft mc) {
+        try {
+            ServerData cur = mc.getCurrentServer();
+            if (cur != null && isSteamServerId(cur.ip)) {
+                return cur.ip;
+            }
+        } catch (Exception ignored) {}
+
+        Screen prev = previousScreen != null ? previousScreen : mc.screen;
+        if (prev instanceof JoinMultiplayerScreen jms) {
+            ServerData sel = resolveSelectedServer(jms);
+            if (sel != null && isSteamServerId(sel.ip)) {
+                return sel.ip;
+            }
+        }
+        if (prev instanceof DirectJoinServerScreen) {
+            EditBox box = findIpEditBox(prev);
+            if (box != null) {
+                String v = box.getValue();
+                if (isSteamServerId(v)) return v;
+            }
+        }
+        return null;
+    }
+
     @SubscribeEvent
     public static void onScreenOpening(ScreenEvent.Opening event) {
         Screen next = event.getNewScreen();
