@@ -37,7 +37,7 @@
   "steambridge.gui.friends_short": "S",
   "steambridge.gui.host_started": "World is now open via Steam. Connection is available!",
   "steambridge.gui.host_failed": "Could not open the world via Steam. Make sure Steam is running.",
-  "steambridge.gui.host_steam_launching": "\u00a7eSteam is not running; attempting to start it automatically. \u00a7eWait a moment and click «Open via Steam» again.",
+  "steambridge.gui.host_steam_launching": "Steam is not running; attempting to start it automatically. Wait a moment and click «Open via Steam» again.",
   "steambridge.gui.conn_relay": "relay",
   "steambridge.gui.conn_p2p": "p2p",
   "steambridge.gui.resync_title": "Steam is not running",
