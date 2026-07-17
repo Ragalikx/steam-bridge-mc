@@ -27,7 +27,8 @@ public class GuiSteamResync extends Screen {
     private static final int POLL_INTERVAL_TICKS = 40; // check every 2 seconds (20 ticks/sec)
 
     private final Screen parent;
-    private final Consumer<String> onSteamIdSelected;
+    private final Runnable onSteamReady;
+    private final String successHintKey;
 
     private enum State { LAUNCHING, WAITING, SUCCESS, FAILED }
 
@@ -41,9 +42,19 @@ public class GuiSteamResync extends Screen {
     private int nextCheckTick = POLL_INTERVAL_TICKS;
 
     public GuiSteamResync(Screen parent, Consumer<String> onSteamIdSelected) {
+        this(parent,
+                () -> Minecraft.getInstance().setScreen(
+                        new GuiSteamFriends(parent, null, onSteamIdSelected)),
+                "steambridge.gui.resync_success_hint");
+    }
+
+    public GuiSteamResync(Screen parent, Runnable onSteamReady, String successHintKey) {
         super(Component.empty());
         this.parent = parent;
-        this.onSteamIdSelected = onSteamIdSelected;
+        this.onSteamReady = onSteamReady;
+        this.successHintKey = successHintKey != null
+                ? successHintKey
+                : "steambridge.gui.resync_success_hint";
     }
 
     @Override
@@ -95,11 +106,10 @@ public class GuiSteamResync extends Screen {
             if (ok) {
                 state = State.SUCCESS;
                 statusLine1 = "§a" + I18n.get("steambridge.gui.resync_success");
-                statusLine2 = "§7" + I18n.get("steambridge.gui.resync_success_hint");
-                // Open friends screen on next tick
-                Minecraft.getInstance().execute(() ->
-                        Minecraft.getInstance().setScreen(
-                                new GuiSteamFriends(parent, null, onSteamIdSelected)));
+                statusLine2 = "§7" + I18n.get(successHintKey);
+                Minecraft.getInstance().execute(() -> {
+                    if (onSteamReady != null) onSteamReady.run();
+                });
                 return;
             }
         }
