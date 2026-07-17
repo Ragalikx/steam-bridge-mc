@@ -58,3 +58,13 @@ steambridge.gui.resync_countdown=Ожидаем Steam... (%s сек)
 
 steambridge.gui.server_steam_motd=Steam P2P / Relay
 steambridge.gui.server_steam_status=Steam
+steambridge.error.native_load=Не удалось загрузить нативные библиотеки Steam.
+steambridge.error.no_steam_client=Клиент Steam не запущен.
+steambridge.error.no_steam_client_hint=Запустите Steam и попробуйте снова.
+steambridge.error.steam_version=Версия клиента Steam несовместима с этим модом.
+steambridge.error.spacewar_failed=Steam запущен, но Spacewar (AppID 480) не удалось стартовать.
+steambridge.error.spacewar_failed_hint=Проверьте Family View, ограничения семейной библиотеки или закройте другие игры Steam.
+steambridge.error.wrong_appid=Steam подключился с неверным AppID (нужен Spacewar 480).
+steambridge.error.family_or_license=Этот аккаунт Steam не может использовать Spacewar (лицензия / Family View / семейная библиотека).
+steambridge.error.family_or_license_hint=Снимите ограничения Family View для Spacewar или используйте другой аккаунт.
+steambridge.error.steam_init_failed=Не удалось инициализировать Steam.
