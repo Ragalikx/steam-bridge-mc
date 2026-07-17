@@ -19,7 +19,7 @@ steambridge.gui.no_bans=Nobody has been banned yet.
 steambridge.gui.friends_short=S
 steambridge.gui.host_started=World is now open via Steam. Connection is available!
 steambridge.gui.host_failed=Could not open the world via Steam. Make sure Steam is running.
-steambridge.gui.host_steam_launching=Steam is not running. Attempting to start it automatically. Wait a moment and click Open via Steam again.
+steambridge.gui.host_steam_launching=§eSteam is not running; attempting to start it automatically. §eWait a moment and click «Open via Steam» again.
 steambridge.gui.conn_relay=relay
 steambridge.gui.conn_p2p=p2p
 
@@ -58,13 +58,3 @@ steambridge.gui.resync_countdown=Waiting for Steam... (%s sec)
 
 steambridge.gui.server_steam_motd=Steam P2P / Relay
 steambridge.gui.server_steam_status=Steam
-steambridge.error.native_load=Could not load Steam native libraries.
-steambridge.error.no_steam_client=Steam client is not running.
-steambridge.error.no_steam_client_hint=Start Steam, then try again.
-steambridge.error.steam_version=Steam client version is incompatible with this mod.
-steambridge.error.spacewar_failed=Steam is running, but Spacewar (AppID 480) could not start.
-steambridge.error.spacewar_failed_hint=Check Family View, shared-library locks, or close other Steam games and retry.
-steambridge.error.wrong_appid=Steam attached with the wrong AppID (expected Spacewar 480).
-steambridge.error.family_or_license=This Steam account cannot use Spacewar (license / Family View / shared library).
-steambridge.error.family_or_license_hint=Disable Family View restrictions for Spacewar or use an unrestricted account.
-steambridge.error.steam_init_failed=Steam failed to initialize.
