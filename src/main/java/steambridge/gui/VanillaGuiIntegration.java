@@ -345,6 +345,37 @@ private static void markAllSteamServers(JoinMultiplayerScreen gui) {
         }
     }
 
+    /**
+     * SteamID for an upcoming vanilla connect. {@link Minecraft#getCurrentServer()} is often still
+     * null when {@link ConnectScreen} opens (set only inside {@code connect()} after setScreen).
+     * Fall back to the selected multiplayer-list row or Direct Join IP field — {@code mc.screen}
+     * is still the previous GUI during Opening / mixin HEAD.
+     */
+    private static String resolveSteamConnectAddress(Screen previousScreen, Minecraft mc) {
+        try {
+            ServerData cur = mc.getCurrentServer();
+            if (cur != null && isSteamServerId(cur.ip)) {
+                return cur.ip;
+            }
+        } catch (Exception ignored) {}
+
+        Screen prev = previousScreen != null ? previousScreen : mc.screen;
+        if (prev instanceof JoinMultiplayerScreen jms) {
+            ServerData sel = resolveSelectedServer(jms);
+            if (sel != null && isSteamServerId(sel.ip)) {
+                return sel.ip;
+            }
+        }
+        if (prev instanceof DirectJoinServerScreen) {
+            EditBox box = findIpEditBox(prev);
+            if (box != null) {
+                String v = box.getValue();
+                if (isSteamServerId(v)) return v;
+            }
+        }
+        return null;
+    }
+
     @SubscribeEvent
     public static void onScreenOpening(ScreenEvent.Opening event) {
         Screen next = event.getNewScreen();
@@ -352,24 +383,29 @@ private static void markAllSteamServers(JoinMultiplayerScreen gui) {
 
         // Catch every path that opens ConnectScreen with a SteamID address:
         // bottom Join/Connect, icon Play overlay, double-click, direct-join confirm.
+        // Must NOT rely only on getCurrentServer() — it is usually null here (see log: Unknown host).
         if (next instanceof ConnectScreen connectScreen) {
-            ServerData sd = mc.getCurrentServer();
-            if (sd != null && isSteamServerId(sd.ip)) {
+            // During Opening, mc.screen is still the previous screen (list / direct join).
+            String addr = resolveSteamConnectAddress(mc.screen, mc);
+            if (addr != null) {
                 abortVanillaConnect(connectScreen);
                 Screen parent = connectScreenParent(connectScreen);
                 if (parent == null) parent = mc.screen;
                 final Screen p = parent;
-                final String addr = sd.ip;
+                final String steamAddr = addr;
+                SteamBridgeMod.LOG.info(
+                        "Rewriting ConnectScreen -> Steam for {} (previous={})",
+                        steamAddr, mc.screen != null ? mc.screen.getClass().getSimpleName() : "null");
                 if (!SteamManager.getInstance().isInitialized()
                         && !SteamManager.getInstance().reinit()) {
                     SteamBridgeMod.LOG.info(
-                            "Steam not running; opening launch screen before connect to {}", addr);
+                            "Steam not running; opening launch screen before connect to {}", steamAddr);
                     event.setNewScreen(new GuiSteamResync(
                             p,
-                            () -> Minecraft.getInstance().setScreen(beginSteamConnect(p, addr)),
+                            () -> Minecraft.getInstance().setScreen(beginSteamConnect(p, steamAddr)),
                             "steambridge.gui.resync_success_hint_connect"));
                 } else {
-                    event.setNewScreen(beginSteamConnect(p, addr));
+                    event.setNewScreen(beginSteamConnect(p, steamAddr));
                 }
                 return;
             }
@@ -409,7 +445,7 @@ private static void markAllSteamServers(JoinMultiplayerScreen gui) {
      * Early wrap for bottom-bar Join/Connect. Play overlay + double-click go through
      * {@link JoinMultiplayerScreen#joinSelectedServer} and are caught in {@link #onScreenOpening}
      * when {@link ConnectScreen} opens (abort leftover vanilla DNS/TCP thread).
-     * Address comes from {@link Minecraft#getCurrentServer()}, not ConnectScreen fields.
+     * Address is resolved from list selection / direct-join field (see {@link #resolveSteamConnectAddress}).
      */
     private static void injectSteamConnectIntercept(ScreenEvent.Init.Post event, Screen gui) {
         if (gui instanceof DirectJoinServerScreen) {
