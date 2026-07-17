@@ -103,7 +103,7 @@ public final class SteamAppIdHelper {
             p.waitFor(3, TimeUnit.SECONDS);
             return matched;
         } catch (Exception e) {
-            SteamBridgeMod.LOG.debug("[SteamAppId] Steam process probe failed: {}", e.getMessage());
+            SteamBridgeMod.LOG.info("[SteamAppId] Steam process probe failed: {}", e.getMessage());
             return false;
         }
     }
