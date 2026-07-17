@@ -655,7 +655,7 @@ private static void markAllSteamServers(MultiplayerScreen gui) {
                 }
                 if (mc.player != null) {
                     mc.player.sendMessage(
-                            new LiteralText("\u00a7e" + I18n.translate("steambridge.gui.host_steam_launching")), false);
+                            new LiteralText(I18n.translate("steambridge.gui.host_steam_launching")), false);
                 }
                 return;
             }
