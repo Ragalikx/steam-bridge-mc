@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright (c) 2026 Ragalikx
  * MIT License - see the LICENSE file in the repository root.
  * If you use this code, please credit the author.
@@ -18,10 +18,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import steambridge.SteamBridgeMod;
 import steambridge.gui.VanillaGuiIntegration;
 
-/**
- * Intercepts every vanilla multiplayer connect path before DNS/TCP.
- * ServerData is remapped by Mixin (reflection-based list selection breaks at runtime).
- */
 @Mixin(ConnectScreen.class)
 public class ConnectScreenMixin {
 
