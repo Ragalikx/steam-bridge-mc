@@ -23,6 +23,7 @@ import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.multiplayer.ServerList;
 import net.minecraft.client.resources.language.I18n;
 import net.minecraft.client.server.IntegratedServer;
+import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.HttpUtil;
 import net.minecraft.world.level.GameType;
@@ -468,7 +469,7 @@ private static void markAllSteamServers(JoinMultiplayerScreen gui) {
                 }
                 if (mc.player != null) {
                     mc.player.displayClientMessage(
-                            Component.literal("§e" + I18n.get("steambridge.gui.host_steam_launching")), false);
+                            Component.translatable("steambridge.gui.host_steam_launching").withStyle(ChatFormatting.YELLOW), false);
                 }
                 return;
             }
@@ -492,10 +493,10 @@ private static void markAllSteamServers(JoinMultiplayerScreen gui) {
         if (mc.player != null) {
             if (server.isRunning()) {
                 mc.player.displayClientMessage(
-                        Component.literal("§a" + I18n.get("steambridge.gui.host_started")), false);
+                        Component.translatable("steambridge.gui.host_started").withStyle(ChatFormatting.GREEN), false);
             } else {
                 mc.player.displayClientMessage(
-                        Component.literal("§c" + I18n.get("steambridge.gui.host_failed")), false);
+                        Component.translatable("steambridge.gui.host_failed").withStyle(ChatFormatting.RED), false);
             }
         }
         mc.setScreen(null);
