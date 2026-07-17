@@ -34,10 +34,6 @@ public class SteamManager {
         return INSTANCE;
     }
 
-    /**
-     * Why the last {@link #init()} / {@link #reinit()} failed (or post-init license checks).
-     * Cleared to {@link InitFailure#NONE} on success.
-     */
     private volatile boolean initialized = false;
     private final AtomicBoolean running = new AtomicBoolean(false);
 
@@ -124,7 +120,6 @@ public class SteamManager {
             }
         });
         if (!loaded) {
-            lastInitFailure = InitFailure.NATIVE_LOAD;
             SteamBridgeMod.LOG.error("[SteamManager] Failed to load Steam native libraries.");
             return false;
         }
@@ -153,13 +148,6 @@ public class SteamManager {
             steamUtils = new SteamUtils(new SteamUtilsCallbackAdapter());
             mySteamID = steamUser.getSteamID();
 
-            if (!verifySpacewarContext()) {
-                // Soft failure after partial init: tear down so the game can retry cleanly.
-                disposeSteamInterfaces();
-                SteamAPI.shutdown();
-                return false;
-            }
-
             socketsApi = SteamSocketsApi.load();
             socketsApi.installConnectionStatusCallback(this::onConnectionStatusChanged);
             // IMPORTANT: configureForGameTraffic() MUST be called BEFORE initRelayNetworkAccess().
@@ -169,7 +157,6 @@ public class SteamManager {
             socketsApi.configureForGameTraffic(steambridge.SteamBridgeConfig.allowWithoutAuth);
             socketsApi.initRelayNetworkAccess();
         } catch (Throwable t) {
-            lastInitFailure = InitFailure.UNKNOWN;
             SteamBridgeMod.LOG.error("[SteamManager] Failed to initialize SteamNetworkingSockets: {}", t.getMessage(), t);
             disposeSteamInterfaces();
             SteamAPI.shutdown();
@@ -262,16 +249,6 @@ public class SteamManager {
             steamUtils = null;
         }
     }
-
-
-    /**
-     * After a successful SteamAPI init, confirm we are running as Spacewar (480) and
-     * surface Family Library / license quirks.
-     *
-     * @return {@code false} only for hard problems (wrong AppID); family-share is logged and allowed
-     */
-
-
 
 
     public boolean reinit() {
