@@ -18,8 +18,9 @@ import net.minecraft.network.chat.Component;
 import java.util.function.Consumer;
 
 /**
- * A screen shown when the Friends button is clicked but Steam is not running.
- * It launches Steam, waits up to {@value #TIMEOUT_SECONDS} seconds, then re-inits.
+ * Shown when Steam is not running. Launches Steam, waits up to {@value #TIMEOUT_SECONDS}
+ * seconds for {@link SteamManager#reinit()}, then runs {@code onSteamReady}.
+ * Used for the Friends picker and for multiplayer SteamID connect.
  */
 public class GuiSteamResync extends Screen {
 
@@ -27,7 +28,8 @@ public class GuiSteamResync extends Screen {
     private static final int POLL_INTERVAL_TICKS = 40; // check every 2 seconds (20 ticks/sec)
 
     private final Screen parent;
-    private final Consumer<String> onSteamIdSelected;
+    private final Runnable onSteamReady;
+    private final String successHintKey;
 
     private enum State { LAUNCHING, WAITING, SUCCESS, FAILED }
 
@@ -40,10 +42,28 @@ public class GuiSteamResync extends Screen {
     /** Next tick to attempt reinit. */
     private int nextCheckTick = POLL_INTERVAL_TICKS;
 
+    /**
+     * Friends-button flow: after Steam is up, open the friends picker.
+     */
     public GuiSteamResync(Screen parent, Consumer<String> onSteamIdSelected) {
+        this(parent,
+                () -> Minecraft.getInstance().setScreen(
+                        new GuiSteamFriends(parent, null, onSteamIdSelected)),
+                "steambridge.gui.resync_success_hint");
+    }
+
+    /**
+     * Generic flow: after Steam is up, run {@code onSteamReady} (e.g. continue connect).
+     *
+     * @param successHintKey i18n key for the second status line on success
+     */
+    public GuiSteamResync(Screen parent, Runnable onSteamReady, String successHintKey) {
         super(Component.empty());
         this.parent = parent;
-        this.onSteamIdSelected = onSteamIdSelected;
+        this.onSteamReady = onSteamReady;
+        this.successHintKey = successHintKey != null
+                ? successHintKey
+                : "steambridge.gui.resync_success_hint";
     }
 
     @Override
@@ -98,11 +118,10 @@ public class GuiSteamResync extends Screen {
             if (ok) {
                 state = State.SUCCESS;
                 statusLine1 = "§a" + I18n.get("steambridge.gui.resync_success");
-                statusLine2 = "§7" + I18n.get("steambridge.gui.resync_success_hint");
-                // Open friends screen on next tick
-                Minecraft.getInstance().execute(() ->
-                        Minecraft.getInstance().setScreen(
-                                new GuiSteamFriends(parent, null, onSteamIdSelected)));
+                statusLine2 = "§7" + I18n.get(successHintKey);
+                Minecraft.getInstance().execute(() -> {
+                    if (onSteamReady != null) onSteamReady.run();
+                });
                 return;
             }
         }
