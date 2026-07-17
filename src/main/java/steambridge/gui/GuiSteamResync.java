@@ -49,7 +49,7 @@ public class GuiSteamResync extends Screen {
     }
 
     public GuiSteamResync(Screen parent, Runnable onSteamReady, String successHintKey) {
-        super(Component.empty());
+        super(new StringTextComponent(""));
         this.parent = parent;
         this.onSteamReady = onSteamReady;
         this.successHintKey = successHintKey != null
