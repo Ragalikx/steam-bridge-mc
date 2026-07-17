@@ -27,6 +27,7 @@ import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.multiplayer.ServerList;
 import net.minecraft.client.resources.language.I18n;
 import net.minecraft.client.server.IntegratedServer;
+import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.HttpUtil;
 import net.minecraft.world.level.GameType;
@@ -488,7 +489,7 @@ try {
                     SteamBridgeMod.LOG.warn("[SteamHost] Failed to launch Steam: {}", e.getMessage());
                 }
                 mc.player.displayClientMessage(
-                        Component.literal("§e" + I18n.get("steambridge.gui.host_steam_launching")), false);
+                        Component.translatable("steambridge.gui.host_steam_launching").withStyle(ChatFormatting.YELLOW), false);
                 return;
             }
             // reinit succeeded: fall through and open the world
@@ -511,11 +512,11 @@ try {
 
         if (server.isRunning()) {
             mc.player.displayClientMessage(
-                    Component.literal("§a" + I18n.get("steambridge.gui.host_started")), false);
+                    Component.translatable("steambridge.gui.host_started").withStyle(ChatFormatting.GREEN), false);
             mc.setScreen(null);
         } else {
             mc.player.displayClientMessage(
-                    Component.literal("§c" + I18n.get("steambridge.gui.host_failed")), false);
+                    Component.translatable("steambridge.gui.host_failed").withStyle(ChatFormatting.RED), false);
             mc.setScreen(null);
         }
     }
