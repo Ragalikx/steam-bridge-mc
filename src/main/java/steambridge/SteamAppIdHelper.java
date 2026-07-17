@@ -59,54 +59,6 @@ public final class SteamAppIdHelper {
         }
     }
 
-    /**
-     * Best-effort process probe for the Steam client (not the Steamworks API).
-     * Used when {@code SteamAPI.init} fails so we can tell "Steam is off" from
-     * "Steam is on but Spacewar/Family View blocked the API".
-     */
-    public static boolean isSteamClientProcessRunning() {
-        String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
-        try {
-            ProcessBuilder pb;
-            if (os.contains("win")) {
-                pb = new ProcessBuilder("tasklist", "/FI", "IMAGENAME eq steam.exe", "/NH");
-            } else if (os.contains("mac")) {
-                pb = new ProcessBuilder("pgrep", "-x", "steam_osx");
-            } else {
-                // Linux: main client is usually "steam"
-                pb = new ProcessBuilder("pgrep", "-x", "steam");
-            }
-            pb.redirectErrorStream(true);
-            Process p = pb.start();
-            boolean matched = false;
-            try (BufferedReader br = new BufferedReader(
-                    new InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8))) {
-                String line;
-                while ((line = br.readLine()) != null) {
-                    String s = line.trim().toLowerCase(Locale.ROOT);
-                    if (s.isEmpty()) continue;
-                    if (os.contains("win")) {
-                        // tasklist: "steam.exe ..." or "INFO: No tasks..."
-                        if (s.contains("steam.exe")) {
-                            matched = true;
-                            break;
-                        }
-                    } else {
-                        // pgrep prints PIDs when found
-                        if (s.matches("\\d+")) {
-                            matched = true;
-                            break;
-                        }
-                    }
-                }
-            }
-            p.waitFor(3, TimeUnit.SECONDS);
-            return matched;
-        } catch (Exception e) {
-            SteamBridgeMod.LOG.info("[SteamAppId] Steam process probe failed: {}", e.getMessage());
-            return false;
-        }
-    }
 
     /** Best-effort steam://run/480 (starts Steam if needed, then Spacewar). */
     public static void launchSteam() {
