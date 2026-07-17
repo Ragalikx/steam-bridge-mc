@@ -5,46 +5,32 @@
  */
 package steambridge;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.util.Locale;
+import java.util.concurrent.TimeUnit;
 
-/**
- * Utilities for Steam setup before SteamAPI.init().
- *
- * <p>Ensures {@code steam_appid.txt} exists with value "480" (Spacewar).
- * Can also launch {@code steam://run/480} to bring Steam online.</p>
- *
- * @author Ragalikx (https://github.com/Ragalikx/steam-bridge-mc)
- */
+/** steam_appid.txt (480 / Spacewar) and optional Steam / Spacewar launch helpers. */
 public final class SteamAppIdHelper {
 
-    /**
-     * Spacewar - Valve's free public test App ID. Hardcoded on purpose and NOT configurable:
-     * pointing the mod at a real game's App ID (especially one with VAC/EAC) would ban the
-     * user's account. Being a numeric literal also removes any command-injection surface from
-     * the steam://run/&lt;id&gt; launch path.
-     */
+    /** Spacewar. Fixed; do not point this at a VAC/EAC game. */
     public static final String APP_ID = "480";
+    public static final int APP_ID_INT = 480;
 
-    /** Returns the fixed Spacewar App ID ("480"). */
     public static String getAppId() {
         return APP_ID;
     }
 
     private SteamAppIdHelper() {}
 
-
-    /**
-     * Writes {@code steam_appid.txt} into {@code gameDir} if it does not already exist
-     * or contains a different value.
-     *
-     * @param gameDir the .minecraft directory (Minecraft.getMinecraft().mcDataDir)
-     */
     public static void ensureAppId(File gameDir) {
         String appId = getAppId();
 
-        // Steam native library ALWAYS reads from the process current working directory (CWD)
+        // Steam reads steam_appid.txt from process CWD.
         File cwdTarget = new File("steam_appid.txt");
         File gameDirTarget = new File(gameDir, "steam_appid.txt");
 
@@ -74,19 +60,62 @@ public final class SteamAppIdHelper {
     }
 
     /**
-     * Tries to launch Steam via {@code steam://run/<appId>}.
-     * Best-effort - silently ignores errors (Steam may already be running).
+     * Best-effort process probe for the Steam client (not the Steamworks API).
+     * Used when {@code SteamAPI.init} fails so we can tell "Steam is off" from
+     * "Steam is on but Spacewar/Family View blocked the API".
      */
+    public static boolean isSteamClientProcessRunning() {
+        String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
+        try {
+            ProcessBuilder pb;
+            if (os.contains("win")) {
+                pb = new ProcessBuilder("tasklist", "/FI", "IMAGENAME eq steam.exe", "/NH");
+            } else if (os.contains("mac")) {
+                pb = new ProcessBuilder("pgrep", "-x", "steam_osx");
+            } else {
+                // Linux: main client is usually "steam"
+                pb = new ProcessBuilder("pgrep", "-x", "steam");
+            }
+            pb.redirectErrorStream(true);
+            Process p = pb.start();
+            boolean matched = false;
+            try (BufferedReader br = new BufferedReader(
+                    new InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = br.readLine()) != null) {
+                    String s = line.trim().toLowerCase(Locale.ROOT);
+                    if (s.isEmpty()) continue;
+                    if (os.contains("win")) {
+                        // tasklist: "steam.exe ..." or "INFO: No tasks..."
+                        if (s.contains("steam.exe")) {
+                            matched = true;
+                            break;
+                        }
+                    } else {
+                        // pgrep prints PIDs when found
+                        if (s.matches("\\d+")) {
+                            matched = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            p.waitFor(3, TimeUnit.SECONDS);
+            return matched;
+        } catch (Exception e) {
+            SteamBridgeMod.LOG.info("[SteamAppId] Steam process probe failed: {}", e.getMessage());
+            return false;
+        }
+    }
+
+    /** Best-effort steam://run/480 (starts Steam if needed, then Spacewar). */
     public static void launchSteam() {
-        // appId is guaranteed numeric by getAppId(); the launch path below also never goes
-        // through a command shell (no "cmd /c"), so the URL cannot be interpreted as a command.
         String appId = getAppId();
         String uri = "steam://run/" + appId;
         try {
-            String os = System.getProperty("os.name", "").toLowerCase();
+            String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
             ProcessBuilder pb;
             if (os.contains("win")) {
-                // explorer.exe resolves the protocol handler directly, without shell parsing.
                 pb = new ProcessBuilder("explorer.exe", uri);
             } else if (os.contains("mac")) {
                 pb = new ProcessBuilder("open", uri);
@@ -94,12 +123,9 @@ public final class SteamAppIdHelper {
                 pb = new ProcessBuilder("xdg-open", uri);
             }
             pb.start();
-            SteamBridgeMod.LOG.info("[SteamAppId] Launched {}", uri);
+            SteamBridgeMod.LOG.info("[SteamAppId] Launching Steam/Spacewar: {}", uri);
         } catch (Exception e) {
             SteamBridgeMod.LOG.warn("[SteamAppId] Could not launch Steam: {}", e.getMessage());
         }
     }
 }
-
-
-
