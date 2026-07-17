@@ -481,23 +481,7 @@ private static void markAllSteamServers(JoinMultiplayerScreen gui) {
             // Try reinit first; covers the case where Steam was launched recently
             // but the mod hasn't detected it yet.
             if (!SteamManager.getInstance().reinit()) {
-                SteamManager.InitFailure fail = SteamManager.getInstance().getLastInitFailure();
-                // Steam client already up but Spacewar/API failed: show a hard error, do not
-                // pretend another steam://run will magically fix Family View / license blocks.
-                if (fail == SteamManager.InitFailure.SPACEWAR_FAILED
-                        || fail == SteamManager.InitFailure.FAMILY_OR_LICENSE
-                        || fail == SteamManager.InitFailure.WRONG_APP_ID
-                        || fail == SteamManager.InitFailure.VERSION_MISMATCH) {
-                    mc.player.displayClientMessage(
-                            Component.literal("§c" + I18n.get(SteamManager.getInstance().getLastInitFailureKey())),
-                            false);
-                    String hint = SteamManager.getInstance().getLastInitFailureHintKey();
-                    if (!hint.isEmpty()) {
-                        mc.player.displayClientMessage(Component.literal("§7" + I18n.get(hint)), false);
-                    }
-                    return;
-                }
-                try {
+try {
                     SteamAppIdHelper.ensureAppId(mc.gameDirectory);
                     SteamAppIdHelper.launchSteam();
                 } catch (Exception e) {
