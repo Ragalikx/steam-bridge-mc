@@ -18,8 +18,8 @@ import net.minecraft.text.TranslatableText;
 import java.util.function.Consumer;
 
 /**
- * Shown when the Friends button is clicked but Steam is not running.
- * Launches Steam, waits up to {@value #TIMEOUT_SECONDS} seconds, then re-inits.
+ * Shown when Steam is not running. Launches Steam, waits up to {@value #TIMEOUT_SECONDS}
+ * seconds for {@link SteamManager#reinit()}, then runs {@code onSteamReady}.
  */
 public class GuiSteamResync extends Screen {
 
@@ -43,13 +43,13 @@ public class GuiSteamResync extends Screen {
 
     public GuiSteamResync(Screen parent, Consumer<String> onSteamIdSelected) {
         this(parent,
-                () -> Minecraft.getInstance().setScreen(
+                () -> MinecraftClient.getInstance().openScreen(
                         new GuiSteamFriends(parent, null, onSteamIdSelected)),
                 "steambridge.gui.resync_success_hint");
     }
 
     public GuiSteamResync(Screen parent, Runnable onSteamReady, String successHintKey) {
-        super(Component.empty());
+        super(LiteralText.EMPTY);
         this.parent = parent;
         this.onSteamReady = onSteamReady;
         this.successHintKey = successHintKey != null
@@ -105,9 +105,9 @@ public class GuiSteamResync extends Screen {
                 state = State.SUCCESS;
                 statusLine1 = "\u00a7a" + I18n.translate("steambridge.gui.resync_success");
                 statusLine2 = "\u00a77" + I18n.translate(successHintKey);
-                MinecraftClient.getInstance().execute(() ->
-                        MinecraftClient.getInstance().openScreen(
-                                new GuiSteamFriends(parent, null, onSteamIdSelected)));
+                MinecraftClient.getInstance().execute(() -> {
+                    if (onSteamReady != null) onSteamReady.run();
+                });
                 return;
             }
         }

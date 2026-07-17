@@ -74,7 +74,18 @@ public final class VanillaGuiIntegration {
                 abortVanillaConnect(connectScreen);
                 Screen parent = connectScreenParent(connectScreen);
                 if (parent == null) parent = mc.currentScreen;
-                return beginSteamConnect(parent, sd.address);
+                final Screen p = parent;
+                final String addr = sd.address;
+                if (!SteamManager.getInstance().isInitialized()
+                        && !SteamManager.getInstance().reinit()) {
+                    SteamBridgeMod.LOG.info(
+                            "Steam not running; opening launch screen before connect to {}", addr);
+                    return new GuiSteamResync(
+                            p,
+                            () -> mc.openScreen(beginSteamConnect(p, addr)),
+                            "steambridge.gui.resync_success_hint_connect");
+                }
+                return beginSteamConnect(p, addr);
             }
         }
         if (next instanceof OpenToLanScreen) {
@@ -254,7 +265,19 @@ public final class VanillaGuiIntegration {
     }
 
     private static void interceptSteamConnect(Screen parent, String steamAddr) {
-        MinecraftClient.getInstance().openScreen(beginSteamConnect(parent, steamAddr));
+        MinecraftClient mc = MinecraftClient.getInstance();
+        if (!SteamManager.getInstance().isInitialized()) {
+            if (!SteamManager.getInstance().reinit()) {
+                SteamBridgeMod.LOG.info(
+                        "Steam not running; opening launch screen before connect to {}", steamAddr);
+                mc.openScreen(new GuiSteamResync(
+                        parent,
+                        () -> mc.openScreen(beginSteamConnect(parent, steamAddr)),
+                        "steambridge.gui.resync_success_hint_connect"));
+                return;
+            }
+        }
+        mc.openScreen(beginSteamConnect(parent, steamAddr));
     }
 
     /**
