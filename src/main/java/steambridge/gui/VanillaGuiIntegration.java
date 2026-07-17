@@ -92,6 +92,16 @@ public class VanillaGuiIntegration {
      * Strips any trailing {@code :port} before checking.
      * Steam64 IDs are 17-digit numbers starting with {@code 7656119}.
      */
+    
+    private static void beginSteamConnect(GuiScreen parent, String steamAddr) {
+        long steamId = Long.parseLong(extractSteamId(steamAddr));
+        SteamBridgeMod.LOG.info("Intercepted connection to SteamID: {}", steamId);
+        SteamClient active = SteamManager.getInstance().getActiveClient();
+        if (active != null) active.disconnect();
+        SteamClient client = new SteamClient();
+        client.connect(com.codedisaster.steamworks.SteamID.createFromNativeHandle(steamId), parent);
+        net.minecraft.client.Minecraft.getMinecraft().displayGuiScreen(new GuiSteamConnecting(parent, client));
+    }
     private static boolean isSteamServerId(String ip) {
         if (ip == null) return false;
         String host = ip.trim();
@@ -330,14 +340,7 @@ public class VanillaGuiIntegration {
         if (next instanceof GuiConnecting) {
             ServerData serverData = mc.func_147104_D();
             if (serverData != null && isSteamServerId(serverData.serverIP)) {
-                long steamId = Long.parseLong(extractSteamId(serverData.serverIP));
-                SteamBridgeMod.LOG.info("Intercepted connection to SteamID: {}", steamId);
-                SteamClient active = SteamManager.getInstance().getActiveClient();
-                if (active != null) active.disconnect();
-                SteamClient client = new SteamClient();
-                client.connect(com.codedisaster.steamworks.SteamID.createFromNativeHandle(steamId), mc.currentScreen);
-                event.setCanceled(true);
-                // Resolve the proper parent screen from GuiConnecting (vanilla sets it before interception)
+                final String steamAddr = serverData.serverIP;
                 GuiScreen connectingParent = mc.currentScreen;
                 if (fConnectingPreviousScreen != null) {
                     try {
@@ -345,7 +348,28 @@ public class VanillaGuiIntegration {
                         if (p != null) connectingParent = p;
                     } catch (Exception ignored) {}
                 }
-                mc.displayGuiScreen(new GuiSteamConnecting(connectingParent, client));
+                final GuiScreen parent = connectingParent;
+
+                if (!SteamManager.getInstance().isInitialized()
+                        && !SteamManager.getInstance().reinit()) {
+                    SteamBridgeMod.LOG.info(
+                            "Steam not running; opening launch screen before connect to {}", steamAddr);
+                    event.setCanceled(true);
+                    mc.displayGuiScreen(new GuiSteamResync(
+                            parent,
+                            () -> beginSteamConnect(parent, steamAddr),
+                            "steambridge.gui.resync_success_hint_connect"));
+                    return;
+                }
+
+                long steamId = Long.parseLong(extractSteamId(steamAddr));
+                SteamBridgeMod.LOG.info("Intercepted connection to SteamID: {}", steamId);
+                SteamClient active = SteamManager.getInstance().getActiveClient();
+                if (active != null) active.disconnect();
+                SteamClient client = new SteamClient();
+                client.connect(com.codedisaster.steamworks.SteamID.createFromNativeHandle(steamId), parent);
+                event.setCanceled(true);
+                mc.displayGuiScreen(new GuiSteamConnecting(parent, client));
             }
         }
 
