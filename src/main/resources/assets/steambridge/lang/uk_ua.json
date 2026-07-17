@@ -40,7 +40,7 @@
   "steambridge.gui.server_steam_status": "Steam",
   "steambridge.gui.host_started": "Світ відкрито через Steam. Підключення доступне!",
   "steambridge.gui.host_failed": "Не вдалося відкрити світ через Steam. Перевірте, чи запущено Steam.",
-  "steambridge.gui.host_steam_launching": "\u00a7eSteam не запущено; пробуємо запустити його автоматично. \u00a7eЗачекайте трохи і натисніть «Відкрити для Steam» знову.",
+  "steambridge.gui.host_steam_launching": "Steam не запущено; пробуємо запустити його автоматично. Зачекайте трохи і натисніть «Відкрити для Steam» знову.",
   "steambridge.gui.conn_relay": "relay",
   "steambridge.gui.conn_p2p": "p2p",
   "steambridge.gui.resync_title": "Steam не запущено",
