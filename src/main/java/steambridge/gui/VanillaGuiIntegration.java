@@ -355,13 +355,15 @@ private static void markAllSteamServers(MultiplayerScreen gui) {
                 abortVanillaConnect(connectScreen);
                 Screen parent = connectScreenParent(connectScreen);
                 if (parent == null) parent = mc.screen;
+                final Screen connectParent = parent;
+                final String steamAddr = sd.ip;
                 if (!SteamManager.getInstance().isInitialized() && !SteamManager.getInstance().reinit()) {
                       event.setGui(new GuiSteamResync(
-                              parent,
-                              () -> Minecraft.getInstance().setScreen(beginSteamConnect(parent, sd.ip)),
+                              connectParent,
+                              () -> Minecraft.getInstance().setScreen(beginSteamConnect(connectParent, steamAddr)),
                               "steambridge.gui.resync_success_hint_connect"));
                   } else {
-                      event.setGui(beginSteamConnect(parent, sd.ip));
+                      event.setGui(beginSteamConnect(connectParent, steamAddr));
                   }
                 return;
             }
