@@ -109,8 +109,6 @@ dependencies {
     }
 
     steamBundle "com.code-disaster.steamworks4j:steamworks4j:${project.steamworks4j_version}"
-
-    annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
 }
 
 // ${...} expansion for neoforge.mods.toml / pack.mcmeta
