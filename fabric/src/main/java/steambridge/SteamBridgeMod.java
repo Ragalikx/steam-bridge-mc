@@ -12,13 +12,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import steambridge.event.SteamClientEvents;
 import steambridge.gui.VanillaGuiIntegration;
+import steambridge.platform.Services;
 import steambridge.steam.SteamManager;
 
 /** Steam Bridge entry (Fabric 1.21.1, client-only). */
 public class SteamBridgeMod implements ClientModInitializer {
 
     public static final String NAME    = "Steam Bridge";
-    public static final String VERSION = BuildInfo.VERSION;
 
     public static final Logger LOG = LoggerFactory.getLogger(NAME);
 
@@ -26,8 +26,6 @@ public class SteamBridgeMod implements ClientModInitializer {
     public void onInitializeClient() {
 
         SteamBridge.init();
-
-        LOG.info("=== Steam Bridge pre-init (Fabric 1.21.1) v{} ===", VERSION);
 
         SteamBridgeConfig.load();
         SteamClientEvents.register();

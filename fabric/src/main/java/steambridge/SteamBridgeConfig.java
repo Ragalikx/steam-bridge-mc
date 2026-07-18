@@ -8,13 +8,13 @@ package steambridge;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
-import net.fabricmc.loader.api.FabricLoader;
 
 import java.io.IOException;
 import java.io.Reader;
 import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import steambridge.platform.Services;
 
 /** Client config (JSON under config/steambridge.json). */
 public final class SteamBridgeConfig {
@@ -31,7 +31,7 @@ public final class SteamBridgeConfig {
     private static final String FILE_NAME = "steambridge.json";
 
     public static void load() {
-        Path path = FabricLoader.getInstance().getConfigDir().resolve(FILE_NAME);
+        Path path = Services.PLATFORM.getConfigDirectory().resolve(FILE_NAME);
         if (!Files.isRegularFile(path)) {
             save();
             return;
@@ -48,7 +48,7 @@ public final class SteamBridgeConfig {
     }
 
     public static void save() {
-        Path path = FabricLoader.getInstance().getConfigDir().resolve(FILE_NAME);
+        Path path = Services.PLATFORM.getConfigDirectory().resolve(FILE_NAME);
         JsonObject o = new JsonObject();
         o.addProperty("allowWithoutAuth", allowWithoutAuth);
         o.addProperty("virtualPort", virtualPort);

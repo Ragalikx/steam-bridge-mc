@@ -23,15 +23,12 @@ import steambridge.steam.SteamManager;
 public class SteamBridgeMod {
 
     public static final String MODID   = "steambridge";
-    public static final String VERSION = BuildInfo.VERSION;
 
     public static final Logger LOG = LogUtils.getLogger();
 
     public SteamBridgeMod(IEventBus modEventBus, ModContainer modContainer) {
 
         SteamBridge.init();
-        
-        LOG.info("=== Steam Bridge pre-init (NeoForge 1.21.1) v{} ===", VERSION);
 
         modEventBus.addListener(this::onClientSetup);
         modEventBus.addListener(SteamBridgeConfig::onLoad);

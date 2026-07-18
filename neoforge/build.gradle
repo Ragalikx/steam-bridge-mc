@@ -25,40 +25,7 @@ group   = project.mod_group
 logger.lifecycle("Steam Bridge version: {}  (modVersion={}, minecraft={})",
         version, rawModVersion, minecraft_version)
 
-def generatedSrcDir = layout.buildDirectory.dir('generated/java').get().asFile
-
-sourceSets {
-    main { java { srcDir generatedSrcDir } }
-}
-
-tasks.register('generateBuildInfo') {
-    def verFull = project.version.toString()
-    def verMod  = project.ext.modVersionOnly.toString()
-    def verMc   = project.minecraft_version.toString()
-    inputs.property('version', verFull)
-    inputs.property('modVersion', verMod)
-    inputs.property('minecraftVersion', verMc)
-    outputs.dir(generatedSrcDir)
-    doFirst {
-        def f = new File("${generatedSrcDir}/steambridge/BuildInfo.java")
-        f.parentFile.mkdirs()
-        f.text = """\
-package steambridge;
-/** Generated at build time. */
-public final class BuildInfo {
-    public static final String VERSION     = "${verFull}";
-    public static final String MOD_VERSION = "${verMod}";
-    public static final String MC_VERSION  = "${verMc}";
-    public static final String AUTHOR      = "Ragalikx";
-    public static final String GITHUB      = "https://github.com/Ragalikx/steam-bridge-mc";
-    private BuildInfo() {}
-}
-"""
-    }
-}
-
 tasks.withType(JavaCompile).configureEach {
-    dependsOn 'generateBuildInfo'
     options.encoding = 'UTF-8'
 }
 
