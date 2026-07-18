@@ -2,6 +2,88 @@ plugins {
     id 'multiloader-loader'
     id 'fabric-loom'
 }
+
+// region originalSetup
+def rawModVersion = (findProperty('modVersion') ?: '0.0.0-dev').toString().trim()
+if (rawModVersion.isEmpty()) {
+    throw new GradleException("modVersion is empty. Pass -PmodVersion=1.145 (or omit for 0.0.0-dev).")
+}
+if (rawModVersion.startsWith('v') || rawModVersion.startsWith('V')) {
+    rawModVersion = rawModVersion.substring(1)
+}
+if (rawModVersion.contains('+mc')) {
+    throw new GradleException(
+            "modVersion must be the mod release only (e.g. 1.145), not '${rawModVersion}'. " +
+                    "Minecraft is appended automatically as +mc${minecraft_version}."
+    )
+}
+
+ext.modVersionOnly = rawModVersion
+version = "${rawModVersion}+mc${minecraft_version}"
+group   = project.mod_group
+
+logger.lifecycle("Steam Bridge (Fabric) version: {}  (modVersion={}, minecraft={})",
+        version, rawModVersion, minecraft_version)
+
+java {
+    withSourcesJar()
+}
+
+def generatedSrcDir = layout.buildDirectory.dir('generated/java').get().asFile
+
+sourceSets {
+    main { java { srcDir generatedSrcDir } }
+}
+
+tasks.register('generateBuildInfo') {
+    def verFull = project.version.toString()
+    def verMod  = project.ext.modVersionOnly.toString()
+    def verMc   = project.minecraft_version.toString()
+    inputs.property('version', verFull)
+    inputs.property('modVersion', verMod)
+    inputs.property('minecraftVersion', verMc)
+    outputs.dir(generatedSrcDir)
+    doFirst {
+        def f = new File("${generatedSrcDir}/steambridge/BuildInfo.java")
+        f.parentFile.mkdirs()
+        f.text = """\
+package steambridge;
+/** Generated at build time. */
+public final class BuildInfo {
+    public static final String VERSION     = "${verFull}";
+    public static final String MOD_VERSION = "${verMod}";
+    public static final String MC_VERSION  = "${verMc}";
+    public static final String AUTHOR      = "Ragalikx";
+    public static final String GITHUB      = "https://github.com/Ragalikx/steam-bridge-mc";
+    private BuildInfo() {}
+}
+"""
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    dependsOn 'generateBuildInfo'
+    options.encoding = 'UTF-8'
+    options.release = 21
+    // Keep source file + line numbers for crash reports; drop local-variable tables (~class bloat).
+    options.debugOptions.debugLevel = 'source,lines'
+}
+
+tasks.named('sourcesJar', Jar).configure {
+    dependsOn 'generateBuildInfo'
+}
+
+repositories {
+    maven { url = 'https://maven.fabricmc.net/' }
+}
+
+configurations {
+    steamBundle { transitive = false }
+    // Full upstream JNA (all OS natives). We slim it before nesting into the mod jar.
+    jnaFull { transitive = false }
+}
+// endregion originalSetup
+
 dependencies {
     minecraft "com.mojang:minecraft:${minecraft_version}"
     mappings loom.layered {
@@ -10,6 +92,164 @@ dependencies {
     }
     modImplementation "net.fabricmc:fabric-loader:${fabric_loader_version}"
     modImplementation "net.fabricmc.fabric-api:fabric-api:${fabric_version}"
+
+    // Compile against full JNA; only a trimmed copy is nested (see slimJnaJar).
+    implementation("net.java.dev.jna:jna:${project.jna_version}")
+    jnaFull "net.java.dev.jna:jna:${project.jna_version}"
+
+    // Compile against steamworks4j; selected classes + win64 DLLs are flattened into the jar.
+    implementation("com.code-disaster.steamworks4j:steamworks4j:${project.steamworks4j_version}") {
+        exclude group: 'net.java.dev.jna'
+    }
+
+    steamBundle "com.code-disaster.steamworks4j:steamworks4j:${project.steamworks4j_version}"
+}
+
+// Slim JNA for packaging: win32-x86-64 jnidispatch only + Java classes.
+// Full jna-5.14.0 is ~1.88 MB; slim is ~0.3 MB (then flattened into the mod jar root).
+tasks.register('slimJnaJar', Zip) {
+    group = 'build'
+    description = 'JNA with only win32-x86-64 native + needed Java classes'
+    dependsOn configurations.jnaFull
+    archiveFileName = "jna-${project.jna_version}-win64.jar"
+    destinationDirectory = layout.buildDirectory.dir('generated/jna-slim')
+    from({
+        zipTree(configurations.jnaFull.singleFile)
+    }) {
+        // Other OS natives (biggest win).
+        exclude 'com/sun/jna/aix-*/**'
+        exclude 'com/sun/jna/darwin-*/**'
+        exclude 'com/sun/jna/freebsd-*/**'
+        exclude 'com/sun/jna/linux-*/**'
+        exclude 'com/sun/jna/openbsd-*/**'
+        exclude 'com/sun/jna/sunos-*/**'
+        exclude 'com/sun/jna/win32-aarch64/**'
+        exclude 'com/sun/jna/win32-x86/**'
+        // Linux-only ELF helper; unused on Windows steamworks path.
+        exclude '**/ELFAnalyser*'
+        // Win32 StdCall / W32API helpers: Steam FlatAPI is cdecl via Library, not used by us.
+        exclude 'com/sun/jna/win32/**'
+        // AWT helpers only used if Native.getWindowID is called (we never call it).
+        exclude '**/Native$AWT*'
+        // ByReference types we do not use (keep Long + Pointer + base ByReference).
+        exclude '**/ptr/ShortByReference*'
+        exclude '**/ptr/DoubleByReference*'
+        exclude '**/ptr/ByteByReference*'
+        exclude '**/ptr/FloatByReference*'
+        exclude '**/ptr/IntByReference*'
+        exclude '**/ptr/NativeLongByReference*'
+        exclude '**/NativeLong.class'
+        exclude '**/WString.class'
+        // Licenses already copied under META-INF/licenses from third_party_licenses/.
+        exclude 'META-INF/AL2.0'
+        exclude 'META-INF/LGPL2.1'
+        exclude 'META-INF/MANIFEST.MF'
+    }
+    doLast {
+        def f = archiveFile.get().asFile
+        logger.lifecycle('slimJnaJar: {} ({} bytes)', f.name, f.length())
+    }
+}
+
+processResources {
+    // Compact lang JSON (drop whitespace). Saves a few KB after zip.
+    doLast {
+        def gson = new groovy.json.JsonSlurper()
+        fileTree(dir: destinationDir, include: 'assets/**/lang/*.json').each { f ->
+            def obj = gson.parse(f)
+            f.text = groovy.json.JsonOutput.toJson(obj)
+        }
+    }
+}
+
+// steamworks4j (trimmed) + win64 natives + flatten slim JNA into jar root
+// (no META-INF/jars nest: avoids zip-in-zip bloat; Fabric loads root classes fine).
+jar {
+    dependsOn configurations.steamBundle, 'slimJnaJar'
+    from({
+        configurations.steamBundle.collect { zipTree(it) }
+    }) {
+        include 'com/codedisaster/**'
+        include 'steam_api64.dll', 'steamworks4j64.dll'
+        exclude 'com/codedisaster/steamworks/SteamController*'
+        exclude 'com/codedisaster/steamworks/SteamHTTP*'
+        exclude 'com/codedisaster/steamworks/SteamLeaderboard*'
+        exclude 'com/codedisaster/steamworks/SteamMatchmaking*'
+        exclude 'com/codedisaster/steamworks/SteamNetworking*'
+        exclude 'com/codedisaster/steamworks/SteamPublishedFile*'
+        exclude 'com/codedisaster/steamworks/SteamRemoteStorage*'
+        exclude 'com/codedisaster/steamworks/SteamScreenshot*'
+        exclude 'com/codedisaster/steamworks/SteamServer*'
+        exclude 'com/codedisaster/steamworks/SteamUGC*'
+        exclude 'com/codedisaster/steamworks/SteamUserStats*'
+        exclude 'com/codedisaster/steamworks/SteamApps*'
+        exclude '**/*.so', '**/*.dylib', 'steam_api.dll', 'steamworks4j.dll'
+        exclude 'libsteam_api.*', 'libsteamworks4j.*'
+        exclude 'META-INF/**'
+    }
+    from({
+        zipTree(tasks.named('slimJnaJar', Zip).get().archiveFile.get().asFile)
+    }) {
+        // Flatten into root so jnidispatch is not stored as a nested zip entry.
+        exclude 'META-INF/**'
+    }
+    from('third_party_licenses') {
+        into 'META-INF/licenses'
+    }
+    from('LICENSE') {
+        into 'META-INF/licenses'
+        rename { 'STEAMBRIDGE_MIT.txt' }
+    }
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+    manifest {
+        attributes([
+            'Specification-Title'   : project.mod_id,
+            'Implementation-Title'  : project.mod_id,
+            'Implementation-Version': project.version,
+            'Implementation-Vendor' : 'Ragalikx',
+            'Implementation-URL'    : 'https://github.com/Ragalikx/steam-bridge-mc',
+            'Built-By'              : 'Ragalikx'
+        ])
+    }
+}
+
+// Re-pack the remapped jar at Deflate level 9 (Gradle Jar default is ~6).
+tasks.register('repackModJar') {
+    group = 'build'
+    description = 'Re-zip remapJar output at maximum Deflate level'
+    dependsOn 'remapJar'
+    def inputProvider = tasks.named('remapJar', net.fabricmc.loom.task.RemapJarTask).flatMap { it.archiveFile }
+    inputs.file(inputProvider)
+    outputs.file(inputProvider)
+    doLast {
+        def input = inputProvider.get().asFile
+        def before = input.length()
+        def tmp = file("${layout.buildDirectory.get().asFile}/tmp/repack-level9.jar")
+        tmp.parentFile.mkdirs()
+        if (tmp.exists()) tmp.delete()
+        ant.zip(destfile: tmp, compress: true, level: 9) {
+            zipfileset(src: input)
+        }
+        ant.move(file: tmp, tofile: input, overwrite: true)
+        logger.lifecycle('repackModJar: {} -> {} bytes (level 9)', before, input.length())
+    }
+}
+
+tasks.named('remapJar', net.fabricmc.loom.task.RemapJarTask).configure {
+    finalizedBy 'repackModJar'
+    doLast {
+        def out = archiveFile.get().asFile
+        if (!out.exists() || out.length() < 1024) {
+            throw new GradleException(
+                "remapJar produced an empty archive (${out.exists() ? out.length() : 0} bytes).")
+        }
+        logger.lifecycle('remapJar OK: {} ({} bytes, before repack)', out.name, out.length())
+    }
+}
+
+tasks.named('build') {
+    dependsOn 'repackModJar'
 }
 
 loom {
