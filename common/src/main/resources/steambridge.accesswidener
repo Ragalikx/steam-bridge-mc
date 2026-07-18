@@ -1,0 +1,4 @@
+accessWidener	v1	named
+
+# ServerCommonPacketListenerImpl.connection is protected; needed to match MC peers to Steam IDs.
+accessible	field	net/minecraft/server/network/ServerCommonPacketListenerImpl	connection	Lnet/minecraft/network/Connection;

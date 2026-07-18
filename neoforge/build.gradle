@@ -1,0 +1,131 @@
+plugins {
+    id 'multiloader-loader'
+    id 'net.neoforged.moddev'
+}
+
+// region originalSetup
+def rawModVersion = (findProperty('modVersion') ?: '0.0.0-dev').toString().trim()
+if (rawModVersion.isEmpty()) {
+    throw new GradleException("modVersion is empty. Pass -PmodVersion=1.145 (or omit for 0.0.0-dev).")
+}
+if (rawModVersion.startsWith('v') || rawModVersion.startsWith('V')) {
+    rawModVersion = rawModVersion.substring(1)
+}
+if (rawModVersion.contains('+mc')) {
+    throw new GradleException(
+            "modVersion must be the mod release only (e.g. 1.145), not '${rawModVersion}'. " +
+                    "Minecraft is appended automatically as +mc${minecraft_version}."
+    )
+}
+
+ext.modVersionOnly = rawModVersion
+version = "${rawModVersion}+mc${minecraft_version}"
+group   = project.mod_group
+
+logger.lifecycle("Steam Bridge version: {}  (modVersion={}, minecraft={})",
+        version, rawModVersion, minecraft_version)
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+configurations {
+    steamBundle { transitive = false }
+}
+
+dependencies {
+    compileOnly "net.java.dev.jna:jna:${project.jna_version}"
+
+    implementation("com.code-disaster.steamworks4j:steamworks4j:${project.steamworks4j_version}") {
+        exclude group: 'net.java.dev.jna'
+    }
+
+    steamBundle "com.code-disaster.steamworks4j:steamworks4j:${project.steamworks4j_version}"
+}
+
+
+
+// endregion originalSetup
+
+neoForge {
+    version = neoforge_version
+    // Automatically enable neoforge AccessTransformers if the file exists
+    def at = project(':common').file('src/main/resources/META-INF/accesstransformer.cfg')
+    if (at.exists()) {
+        accessTransformers.from(at.absolutePath)
+    }
+    parchment {
+        minecraftVersion = parchment_minecraft
+        mappingsVersion = parchment_version
+    }
+    runs {
+        configureEach {
+            systemProperty('neoforge.enabledGameTestNamespaces', mod_id)
+            ideName = "NeoForge ${it.name.capitalize()} (${project.path})" // Unify the run config names with fabric
+
+            systemProperty 'forge.logging.markers', 'REGISTRIES'
+            systemProperty 'forge.logging.console.level', 'debug'
+        }
+        client {
+            client()
+        }
+        data {
+            data()
+
+            // DataGen can be run by - "./gradlew :neoforge:runData" in Terminal.
+            // Specify the modid for data generation, where to output the resulting resource, and where to look for existing resources.
+            programArguments.addAll '--mod', project.mod_id, '--all', '--output', file('src/generated/resources/').getAbsolutePath(), '--existing', file('src/main/resources/').getAbsolutePath()
+
+        }
+        server {
+            server()
+        }
+    }
+    mods {
+        "${mod_id}" {
+            sourceSet sourceSets.main
+        }
+    }
+}
+
+sourceSets.main.resources { srcDir 'src/generated/resources' }
+
+jar {
+    // Win64 natives at jar root (SteamManager loads /steam_api64.dll). Drop unused APIs.
+    from({ project.configurations.steamBundle.collect { zipTree(it) } }) {
+        include 'com/codedisaster/**'
+        include 'steam_api64.dll', 'steamworks4j64.dll'
+        exclude 'com/codedisaster/steamworks/SteamController*'
+        exclude 'com/codedisaster/steamworks/SteamHTTP*'
+        exclude 'com/codedisaster/steamworks/SteamLeaderboard*'
+        exclude 'com/codedisaster/steamworks/SteamMatchmaking*'
+        exclude 'com/codedisaster/steamworks/SteamNetworking*'
+        exclude 'com/codedisaster/steamworks/SteamPublishedFile*'
+        exclude 'com/codedisaster/steamworks/SteamRemoteStorage*'
+        exclude 'com/codedisaster/steamworks/SteamScreenshot*'
+        exclude 'com/codedisaster/steamworks/SteamServer*'
+        exclude 'com/codedisaster/steamworks/SteamUGC*'
+        exclude 'com/codedisaster/steamworks/SteamUserStats*'
+        exclude 'com/codedisaster/steamworks/SteamApps*'
+    }
+    from('third_party_licenses') {
+        into 'META-INF/licenses'
+    }
+    from('LICENSE') {
+        into 'META-INF/licenses'
+        rename { 'STEAMBRIDGE_MIT.txt' }
+    }
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+    manifest {
+        attributes([
+                'Specification-Title'   : project.mod_id,
+                'Implementation-Title'  : project.mod_id,
+                'Implementation-Version': project.version,
+                'Implementation-Vendor' : 'Ragalikx',
+                'Implementation-URL'    : 'https://github.com/Ragalikx/steam-bridge-mc',
+                'Built-By'              : 'Ragalikx',
+                'MixinConfigs'          : 'steambridge.mixins.json'
+        ])
+    }
+}

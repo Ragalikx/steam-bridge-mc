@@ -1,170 +1,177 @@
 plugins {
-    id 'java'
-    id 'net.neoforged.gradle.userdev' version '7.0.170'
+    // see https://fabricmc.net/develop/ for new versions
+    id 'fabric-loom' version '1.10.5' apply false
+    // see https://projects.neoforged.net/neoforged/moddevgradle for new versions
+    id 'net.neoforged.moddev' version '2.0.49-beta' apply false
 }
 
-// Version: -PmodVersion=1.145 -> 1.145+mc1.21.1  |  no -P -> 0.0.0-dev+mc1.21.1
-// PowerShell: .\gradlew.bat build "-PmodVersion=1.145"  (quotes required)
-def rawModVersion = (findProperty('modVersion') ?: '0.0.0-dev').toString().trim()
-if (rawModVersion.isEmpty()) {
-    throw new GradleException("modVersion is empty. Pass -PmodVersion=1.145 (or omit for 0.0.0-dev).")
-}
-if (rawModVersion.startsWith('v') || rawModVersion.startsWith('V')) {
-    rawModVersion = rawModVersion.substring(1)
-}
-if (rawModVersion.contains('+mc')) {
-    throw new GradleException(
-        "modVersion must be the mod release only (e.g. 1.145), not '${rawModVersion}'. " +
-        "Minecraft is appended automatically as +mc${minecraft_version}."
-    )
-}
-
-ext.modVersionOnly = rawModVersion
-version = "${rawModVersion}+mc${minecraft_version}"
-group   = project.mod_group
-
-logger.lifecycle("Steam Bridge version: {}  (modVersion={}, minecraft={})",
-    version, rawModVersion, minecraft_version)
-
-base {
-    archivesName = project.mod_id
-}
-
-// NeoForge 1.21.1 needs Java 21 (foojay may provision it if the daemon is on 17).
-java {
-    toolchain.languageVersion = JavaLanguageVersion.of(21)
-}
-
-def generatedSrcDir = layout.buildDirectory.dir('generated/java').get().asFile
-
-sourceSets {
-    main { java { srcDir generatedSrcDir } }
-}
-
-tasks.register('generateBuildInfo') {
-    def verFull = project.version.toString()
-    def verMod  = project.ext.modVersionOnly.toString()
-    def verMc   = project.minecraft_version.toString()
-    inputs.property('version', verFull)
-    inputs.property('modVersion', verMod)
-    inputs.property('minecraftVersion', verMc)
-    outputs.dir(generatedSrcDir)
-    doFirst {
-        def f = new File("${generatedSrcDir}/steambridge/BuildInfo.java")
-        f.parentFile.mkdirs()
-        f.text = """\
-package steambridge;
-/** Generated at build time. */
-public final class BuildInfo {
-    public static final String VERSION     = "${verFull}";
-    public static final String MOD_VERSION = "${verMod}";
-    public static final String MC_VERSION  = "${verMc}";
-    public static final String AUTHOR      = "Ragalikx";
-    public static final String GITHUB      = "https://github.com/Ragalikx/steam-bridge-mc";
-    private BuildInfo() {}
-}
-"""
-    }
-}
-
-tasks.withType(JavaCompile).configureEach {
-    dependsOn 'generateBuildInfo'
-    options.encoding = 'UTF-8'
-}
-
-// AT also listed in neoforge.mods.toml; this applies it at compile time.
-minecraft {
-    accessTransformers {
-        file 'src/main/resources/META-INF/accesstransformer.cfg'
-    }
-}
-
-runs {
-    configureEach {
-        systemProperty 'forge.logging.markers', 'REGISTRIES'
-        systemProperty 'forge.logging.console.level', 'debug'
-        modSource project.sourceSets.main
-    }
-    client {}
-}
-
-repositories {
-    mavenCentral()
-}
-
-// steamworks4j zip for shading into the jar (API classes + win64 DLLs only).
-configurations {
-    steamBundle { transitive = false }
-}
-
-// steamworks4j: shade selected classes/natives into the mod jar (see jar {}).
-// JNA: compileOnly only; NeoForge already ships it. Do not shade/relocate/jarJar a second copy.
-dependencies {
-    implementation "net.neoforged:neoforge:${project.neo_version}"
-
-    compileOnly "net.java.dev.jna:jna:${project.jna_version}"
-
-    implementation("com.code-disaster.steamworks4j:steamworks4j:${project.steamworks4j_version}") {
-        exclude group: 'net.java.dev.jna'
-    }
-
-    steamBundle "com.code-disaster.steamworks4j:steamworks4j:${project.steamworks4j_version}"
-}
-
-// ${...} expansion for neoforge.mods.toml / pack.mcmeta
-tasks.withType(ProcessResources).configureEach {
-    var replaceProperties = [
-        mod_id                 : project.mod_id,
-        mod_name               : project.mod_name,
-        mod_version            : project.version,
-        minecraft_version      : project.minecraft_version,
-        minecraft_version_range: project.minecraft_version_range,
-        neo_version            : project.neo_version,
-        neo_version_range      : project.neo_version_range,
-        loader_version_range   : project.loader_version_range
-    ]
-    inputs.properties replaceProperties
-    filesMatching(['META-INF/neoforge.mods.toml', 'pack.mcmeta']) {
-        expand replaceProperties
-    }
-}
-
-jar {
-    // Win64 natives at jar root (SteamManager loads /steam_api64.dll). Drop unused APIs.
-    from({ project.configurations.steamBundle.collect { zipTree(it) } }) {
-        include 'com/codedisaster/**'
-        include 'steam_api64.dll', 'steamworks4j64.dll'
-        exclude 'com/codedisaster/steamworks/SteamController*'
-        exclude 'com/codedisaster/steamworks/SteamHTTP*'
-        exclude 'com/codedisaster/steamworks/SteamLeaderboard*'
-        exclude 'com/codedisaster/steamworks/SteamMatchmaking*'
-        exclude 'com/codedisaster/steamworks/SteamNetworking*'
-        exclude 'com/codedisaster/steamworks/SteamPublishedFile*'
-        exclude 'com/codedisaster/steamworks/SteamRemoteStorage*'
-        exclude 'com/codedisaster/steamworks/SteamScreenshot*'
-        exclude 'com/codedisaster/steamworks/SteamServer*'
-        exclude 'com/codedisaster/steamworks/SteamUGC*'
-        exclude 'com/codedisaster/steamworks/SteamUserStats*'
-    exclude 'com/codedisaster/steamworks/SteamApps*'
-    }
-    from('third_party_licenses') {
-        into 'META-INF/licenses'
-    }
-    from('LICENSE') {
-        into 'META-INF/licenses'
-        rename { 'STEAMBRIDGE_MIT.txt' }
-    }
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-
-    manifest {
-        attributes([
-            'Specification-Title'   : project.mod_id,
-            'Implementation-Title'  : project.mod_id,
-            'Implementation-Version': project.version,
-            'Implementation-Vendor' : 'Ragalikx',
-            'Implementation-URL'    : 'https://github.com/Ragalikx/steam-bridge-mc',
-            'Built-By'              : 'Ragalikx',
-            'MixinConfigs'          : 'steambridge.mixins.json'
-        ])
-    }
-}
+//plugins {
+//    id 'java'
+//    id 'net.neoforged.gradle.userdev' version '7.0.170'
+//}
+//
+//// Version: -PmodVersion=1.145 -> 1.145+mc1.21.1  |  no -P -> 0.0.0-dev+mc1.21.1
+//// PowerShell: .\gradlew.bat build "-PmodVersion=1.145"  (quotes required)
+//def rawModVersion = (findProperty('modVersion') ?: '0.0.0-dev').toString().trim()
+//if (rawModVersion.isEmpty()) {
+//    throw new GradleException("modVersion is empty. Pass -PmodVersion=1.145 (or omit for 0.0.0-dev).")
+//}
+//if (rawModVersion.startsWith('v') || rawModVersion.startsWith('V')) {
+//    rawModVersion = rawModVersion.substring(1)
+//}
+//if (rawModVersion.contains('+mc')) {
+//    throw new GradleException(
+//        "modVersion must be the mod release only (e.g. 1.145), not '${rawModVersion}'. " +
+//        "Minecraft is appended automatically as +mc${minecraft_version}."
+//    )
+//}
+//
+//ext.modVersionOnly = rawModVersion
+//version = "${rawModVersion}+mc${minecraft_version}"
+//group   = project.mod_group
+//
+//logger.lifecycle("Steam Bridge version: {}  (modVersion={}, minecraft={})",
+//    version, rawModVersion, minecraft_version)
+//
+//base {
+//    archivesName = project.mod_id
+//}
+//
+//// NeoForge 1.21.1 needs Java 21 (foojay may provision it if the daemon is on 17).
+//java {
+//    toolchain.languageVersion = JavaLanguageVersion.of(21)
+//}
+//
+//def generatedSrcDir = layout.buildDirectory.dir('generated/java').get().asFile
+//
+//sourceSets {
+//    main { java { srcDir generatedSrcDir } }
+//}
+//
+//tasks.register('generateBuildInfo') {
+//    def verFull = project.version.toString()
+//    def verMod  = project.ext.modVersionOnly.toString()
+//    def verMc   = project.minecraft_version.toString()
+//    inputs.property('version', verFull)
+//    inputs.property('modVersion', verMod)
+//    inputs.property('minecraftVersion', verMc)
+//    outputs.dir(generatedSrcDir)
+//    doFirst {
+//        def f = new File("${generatedSrcDir}/steambridge/BuildInfo.java")
+//        f.parentFile.mkdirs()
+//        f.text = """\
+//package steambridge;
+///** Generated at build time. */
+//public final class BuildInfo {
+//    public static final String VERSION     = "${verFull}";
+//    public static final String MOD_VERSION = "${verMod}";
+//    public static final String MC_VERSION  = "${verMc}";
+//    public static final String AUTHOR      = "Ragalikx";
+//    public static final String GITHUB      = "https://github.com/Ragalikx/steam-bridge-mc";
+//    private BuildInfo() {}
+//}
+//"""
+//    }
+//}
+//
+//tasks.withType(JavaCompile).configureEach {
+//    dependsOn 'generateBuildInfo'
+//    options.encoding = 'UTF-8'
+//}
+//
+//// AT also listed in neoforge.mods.toml; this applies it at compile time.
+//minecraft {
+//    accessTransformers {
+//        file 'src/main/resources/META-INF/accesstransformer.cfg'
+//    }
+//}
+//
+//runs {
+//    configureEach {
+//        systemProperty 'forge.logging.markers', 'REGISTRIES'
+//        systemProperty 'forge.logging.console.level', 'debug'
+//        modSource project.sourceSets.main
+//    }
+//    client {}
+//}
+//
+//repositories {
+//    mavenCentral()
+//}
+//
+//// steamworks4j zip for shading into the jar (API classes + win64 DLLs only).
+//configurations {
+//    steamBundle { transitive = false }
+//}
+//
+//// steamworks4j: shade selected classes/natives into the mod jar (see jar {}).
+//// JNA: compileOnly only; NeoForge already ships it. Do not shade/relocate/jarJar a second copy.
+//dependencies {
+//    implementation "net.neoforged:neoforge:${project.neo_version}"
+//
+//    compileOnly "net.java.dev.jna:jna:${project.jna_version}"
+//
+//    implementation("com.code-disaster.steamworks4j:steamworks4j:${project.steamworks4j_version}") {
+//        exclude group: 'net.java.dev.jna'
+//    }
+//
+//    steamBundle "com.code-disaster.steamworks4j:steamworks4j:${project.steamworks4j_version}"
+//}
+//
+//// ${...} expansion for neoforge.mods.toml / pack.mcmeta
+//tasks.withType(ProcessResources).configureEach {
+//    var replaceProperties = [
+//        mod_id                 : project.mod_id,
+//        mod_name               : project.mod_name,
+//        mod_version            : project.version,
+//        minecraft_version      : project.minecraft_version,
+//        minecraft_version_range: project.minecraft_version_range,
+//        neo_version            : project.neo_version,
+//        neo_version_range      : project.neo_version_range,
+//        loader_version_range   : project.loader_version_range
+//    ]
+//    inputs.properties replaceProperties
+//    filesMatching(['META-INF/neoforge.mods.toml', 'pack.mcmeta']) {
+//        expand replaceProperties
+//    }
+//}
+//
+//jar {
+//    // Win64 natives at jar root (SteamManager loads /steam_api64.dll). Drop unused APIs.
+//    from({ project.configurations.steamBundle.collect { zipTree(it) } }) {
+//        include 'com/codedisaster/**'
+//        include 'steam_api64.dll', 'steamworks4j64.dll'
+//        exclude 'com/codedisaster/steamworks/SteamController*'
+//        exclude 'com/codedisaster/steamworks/SteamHTTP*'
+//        exclude 'com/codedisaster/steamworks/SteamLeaderboard*'
+//        exclude 'com/codedisaster/steamworks/SteamMatchmaking*'
+//        exclude 'com/codedisaster/steamworks/SteamNetworking*'
+//        exclude 'com/codedisaster/steamworks/SteamPublishedFile*'
+//        exclude 'com/codedisaster/steamworks/SteamRemoteStorage*'
+//        exclude 'com/codedisaster/steamworks/SteamScreenshot*'
+//        exclude 'com/codedisaster/steamworks/SteamServer*'
+//        exclude 'com/codedisaster/steamworks/SteamUGC*'
+//        exclude 'com/codedisaster/steamworks/SteamUserStats*'
+//    exclude 'com/codedisaster/steamworks/SteamApps*'
+//    }
+//    from('third_party_licenses') {
+//        into 'META-INF/licenses'
+//    }
+//    from('LICENSE') {
+//        into 'META-INF/licenses'
+//        rename { 'STEAMBRIDGE_MIT.txt' }
+//    }
+//    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+//
+//    manifest {
+//        attributes([
+//            'Specification-Title'   : project.mod_id,
+//            'Implementation-Title'  : project.mod_id,
+//            'Implementation-Version': project.version,
+//            'Implementation-Vendor' : 'Ragalikx',
+//            'Implementation-URL'    : 'https://github.com/Ragalikx/steam-bridge-mc',
+//            'Built-By'              : 'Ragalikx',
+//            'MixinConfigs'          : 'steambridge.mixins.json'
+//        ])
+//    }
+//}

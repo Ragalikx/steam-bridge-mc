@@ -1,0 +1,106 @@
+plugins {
+    id 'multiloader-common'
+    id 'net.neoforged.moddev'
+}
+
+def rawModVersion = (findProperty('modVersion') ?: '0.0.0-dev').toString().trim()
+if (rawModVersion.isEmpty()) {
+    throw new GradleException("modVersion is empty. Pass -PmodVersion=1.145 (or omit for 0.0.0-dev).")
+}
+if (rawModVersion.startsWith('v') || rawModVersion.startsWith('V')) {
+    rawModVersion = rawModVersion.substring(1)
+}
+if (rawModVersion.contains('+mc')) {
+    throw new GradleException(
+            "modVersion must be the mod release only (e.g. 1.145), not '${rawModVersion}'. " +
+                    "Minecraft is appended automatically as +mc${minecraft_version}."
+    )
+}
+
+ext.modVersionOnly = rawModVersion
+version = "${rawModVersion}+mc${minecraft_version}"
+
+java {
+    withSourcesJar()
+}
+
+def generatedSrcDir = layout.buildDirectory.dir('generated/java').get().asFile
+
+sourceSets {
+    main { java { srcDir generatedSrcDir } }
+}
+
+tasks.register('generateBuildInfo') {
+    def verFull = project.version.toString()
+    def verMod  = project.ext.modVersionOnly.toString()
+    def verMc   = project.minecraft_version.toString()
+    inputs.property('version', verFull)
+    inputs.property('modVersion', verMod)
+    inputs.property('minecraftVersion', verMc)
+    outputs.dir(generatedSrcDir)
+    doFirst {
+        def f = new File("${generatedSrcDir}/steambridge/BuildInfo.java")
+        f.parentFile.mkdirs()
+        f.text = """\
+package steambridge;
+/** Generated at build time. */
+public final class BuildInfo {
+    public static final String VERSION     = "${verFull}";
+    public static final String MOD_VERSION = "${verMod}";
+    public static final String MC_VERSION  = "${verMc}";
+    public static final String AUTHOR      = "Ragalikx";
+    public static final String GITHUB      = "https://github.com/Ragalikx/steam-bridge-mc";
+    private BuildInfo() {}
+}
+"""
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    dependsOn 'generateBuildInfo'
+    options.encoding = 'UTF-8'
+    options.release = 21
+    // Keep source file + line numbers for crash reports; drop local-variable tables (~class bloat).
+    options.debugOptions.debugLevel = 'source,lines'
+}
+
+tasks.named('sourcesJar', Jar).configure {
+    dependsOn 'generateBuildInfo'
+}
+
+
+neoForge {
+    neoFormVersion = neo_form_version
+    // Automatically enable AccessTransformers if the file exists
+    def at = file('src/main/resources/META-INF/accesstransformer.cfg')
+    if (at.exists()) {
+        accessTransformers.from(at.absolutePath)
+    }
+    parchment {
+        minecraftVersion = parchment_minecraft
+        mappingsVersion = parchment_version
+    }
+}
+
+dependencies {
+    compileOnly group: 'org.spongepowered', name: 'mixin', version: '0.8.5'
+    // fabric and neoforge both bundle mixinextras, so it is safe to use it in common
+    compileOnly group: 'io.github.llamalad7', name: 'mixinextras-common', version: '0.3.5'
+    annotationProcessor group: 'io.github.llamalad7', name: 'mixinextras-common', version: '0.3.5'
+}
+
+configurations {
+    commonJava {
+        canBeResolved = false
+        canBeConsumed = true
+    }
+    commonResources {
+        canBeResolved = false
+        canBeConsumed = true
+    }
+}
+
+artifacts {
+    sourceSets.main.java.srcDirs.each { dir -> commonJava dir }
+    commonResources sourceSets.main.resources.sourceDirectories.singleFile
+}
