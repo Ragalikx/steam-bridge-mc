@@ -28,6 +28,9 @@ public class SteamBridgeMod {
     public static final Logger LOG = LogUtils.getLogger();
 
     public SteamBridgeMod(IEventBus modEventBus, ModContainer modContainer) {
+
+        SteamBridge.init();
+        
         LOG.info("=== Steam Bridge pre-init (NeoForge 1.21.1) v{} ===", VERSION);
 
         modEventBus.addListener(this::onClientSetup);

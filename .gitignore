@@ -10,7 +10,7 @@ out/
 bin/
 
 # Forge/NeoForge decompiled workspace
-src/generated/
+neoforge/src/generated/
 run/
 runs/
 
