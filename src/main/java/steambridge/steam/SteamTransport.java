@@ -20,6 +20,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen;
 import net.minecraft.client.multiplayer.ClientHandshakePacketListenerImpl;
+import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.network.Connection;
 import net.minecraft.network.ConnectionProtocol;
 import net.minecraft.network.protocol.PacketFlow;
@@ -140,8 +141,14 @@ public final class SteamTransport {
                 return false;
             }
 
+            // ClientHandshakePacketListenerImpl.handleHello() disconnects on a failed Mojang
+            // session check unless serverData.isLan() is true. Passing null here meant anyone
+            // without a real premium session (offline account, cracked launcher) got kicked
+            // right after the host's auth challenge, even though the Steam transport itself
+            // was healthy. Treat Steam Bridge connections the same way a LAN game is treated.
+            ServerData lanLikeServerData = new ServerData("SteamRelay", "127.0.0.1", true);
             connection.setListener(new ClientHandshakePacketListenerImpl(
-                    connection, mc, null, returnScreen, false, null, status -> {}));
+                    connection, mc, lanLikeServerData, returnScreen, false, null, status -> {}));
 
             // Intention hostname carries the Forge modded-connection marker ("...\0FML3\0"),
             // so the host runs the Forge login handshake instead of treating us as vanilla.
