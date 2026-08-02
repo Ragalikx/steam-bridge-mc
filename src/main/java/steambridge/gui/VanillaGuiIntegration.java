@@ -6,6 +6,7 @@
 package steambridge.gui;
 
 import steambridge.SteamAppIdHelper;
+import steambridge.SteamBridgeConfig;
 import steambridge.SteamBridgeMod;
 import steambridge.steam.SteamClient;
 import steambridge.steam.SteamManager;
@@ -313,6 +314,7 @@ private static void markAllSteamServers(JoinMultiplayerScreen gui) {
     }
 
     private static void markAllSteamServers(JoinMultiplayerScreen gui, boolean force) {
+        if (!SteamManager.getInstance().isInitialized()) return;
         ServerList list = gui.getServers();
         if (list == null) return;
         try {
@@ -390,7 +392,7 @@ private static void markAllSteamServers(JoinMultiplayerScreen gui) {
                 event.setNewScreen(new GuiSteamHostManagement(mc.screen));
                 return;
             }
-            if (mc.getSingleplayerServer() != null) {
+            if (mc.getSingleplayerServer() != null && SteamBridgeConfig.rememberNetworkSettings) {
                 try {
                     String worldKey = worldKey(mc.getSingleplayerServer());
                     SteamSocial.Worlds.Settings saved = SteamSocial.Worlds.get().load(worldKey);
@@ -485,7 +487,7 @@ private static void markAllSteamServers(JoinMultiplayerScreen gui) {
 
             // ShareToLanScreen.init() overwrites commands from level.dat, discarding
             // what onScreenOpening set. If our saved value differs, press the CycleButton once.
-            if (saved.allowCommands != findPrimitiveBoolean(gui)) {
+            if (SteamBridgeConfig.rememberNetworkSettings && saved.allowCommands != findPrimitiveBoolean(gui)) {
                 // 1.19.2 uses selectWorld.allowCommands (no ".new" suffix).
                 String commandsLabel = I18n.get("selectWorld.allowCommands");
                 for (GuiEventListener l : event.getListenersList()) {
