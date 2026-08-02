@@ -10,6 +10,7 @@ import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
 import net.fabricmc.fabric.api.client.screen.v1.Screens;
 
 import steambridge.SteamAppIdHelper;
+import steambridge.SteamBridgeConfig;
 import steambridge.SteamBridgeMod;
 import steambridge.steam.SteamClient;
 import steambridge.steam.SteamManager;
@@ -92,7 +93,7 @@ public final class VanillaGuiIntegration {
             if (isSteamHostSessionActive(mc)) {
                 return new GuiSteamHostManagement(mc.currentScreen);
             }
-            if (mc.getServer() != null) {
+            if (mc.getServer() != null && SteamBridgeConfig.rememberNetworkSettings) {
                 try {
                     String worldKey = worldKey(mc.getServer());
                     SteamSocial.Worlds.Settings saved = SteamSocial.Worlds.get().load(worldKey);
@@ -392,6 +393,7 @@ private static void markAllSteamServers(MultiplayerScreen gui) {
     }
 
     private static void markAllSteamServers(MultiplayerScreen gui, boolean force) {
+        if (!SteamManager.getInstance().isInitialized()) return;
         ServerList list = gui.getServerList();
         if (list == null) return;
         try {
@@ -482,7 +484,7 @@ private static void markAllSteamServers(MultiplayerScreen gui) {
             pendingAccessPolicy  = SteamSocial.Worlds.parseAccessPolicy(saved.accessPolicy);
 
             // ShareToLan init overwrites commands from level.dat. If saved value differs, press once.
-            if (saved.allowCommands != findPrimitiveBoolean(gui)) {
+            if (SteamBridgeConfig.rememberNetworkSettings && saved.allowCommands != findPrimitiveBoolean(gui)) {
                 String commandsLabel = I18n.translate("selectWorld.allowCommands");
                 for (ClickableWidget w : Screens.getButtons(gui)) {
                     if (w instanceof ButtonWidget) {
