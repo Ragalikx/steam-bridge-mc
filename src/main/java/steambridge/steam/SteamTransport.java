@@ -20,6 +20,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen;
 import net.minecraft.client.multiplayer.ClientHandshakePacketListenerImpl;
+import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.network.Connection;
 import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.network.protocol.login.ServerboundHelloPacket;
@@ -139,11 +140,18 @@ public final class SteamTransport {
             // initiateServerboundPlayConnection sends only ClientIntentionPacket.
             // ServerboundHelloPacket must follow immediately; without it the server
             // waits indefinitely for the login hello and times out after 30s.
+            //
+            // ClientHandshakePacketListenerImpl.handleHello() disconnects on a failed Mojang
+            // session check unless serverData.isLan() is true. Passing null here meant anyone
+            // without a real premium session (offline account, cracked launcher) got kicked
+            // right after the host's auth challenge, even though the Steam transport itself
+            // was healthy. Treat Steam Bridge connections the same way a LAN game is treated.
+            ServerData lanLikeServerData = new ServerData("SteamRelay", "127.0.0.1", ServerData.Type.LAN);
             connection.initiateServerboundPlayConnection(
                     "SteamRelay",
                     25565,
                     new ClientHandshakePacketListenerImpl(
-                            connection, mc, null, returnScreen, false, null, status -> {}, null
+                            connection, mc, lanLikeServerData, returnScreen, false, null, status -> {}, null
                     )
             );
             connection.send(new ServerboundHelloPacket(mc.getUser().getName(), mc.getUser().getProfileId()));

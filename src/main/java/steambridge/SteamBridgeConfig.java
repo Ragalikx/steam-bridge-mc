@@ -18,11 +18,18 @@ public final class SteamBridgeConfig {
     public static int     virtualPort      = 0;
     /** Voice UDP intercept (JVM DatagramSocket factory). Launch-only. */
     public static boolean interceptUdp    = true;
+    /**
+     * Remember the last game mode / allow-commands choice on the Open for Steam screen, per
+     * world. Pokes at vanilla ShareToLanScreen internals through reflection, so if another
+     * mod does something similar on the same screen, turn this off.
+     */
+    public static boolean rememberNetworkSettings = true;
 
     public static final ModConfigSpec SPEC;
     private static final ModConfigSpec.BooleanValue ALLOW_WITHOUT_AUTH;
     private static final ModConfigSpec.IntValue     VIRTUAL_PORT;
     private static final ModConfigSpec.BooleanValue INTERCEPT_UDP;
+    private static final ModConfigSpec.BooleanValue REMEMBER_NETWORK_SETTINGS;
 
     static {
         ModConfigSpec.Builder b = new ModConfigSpec.Builder();
@@ -42,6 +49,13 @@ public final class SteamBridgeConfig {
                    + "Launch-only; cannot toggle at runtime.")
             .define("interceptUdp", true);
 
+        REMEMBER_NETWORK_SETTINGS = b
+            .comment("Remember the last game mode / allow-commands choice on the Open for "
+                   + "Steam screen, per world. Uses reflection into vanilla's own screen "
+                   + "fields, so if another mod also messes with that screen and something "
+                   + "looks off, turn this off.")
+            .define("rememberNetworkSettings", true);
+
         SPEC = b.build();
     }
 
@@ -49,6 +63,7 @@ public final class SteamBridgeConfig {
         allowWithoutAuth = ALLOW_WITHOUT_AUTH.get();
         virtualPort      = VIRTUAL_PORT.get();
         interceptUdp     = INTERCEPT_UDP.get();
+        rememberNetworkSettings = REMEMBER_NETWORK_SETTINGS.get();
     }
 
     public static void onLoad(ModConfigEvent.Loading event) {
