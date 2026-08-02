@@ -207,6 +207,18 @@ public final class SteamTransport {
 
             // Fake remote for logs / disconnect UI; channelActive already bound the Netty channel.
             setNmSocketAddress(nm, new InetSocketAddress("SteamRelay", 25565));
+
+            // NetHandlerLoginClient's auth-failure path checks
+            // mc.getCurrentServerData().isOnLAN() instead of taking a ServerData argument
+            // here. We never set it, so it always fell through to the strict path and
+            // anyone without a real premium session (offline account, cracked launcher)
+            // got kicked right after the host's auth challenge, even though the Steam
+            // transport itself was healthy. Treat Steam Bridge connections the same way
+            // a LAN game is treated.
+            net.minecraft.client.multiplayer.ServerData lanEntry =
+                    new net.minecraft.client.multiplayer.ServerData("Steam Bridge", "127.0.0.1", true);
+            mc.setServerData(lanEntry);
+
             nm.setNetHandler(new net.minecraft.client.network.NetHandlerLoginClient(nm, mc, returnScreen));
 
             // Protocol 5 = Minecraft 1.7.10. "\0FML\0" marks a Forge client for the server.

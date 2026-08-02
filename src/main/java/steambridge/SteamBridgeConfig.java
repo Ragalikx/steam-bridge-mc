@@ -18,6 +18,7 @@ public final class SteamBridgeConfig {
 
     public static boolean allowWithoutAuth = true;
     public static int virtualPort = 0;
+    public static boolean rememberNetworkSettings = true;
 
     private static Configuration config;
 
@@ -47,6 +48,14 @@ public final class SteamBridgeConfig {
                 "Virtual port for Steam network. 0 is default."
             );
             virtualPort = Math.max(0, Math.min(65535, port.getInt(0)));
+
+            Property remember = config.get(
+                Configuration.CATEGORY_GENERAL,
+                "Remember Network Settings",
+                true,
+                "Remember the last game mode / allow-commands choice on the Open for Steam screen, per world. Uses reflection into vanilla's own screen fields, so if another mod also messes with that screen and something looks off, turn this off."
+            );
+            rememberNetworkSettings = remember.getBoolean(true);
 
             if (config.hasChanged()) {
                 config.save();
