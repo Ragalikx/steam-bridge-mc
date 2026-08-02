@@ -18,6 +18,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screen.MainMenuScreen;
 import net.minecraft.client.gui.screen.MultiplayerScreen;
 import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.network.login.ClientLoginNetHandler;
 import net.minecraft.network.NetworkManager;
 import net.minecraft.network.ProtocolType;
@@ -125,6 +126,14 @@ public final class SteamTransport {
                     java.net.InetAddress.getByName("127.0.0.1"),
                     proxyPort,
                     mc.options.useNativeTransport());
+
+            // ClientLoginNetHandler's auth-failure path checks mc.getCurrentServer().isLan()
+            // instead of taking a ServerData argument here. We never set it, so it always
+            // fell through to the strict path and anyone without a real premium session
+            // (offline account, cracked launcher) got kicked right after the host's auth
+            // challenge, even though the Steam transport itself was healthy. Treat Steam
+            // Bridge connections the same way a LAN game is treated.
+            mc.setCurrentServer(new ServerData("SteamRelay", "127.0.0.1", true));
 
             connection.setListener(new ClientLoginNetHandler(
                     connection, mc, returnScreen, status -> {}));

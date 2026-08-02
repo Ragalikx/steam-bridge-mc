@@ -6,6 +6,7 @@
 package steambridge.gui;
 
 import steambridge.SteamAppIdHelper;
+import steambridge.SteamBridgeConfig;
 import steambridge.SteamBridgeMod;
 import steambridge.steam.SteamClient;
 import steambridge.steam.SteamManager;
@@ -303,6 +304,7 @@ private static void markAllSteamServers(MultiplayerScreen gui) {
     }
 
     private static void markAllSteamServers(MultiplayerScreen gui, boolean force) {
+        if (!SteamManager.getInstance().isInitialized()) return;
         ServerList list = gui.getServers();
         if (list == null) return;
         try {
@@ -374,7 +376,7 @@ private static void markAllSteamServers(MultiplayerScreen gui) {
                 event.setGui(new GuiSteamHostManagement(mc.screen));
                 return;
             }
-            if (mc.getSingleplayerServer() != null) {
+            if (mc.getSingleplayerServer() != null && SteamBridgeConfig.rememberNetworkSettings) {
                 try {
                     String worldKey = worldKey(mc.getSingleplayerServer());
                     SteamSocial.Worlds.Settings saved = SteamSocial.Worlds.get().load(worldKey);
@@ -464,7 +466,7 @@ private static void markAllSteamServers(MultiplayerScreen gui) {
             pendingAccessPolicy  = SteamSocial.Worlds.parseAccessPolicy(saved.accessPolicy);
 
             // ShareToLan init overwrites commands from level.dat. If saved value differs, press once.
-            if (saved.allowCommands != findPrimitiveBoolean(gui)) {
+            if (SteamBridgeConfig.rememberNetworkSettings && saved.allowCommands != findPrimitiveBoolean(gui)) {
                 String commandsLabel = I18n.get("selectWorld.allowCommands");
                 for (Widget w : event.getWidgetList()) {
                     if (w instanceof Button) {

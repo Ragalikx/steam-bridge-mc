@@ -26,11 +26,20 @@ public final class SteamBridgeConfig {
      * UDP sockets so voice-chat mods can be tunnelled through Steam alongside Minecraft traffic.
      */
     public static boolean interceptUdp    = true;
+    /**
+     * Whether the mod remembers and restores the last used game mode / allow-commands
+     * setting for the "Open for Steam" screen, per world. Relies on reflection into vanilla's
+     * ShareToLanScreen fields and widgets, so a conflict with another mod poking the same
+     * screen is possible in theory. Turning this off makes the screen behave exactly like
+     * plain vanilla, no memory between sessions.
+     */
+    public static boolean rememberNetworkSettings = true;
 
     public static final ForgeConfigSpec SPEC;
     private static final ForgeConfigSpec.BooleanValue ALLOW_WITHOUT_AUTH;
     private static final ForgeConfigSpec.IntValue     VIRTUAL_PORT;
     private static final ForgeConfigSpec.BooleanValue INTERCEPT_UDP;
+    private static final ForgeConfigSpec.BooleanValue REMEMBER_NETWORK_SETTINGS;
 
     static {
         ForgeConfigSpec.Builder b = new ForgeConfigSpec.Builder();
@@ -52,6 +61,13 @@ public final class SteamBridgeConfig {
                    + "Takes effect only on launch - cannot be toggled at runtime.")
             .define("interceptUdp", true);
 
+        REMEMBER_NETWORK_SETTINGS = b
+            .comment("Remember the last game mode / allow-commands choice on the Open for "
+                   + "Steam screen, per world. Uses reflection into vanilla's own screen "
+                   + "fields, so if another mod also messes with that screen and something "
+                   + "looks off, turn this off.")
+            .define("rememberNetworkSettings", true);
+
         SPEC = b.build();
     }
 
@@ -59,6 +75,7 @@ public final class SteamBridgeConfig {
         allowWithoutAuth = ALLOW_WITHOUT_AUTH.get();
         virtualPort      = VIRTUAL_PORT.get();
         interceptUdp     = INTERCEPT_UDP.get();
+        rememberNetworkSettings = REMEMBER_NETWORK_SETTINGS.get();
     }
 
     public static void onLoad(final ModConfig.Loading event) {
