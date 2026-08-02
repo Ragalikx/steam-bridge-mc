@@ -33,6 +33,7 @@ import net.minecraft.util.HttpUtil;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.storage.LevelResource;
 import steambridge.SteamAppIdHelper;
+import steambridge.SteamBridgeConfig;
 import steambridge.SteamBridgeMod;
 import steambridge.steam.SteamClient;
 import steambridge.steam.SteamManager;
@@ -365,6 +366,7 @@ private static void markAllSteamServers(JoinMultiplayerScreen gui) {
     }
 
     private static void markAllSteamServers(JoinMultiplayerScreen gui, boolean force) {
+        if (!SteamManager.getInstance().isInitialized()) return;
         ServerList list = gui.getServers();
         if (list == null) return;
         try {
@@ -451,7 +453,7 @@ private static void markAllSteamServers(JoinMultiplayerScreen gui) {
             pendingTransportMode = SteamSocial.Worlds.parseTransportMode(saved.transportMode);
             pendingAccessPolicy  = SteamSocial.Worlds.parseAccessPolicy(saved.accessPolicy);
             // Restore after init() (it overwrites gameMode/commands from world data).
-            applySavedShareToLan(gui, saved);
+            if (SteamBridgeConfig.rememberNetworkSettings) applySavedShareToLan(gui, saved);
         }
 
         // 1.19.2 ShareToLan: game mode at y=100, no Port EditBox. Steam opts at y=140.

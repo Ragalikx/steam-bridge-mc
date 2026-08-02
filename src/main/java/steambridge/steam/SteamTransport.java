@@ -20,6 +20,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen;
 import net.minecraft.client.multiplayer.ClientHandshakePacketListenerImpl;
+import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.network.Connection;
 import net.minecraft.network.ConnectionProtocol;
 import net.minecraft.network.protocol.handshake.ClientIntentionPacket;
@@ -132,6 +133,14 @@ public final class SteamTransport {
 
             InetSocketAddress addr = new InetSocketAddress("127.0.0.1", proxyPort);
             Connection connection = Connection.connectToServer(addr, false);
+
+            // ClientHandshakePacketListenerImpl's auth-failure path checks
+            // mc.getCurrentServer().isLan() instead of taking a ServerData argument here.
+            // We never set it, so it always fell through to the strict path and anyone
+            // without a real premium session (offline account, cracked launcher) got kicked
+            // right after the host's auth challenge, even though the Steam transport itself
+            // was healthy. Treat Steam Bridge connections the same way a LAN game is treated.
+            mc.setCurrentServer(new ServerData("SteamRelay", "127.0.0.1", true));
 
             connection.setListener(new ClientHandshakePacketListenerImpl(
                     connection, mc, returnScreen, status -> {}));
