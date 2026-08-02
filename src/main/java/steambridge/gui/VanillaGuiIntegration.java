@@ -6,6 +6,7 @@
 package steambridge.gui;
 
 import steambridge.SteamAppIdHelper;
+import steambridge.SteamBridgeConfig;
 import steambridge.SteamBridgeMod;
 import steambridge.steam.SteamClient;
 import steambridge.steam.SteamManager;
@@ -206,6 +207,7 @@ public class VanillaGuiIntegration {
     }
 
     private static void markAllSteamServers(GuiScreen gui, boolean force) {
+        if (!SteamManager.getInstance().isInitialized()) return;
         try {
             ServerList list = getSavedServerList(gui);
             if (list == null) return;
@@ -310,7 +312,7 @@ public class VanillaGuiIntegration {
                 mc.displayGuiScreen(new GuiSteamHostManagement(mc.currentScreen));
                 return;
             }
-            if (mc.getIntegratedServer() != null) {
+            if (mc.getIntegratedServer() != null && SteamBridgeConfig.rememberNetworkSettings) {
                 try {
                     String worldKey = mc.getIntegratedServer().getFolderName();
                     steambridge.steam.SteamSocial.Worlds.Settings saved =
@@ -420,6 +422,12 @@ public class VanillaGuiIntegration {
                             steambridge.steam.SteamSocial.Worlds.get().load(srv.getFolderName());
                     pendingTransportMode = steambridge.steam.SteamSocial.Worlds.parseTransportMode(saved.transportMode);
                     pendingAccessPolicy  = steambridge.steam.SteamSocial.Worlds.parseAccessPolicy(saved.accessPolicy);
+
+                    // initGui() re-reads allowCommands from level.dat, discarding what
+                    // onGuiOpen set before init. Set the field again now that init is done.
+                    if (SteamBridgeConfig.rememberNetworkSettings && fShareToLanAllowCommands != null) {
+                        try { fShareToLanAllowCommands.set(gui, saved.allowCommands); } catch (Exception ignored) {}
+                    }
                 }
 
                 // Steam settings row: sit directly below vanilla's Game Mode button

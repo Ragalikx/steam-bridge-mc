@@ -26,6 +26,10 @@ public class SteamBridgeConfig {
     @Config.Name("Intercept UDP (voice)")
     public static boolean interceptUdp = true;
 
+    @Config.Comment("Remember the last game mode / allow-commands choice on the Open for Steam screen, per world. Uses reflection into vanilla's own screen fields, so if another mod also messes with that screen and something looks off, turn this off.")
+    @Config.Name("Remember Network Settings")
+    public static boolean rememberNetworkSettings = true;
+
     // NOTE: the Steam App ID is intentionally NOT configurable. It is hardcoded to 480
     // (Spacewar) in SteamAppIdHelper. Letting users point it at a real game's App ID -
     // especially one with an anti-cheat (VAC/EAC) - would get their account banned and
