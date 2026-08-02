@@ -30,6 +30,7 @@ import net.minecraft.util.HttpUtil;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.storage.LevelResource;
 import steambridge.SteamAppIdHelper;
+import steambridge.SteamBridgeConfig;
 import steambridge.SteamBridgeMod;
 import steambridge.steam.SteamClient;
 import steambridge.steam.SteamManager;
@@ -134,7 +135,7 @@ public final class VanillaGuiIntegration {
             if (isSteamHostSessionActive(mc)) {
                 return new GuiSteamHostManagement(mc.screen);
             }
-            if (mc.getSingleplayerServer() != null) {
+            if (mc.getSingleplayerServer() != null && SteamBridgeConfig.rememberNetworkSettings) {
                 try {
                     String worldKey = worldKey(mc.getSingleplayerServer());
                     SteamSocial.Worlds.Settings saved = SteamSocial.Worlds.get().load(worldKey);
@@ -413,6 +414,7 @@ private static void markAllSteamServers(JoinMultiplayerScreen gui) {
     }
 
     private static void markAllSteamServers(JoinMultiplayerScreen gui, boolean force) {
+        if (!SteamManager.getInstance().isInitialized()) return;
         ServerList list = gui.getServers();
         if (list == null) return;
         try {
@@ -501,8 +503,8 @@ private static void markAllSteamServers(JoinMultiplayerScreen gui) {
             pendingTransportMode = SteamSocial.Worlds.parseTransportMode(saved.transportMode);
             pendingAccessPolicy  = SteamSocial.Worlds.parseAccessPolicy(saved.accessPolicy);
 
-            if (saved.allowCommands != findPrimitiveBoolean(gui)) {
-                String commandsLabel = I18n.get("selectWorld.allowCommands.new");
+            if (SteamBridgeConfig.rememberNetworkSettings && saved.allowCommands != findPrimitiveBoolean(gui)) {
+                String commandsLabel = I18n.get("selectWorld.allowCommands");
                 for (GuiEventListener l : gui.children()) {
                     if (l instanceof CycleButton<?> btn
                             && btn.getMessage().getString().contains(commandsLabel)) {
