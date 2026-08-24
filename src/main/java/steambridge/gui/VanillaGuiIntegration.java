@@ -10,6 +10,7 @@ import steambridge.SteamBridgeConfig;
 import steambridge.SteamBridgeMod;
 import steambridge.steam.SteamClient;
 import steambridge.steam.SteamManager;
+import steambridge.steam.HostAuth;
 import steambridge.steam.SteamServer;
 import steambridge.steam.SteamSocial;
 
@@ -427,16 +428,6 @@ private static void markAllSteamServers(JoinMultiplayerScreen gui) {
                 event.setNewScreen(new GuiSteamHostManagement(mc.screen));
                 return;
             }
-            if (mc.getSingleplayerServer() != null && SteamBridgeConfig.rememberNetworkSettings) {
-                try {
-                    String worldKey = worldKey(mc.getSingleplayerServer());
-                    SteamSocial.Worlds.Settings saved = SteamSocial.Worlds.get().load(worldKey);
-                    setByType(next, GameType.class, SteamSocial.Worlds.parseGameType(saved.gametype));
-                    setByType(next, boolean.class, saved.allowCommands);
-                } catch (Exception e) {
-                    SteamBridgeMod.LOG.warn("Failed to load ShareToLan defaults", e);
-                }
-            }
         }
     }
 
@@ -518,21 +509,6 @@ private static void markAllSteamServers(JoinMultiplayerScreen gui) {
             saved = SteamSocial.Worlds.get().load(worldKey(srv));
             pendingTransportMode = SteamSocial.Worlds.parseTransportMode(saved.transportMode);
             pendingAccessPolicy  = SteamSocial.Worlds.parseAccessPolicy(saved.accessPolicy);
-
-            // ShareToLanScreen.init() overwrites the commands field from world data
-            // (level.dat allowCommands), discarding what onScreenOpening set.
-            // Fix: if our saved value differs from what init() wrote, find the
-            // commands CycleButton and press it once to toggle it to the right state.
-            if (SteamBridgeConfig.rememberNetworkSettings && saved.allowCommands != findPrimitiveBoolean(gui)) {
-                String commandsLabel = I18n.get("selectWorld.allowCommands");
-                for (GuiEventListener l : event.getListenersList()) {
-                    if (l instanceof CycleButton<?> btn
-                            && btn.getMessage().getString().contains(commandsLabel)) {
-                        btn.onPress();
-                        break;
-                    }
-                }
-            }
         }
 
         EditBox portEdit = findByType(gui, EditBox.class);
@@ -647,10 +623,11 @@ try {
         boolean commands = findPrimitiveBoolean(gui);
 
         String worldKey = worldKey(srv);
-        SteamSocial.Worlds.get().save(worldKey, gameType, commands, pendingAccessPolicy, pendingTransportMode);
+        SteamSocial.Worlds.get().save(worldKey, pendingAccessPolicy, pendingTransportMode);
 
         int port = HttpUtil.getAvailablePort();
         boolean published = srv.publishServer(gameType, commands, port);
+        if (published) HostAuth.applyAfterPublish(srv);
 
         SteamServer server = new SteamServer(pendingAccessPolicy, worldKey);
         server.setTransportMode(pendingTransportMode);
@@ -675,7 +652,7 @@ try {
         GameType gameType = findByType(gui, GameType.class);
         if (gameType == null) gameType = GameType.SURVIVAL;
         boolean commands = findPrimitiveBoolean(gui);
-        SteamSocial.Worlds.get().save(worldKey(srv), gameType, commands, pendingAccessPolicy, pendingTransportMode);
+        SteamSocial.Worlds.get().save(worldKey(srv), pendingAccessPolicy, pendingTransportMode);
     }
 
     // -- Labels ----------------------------------------------------------------

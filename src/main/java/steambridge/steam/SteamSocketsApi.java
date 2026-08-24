@@ -214,20 +214,23 @@ public final class SteamSocketsApi {
         try {
             Memory val32 = new Memory(4);
 
-            // 0. STUN servers for ICE (direct P2P) candidate discovery. This is a String config
-            //    value, so pArg points to the null-terminated UTF-8 string itself (NOT a pointer
-            //    to a pointer). Steam copies the string synchronously, so the local Memory is safe
-            //    to let go after the call. Must be set before initRelayNetworkAccess().
-            byte[] stunBytes = (DEFAULT_STUN_SERVERS + "\0").getBytes(java.nio.charset.StandardCharsets.UTF_8);
-            Memory stunMem = new Memory(stunBytes.length);
-            stunMem.write(0, stunBytes, 0, stunBytes.length);
-            boolean stunOk = api.SteamAPI_ISteamNetworkingUtils_SetConfigValue(
-                    utils, CONFIG_P2P_STUN_SERVER_LIST, CONFIG_SCOPE_GLOBAL, 0L, CONFIG_TYPE_STRING, stunMem);
-            SteamBridgeMod.LOG.info("[SteamSocketsApi] STUN server list {}: {}",
-                    stunOk ? "set" : "FAILED", DEFAULT_STUN_SERVERS);
+            String stunServers = steambridge.SteamBridgeConfig.stunServers;
+            int timeoutInitialMs = Math.max(5, steambridge.SteamBridgeConfig.timeoutInitialSec) * 1000;
+            int timeoutConnectedMs = Math.max(10, steambridge.SteamBridgeConfig.timeoutConnectedSec) * 1000;
+
+            boolean stunOk = false;
+            if (stunServers != null && stunServers.trim().length() > 0) {
+                byte[] stunBytes = (stunServers.trim() + "\0").getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                Memory stunMem = new Memory(stunBytes.length);
+                stunMem.write(0, stunBytes, 0, stunBytes.length);
+                stunOk = api.SteamAPI_ISteamNetworkingUtils_SetConfigValue(
+                        utils, CONFIG_P2P_STUN_SERVER_LIST, CONFIG_SCOPE_GLOBAL, 0L, CONFIG_TYPE_STRING, stunMem);
+                SteamBridgeMod.LOG.info("[SteamSocketsApi] STUN server list {}: {}",
+                        stunOk ? "set" : "FAILED", stunServers.trim());
+            }
 
             // 1. Increase P2P initial-connection timeout to 30 s (value is in milliseconds)
-            val32.setInt(0, 30_000);
+            val32.setInt(0, timeoutInitialMs);
             api.SteamAPI_ISteamNetworkingUtils_SetConfigValue(utils, CONFIG_P2P_TIMEOUT, CONFIG_SCOPE_GLOBAL, 0L, CONFIG_TYPE_INT32, val32);
 
             // 1b. set TimeoutConnected to 60 s.
@@ -236,7 +239,7 @@ public final class SteamSocketsApi {
             // freeze for ~10 s without sending any game packets -> Steam Relay terminates the
             // connection ("Rx age server 10.6s relay 0.0s") -> crash on the still-rendering GUI.
             // 60 s gives plenty of headroom for heavy loading screens on any hardware.
-            val32.setInt(0, 60_000);
+            val32.setInt(0, timeoutConnectedMs);
             api.SteamAPI_ISteamNetworkingUtils_SetConfigValue(utils, CONFIG_TIMEOUT_CONNECTED, CONFIG_SCOPE_GLOBAL, 0L, CONFIG_TYPE_INT32, val32);
 
             // 2. Allow connection without auth if needed (helps with some NAT types)
@@ -290,7 +293,9 @@ public final class SteamSocketsApi {
 
             if (ok) {
                 SteamBridgeMod.LOG.info(
-                        "[SteamSocketsApi] Steam config applied (TimeoutInitial=30s, TimeoutConnected=60s, Auth={}, Buffer={}MB, Rate={}-{}MB/s, ICE=ALL, ICEPenalty={}ms, SDRPenalty={}ms, DirectPref={}, Nagle={})",
+                        "[SteamSocketsApi] Steam config applied (TimeoutInitial={}s, TimeoutConnected={}s, Auth={}, Buffer={}MB, Rate={}-{}MB/s, ICE=ALL, ICEPenalty={}ms, SDRPenalty={}ms, DirectPref={}, Nagle={})",
+                        timeoutInitialMs / 1000,
+                        timeoutConnectedMs / 1000,
                         allowWithoutAuth ? 1 : 0,
                         SEND_BUFFER_VAL / 1024 / 1024,
                         SEND_RATE_MIN_VAL / 1024 / 1024,
