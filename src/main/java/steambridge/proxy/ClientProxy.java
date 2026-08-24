@@ -8,6 +8,7 @@ package steambridge.proxy;
 import steambridge.ClientTasks;
 import steambridge.JnaBootstrap;
 import steambridge.SteamAppIdHelper;
+import steambridge.SteamBridgeConfig;
 import steambridge.SteamBridgeMod;
 import steambridge.gui.GuiSteamConnecting;
 import steambridge.steam.SteamClient;
@@ -270,6 +271,15 @@ public class ClientProxy extends CommonProxy {
 
         EntityPlayerMP player = (EntityPlayerMP) event.player;
         if (player.playerNetServerHandler == null) {
+            return;
+        }
+
+        Minecraft mc = Minecraft.getMinecraft();
+        if (SteamBridgeConfig.kickOnSameNameAsHost()
+                && mc.thePlayer != null
+                && player.getCommandSenderName().equalsIgnoreCase(mc.thePlayer.getCommandSenderName())) {
+            player.playerNetServerHandler.kickPlayerFromServer(
+                    I18n.format("steambridge.disconnect.same_name_as_host"));
             return;
         }
 

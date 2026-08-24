@@ -420,15 +420,13 @@ public final class SteamSocial {
             return saved;
         }
 
-        /** Saves the current settings for the given world key. */
-        public synchronized void save(String worldKey, GameType gameType,
-                                      boolean allowCommands,
+        /** Saves Steam host session settings for the world (route / access). */
+        public synchronized void save(String worldKey,
                                       SteamServer.AccessPolicy accessPolicy,
                                       SteamServer.TransportMode transportMode) {
             ensureLoaded();
-            Settings s = new Settings();
-            s.gametype         = gameType      != null ? gameType.name()      : GameType.SURVIVAL.name();
-            s.allowCommands    = allowCommands;
+            Settings s = store.worlds.get(normalizeKey(worldKey));
+            if (s == null) s = new Settings();
             s.accessPolicy     = accessPolicy  != null ? accessPolicy.name()  : SteamServer.AccessPolicy.EVERYONE.name();
             s.transportMode    = transportMode != null ? transportMode.name() : SteamServer.TransportMode.AUTO.name();
             store.worlds.put(normalizeKey(worldKey), s);

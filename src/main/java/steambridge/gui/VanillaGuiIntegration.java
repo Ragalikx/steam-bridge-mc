@@ -6,8 +6,8 @@
 package steambridge.gui;
 
 import steambridge.SteamAppIdHelper;
-import steambridge.SteamBridgeConfig;
 import steambridge.SteamBridgeMod;
+import steambridge.steam.HostAuth;
 import steambridge.steam.SteamClient;
 import steambridge.steam.SteamManager;
 import steambridge.steam.SteamServer;
@@ -328,15 +328,8 @@ public class VanillaGuiIntegration {
                 mc.displayGuiScreen(new GuiSteamHostManagement(mc.currentScreen));
                 return;
             }
-            if (mc.getIntegratedServer() != null && SteamBridgeConfig.rememberNetworkSettings) {
-                try {
-                    String worldKey = mc.getIntegratedServer().getFolderName();
-                    steambridge.steam.SteamSocial.Worlds.Settings saved =
-                            steambridge.steam.SteamSocial.Worlds.get().load(worldKey);
-                    if (fShareToLanGameMode != null)      fShareToLanGameMode.set(next, saved.gametype.toLowerCase(java.util.Locale.ROOT));
-                    if (fShareToLanAllowCommands != null)  fShareToLanAllowCommands.set(next, saved.allowCommands);
-                } catch (Exception e) { SteamBridgeMod.LOG.warn("Failed to load GuiShareToLan defaults", e); }
-            }
+            // Game mode / cheats stay whatever vanilla shows from the world.
+            // We only restore Steam session fields (route / access) when the buttons are injected.
         }
 
         if (next instanceof GuiConnecting) {
@@ -441,12 +434,6 @@ public class VanillaGuiIntegration {
                             steambridge.steam.SteamSocial.Worlds.get().load(srv.getFolderName());
                     pendingTransportMode = steambridge.steam.SteamSocial.Worlds.parseTransportMode(saved.transportMode);
                     pendingAccessPolicy  = steambridge.steam.SteamSocial.Worlds.parseAccessPolicy(saved.accessPolicy);
-
-                    // initGui() re-reads allowCommands from level.dat, discarding what
-                    // onGuiOpen set before init. Set the field again now that init is done.
-                    if (SteamBridgeConfig.rememberNetworkSettings && fShareToLanAllowCommands != null) {
-                        try { fShareToLanAllowCommands.set(gui, saved.allowCommands); } catch (Exception ignored) {}
-                    }
                 }
 
                 // Steam settings row: sit directly below vanilla's Game Mode button
@@ -627,7 +614,7 @@ public class VanillaGuiIntegration {
                         parseGameType(gm);
                 String worldKey = mc.getIntegratedServer().getFolderName();
                 steambridge.steam.SteamSocial.Worlds.get().save(
-                        worldKey, gameType, ac,
+                        worldKey,
                         pendingAccessPolicy,
                         pendingTransportMode);
 
@@ -685,6 +672,7 @@ public class VanillaGuiIntegration {
                         return;
                     }
                 }
+                HostAuth.applyAfterPublish(mc.getIntegratedServer());
 
                 mc.ingameGUI.getChatGUI().printChatMessage(new net.minecraft.util.ChatComponentText(
                         "\u00A7a" + net.minecraft.client.resources.I18n.format("steambridge.gui.host_started")));
@@ -752,20 +740,8 @@ public class VanillaGuiIntegration {
     private static void saveShareToLanSettings(GuiScreen gui) {
         Minecraft mc = Minecraft.getMinecraft();
         if (mc.getIntegratedServer() == null) return;
-
-        boolean ac = false;
-        String gm  = "survival";
-        try {
-            if (fShareToLanGameMode != null)       gm = (String) fShareToLanGameMode.get(gui);
-            if (fShareToLanAllowCommands != null)  ac = (Boolean) fShareToLanAllowCommands.get(gui);
-        } catch (Exception ignored) {}
-
-        net.minecraft.world.WorldSettings.GameType gameType =
-                parseGameType(gm);
-        String worldKey = mc.getIntegratedServer().getFolderName();
-
         steambridge.steam.SteamSocial.Worlds.get().save(
-                worldKey, gameType, ac,
+                mc.getIntegratedServer().getFolderName(),
                 pendingAccessPolicy,
                 pendingTransportMode);
     }

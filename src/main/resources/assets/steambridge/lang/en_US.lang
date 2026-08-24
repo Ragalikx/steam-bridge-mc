@@ -26,6 +26,7 @@ steambridge.gui.conn_p2p=p2p
 steambridge.disconnect.kicked=Host has temporarily blocked you (1 min)
 steambridge.disconnect.banned=You are banned from this world
 steambridge.disconnect.friends_only=Host accepts Steam friends only
+steambridge.disconnect.same_name_as_host=Your Minecraft name matches the host. Change your nickname and try again.
 steambridge.disconnect.mod_mismatch_hint=Connection closed during the Forge handshake. Your mods probably don't match the host's. Install the same modpack and try again.
 
 steambridge.error.steam_shutdown=Lost connection to Steam. Make sure your Steam client is running.

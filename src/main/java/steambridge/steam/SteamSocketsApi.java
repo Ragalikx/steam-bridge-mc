@@ -104,14 +104,11 @@ public final class SteamSocketsApi {
     private static final int CONFIG_SCOPE_CONNECTION  = 4;
     private static final int CONFIG_TYPE_INT32   = 1;
     private static final int CONFIG_TYPE_STRING  = 4;   // k_ESteamNetworkingConfig_String
-    // STUN servers ICE uses to discover each peer's public address (server-reflexive candidate).
-    // Without at least one, ICE cannot gather routable candidates and every connection silently
-    // falls back to SDR relay - even on a LAN. Two Google public STUN servers (primary + backup).
-    private static final String DEFAULT_STUN_SERVERS = "stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302";
-    private static final int SEND_BUFFER_VAL     = 2 * 1024 * 1024; // 2MB - reduced to prevent ACK window overflow during bulk dimension loads
-    private static final int SEND_RATE_MIN_VAL   = 512 * 1024;      // 512 KB/s - conservative floor (keeps Steam from over-sending on a friend's poor link)
-    private static final int SEND_RATE_MAX_VAL   = 8 * 1024 * 1024; // 8 MB/s - ceiling only; lets big-modpack join bursts (registry sync + first chunks) ramp fast over relay. Steam's congestion control still governs the actual rate, so this never over-sends on a bad link. Lower toward 4MB/s to be gentler on Valve relays.
+    // Defaults match SteamBridgeConfig. Overridden from config in configureForGameTraffic.
     // k_nSteamNetworkingConfig_P2P_Transport_ICE_Enable_All = 0xFFFF (not 0x7FFFFFFF)
+    private static final int SEND_BUFFER_VAL     = 2 * 1024 * 1024;
+    private static final int SEND_RATE_MIN_VAL   = 512 * 1024;
+    private static final int SEND_RATE_MAX_VAL   = 8 * 1024 * 1024;
     private static final int P2P_TRANSPORT_ICE_ENABLE_ALL = 0xFFFF;
     private static final int P2P_TRANSPORT_ICE_PENALTY_VAL = 0;
     private static final int P2P_TRANSPORT_SDR_PENALTY_VAL = 25; // lower SDR penalty -> prefer direct when both viable
@@ -215,30 +212,32 @@ public final class SteamSocketsApi {
     public void configureForGameTraffic(boolean allowWithoutAuth) {
         try {
             Memory val32 = new Memory(4);
+            String stunServers = steambridge.SteamBridgeConfig.stunServers;
+            int timeoutInitialMs = Math.max(5, steambridge.SteamBridgeConfig.timeoutInitialSec) * 1000;
+            int timeoutConnectedMs = Math.max(10, steambridge.SteamBridgeConfig.timeoutConnectedSec) * 1000;
 
             // 0. STUN servers for ICE (direct P2P) candidate discovery. This is a String config
             //    value, so pArg points to the null-terminated UTF-8 string itself (NOT a pointer
             //    to a pointer). Steam copies the string synchronously, so the local Memory is safe
             //    to let go after the call. Must be set before initRelayNetworkAccess().
-            byte[] stunBytes = (DEFAULT_STUN_SERVERS + "\0").getBytes(java.nio.charset.StandardCharsets.UTF_8);
-            Memory stunMem = new Memory(stunBytes.length);
-            stunMem.write(0, stunBytes, 0, stunBytes.length);
-            boolean stunOk = api.SteamAPI_ISteamNetworkingUtils_SetConfigValue(
-                    utils, CONFIG_P2P_STUN_SERVER_LIST, CONFIG_SCOPE_GLOBAL, 0L, CONFIG_TYPE_STRING, stunMem);
-            SteamBridgeMod.LOG.info("[SteamSocketsApi] STUN server list {}: {}",
-                    stunOk ? "set" : "FAILED", DEFAULT_STUN_SERVERS);
+            boolean stunOk = false;
+            if (stunServers != null && stunServers.trim().length() > 0) {
+                byte[] stunBytes = (stunServers.trim() + "\0").getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                Memory stunMem = new Memory(stunBytes.length);
+                stunMem.write(0, stunBytes, 0, stunBytes.length);
+                stunOk = api.SteamAPI_ISteamNetworkingUtils_SetConfigValue(
+                        utils, CONFIG_P2P_STUN_SERVER_LIST, CONFIG_SCOPE_GLOBAL, 0L, CONFIG_TYPE_STRING, stunMem);
+                SteamBridgeMod.LOG.info("[SteamSocketsApi] STUN server list {}: {}",
+                        stunOk ? "set" : "FAILED", stunServers.trim());
+            }
 
-            // 1. Increase P2P initial-connection timeout to 30 s (value is in milliseconds)
-            val32.setInt(0, 30_000);
+            // 1. P2P initial-connection timeout (ms).
+            val32.setInt(0, timeoutInitialMs);
             api.SteamAPI_ISteamNetworkingUtils_SetConfigValue(utils, CONFIG_P2P_TIMEOUT, CONFIG_SCOPE_GLOBAL, 0L, CONFIG_TYPE_INT32, val32);
 
-            // 1b. set TimeoutConnected to 60 s.
-            // Default is only 10 000 ms. When the client opens heavy GUIs (e.g. Galacticraft's
-            // planet selection screen which loads 15+ planet textures), the MC client thread can
-            // freeze for ~10 s without sending any game packets -> Steam Relay terminates the
-            // connection ("Rx age server 10.6s relay 0.0s") -> crash on the still-rendering GUI.
-            // 60 s gives plenty of headroom for heavy loading screens on any hardware.
-            val32.setInt(0, 60_000);
+            // 1b. Timeout after the connection is up. Default Steam value is only 10s;
+            // heavy loading screens can freeze the client thread long enough to drop the relay.
+            val32.setInt(0, timeoutConnectedMs);
             api.SteamAPI_ISteamNetworkingUtils_SetConfigValue(utils, CONFIG_TIMEOUT_CONNECTED, CONFIG_SCOPE_GLOBAL, 0L, CONFIG_TYPE_INT32, val32);
 
             // 2. Allow connection without auth if needed (helps with some NAT types)
@@ -276,15 +275,11 @@ public final class SteamSocketsApi {
                     utils, CONFIG_NAGLE_TIME, CONFIG_SCOPE_GLOBAL, 0L, CONFIG_TYPE_INT32, val32
             );
 
-            // 7. Send rate min: prevent Steam from throttling speed at session start
-            //    (chunk loading happens right then)
             val32.setInt(0, SEND_RATE_MIN_VAL);
             api.SteamAPI_ISteamNetworkingUtils_SetConfigValue(
                     utils, CONFIG_SEND_RATE_MIN, CONFIG_SCOPE_GLOBAL, 0L, CONFIG_TYPE_INT32, val32
             );
 
-            // 8. Send rate max: cap at SEND_RATE_MAX_VAL (4 MB/s) to avoid relay flooding
-            //    while staying well above any realistic LAN/chunk-load demand.
             val32.setInt(0, SEND_RATE_MAX_VAL);
             api.SteamAPI_ISteamNetworkingUtils_SetConfigValue(
                     utils, CONFIG_SEND_RATE_MAX, CONFIG_SCOPE_GLOBAL, 0L, CONFIG_TYPE_INT32, val32
@@ -292,7 +287,9 @@ public final class SteamSocketsApi {
 
             if (ok) {
                 SteamBridgeMod.LOG.info(
-                        "[SteamSocketsApi] Steam config applied (TimeoutInitial=30s, TimeoutConnected=60s, Auth={}, Buffer={}MB, Rate={}-{}MB/s, ICE=ALL, ICEPenalty={}ms, SDRPenalty={}ms, DirectPref={}, Nagle={})",
+                        "[SteamSocketsApi] Steam config applied (TimeoutInitial={}s, TimeoutConnected={}s, Auth={}, Buffer={}MB, Rate={}-{}MB/s, ICE=ALL, ICEPenalty={}ms, SDRPenalty={}ms, DirectPref={}, Nagle={})",
+                        timeoutInitialMs / 1000,
+                        timeoutConnectedMs / 1000,
                         allowWithoutAuth ? 1 : 0,
                         SEND_BUFFER_VAL / 1024 / 1024,
                         SEND_RATE_MIN_VAL / 1024 / 1024,
