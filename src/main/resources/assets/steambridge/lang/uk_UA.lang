@@ -25,6 +25,7 @@ steambridge.gui.conn_p2p=p2p
 
 steambridge.disconnect.kicked=Хост тимчасово заблокував вас (1 хв)
 steambridge.disconnect.banned=Вас заблоковано на цьому сервері
+steambridge.disconnect.same_name_as_host=Ваш нік збігається з ніком хоста. Змініть нік і зайдіть знову.
 steambridge.disconnect.friends_only=Хост приймає лише друзів зі Steam
 steambridge.disconnect.mod_mismatch_hint=З'єднання закрилось під час входу Forge. Скоріш за все, ваші моди не збігаються з модами хоста. Встановіть той самий набір модів і спробуйте знову.
 

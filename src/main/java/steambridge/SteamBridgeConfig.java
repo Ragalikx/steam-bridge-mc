@@ -17,7 +17,15 @@ public final class SteamBridgeConfig {
 
     public static boolean allowWithoutAuth = true;
     public static int virtualPort = 0;
-    public static boolean rememberNetworkSettings = true;
+    public static boolean disableOnlineModeOnPublish = true;
+    public static String sameNameAsHost = "allow";
+    public static int timeoutInitialSec = 30;
+    public static int timeoutConnectedSec = 60;
+    public static String stunServers = "stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302";
+
+    public static boolean kickOnSameNameAsHost() {
+        return "kick".equalsIgnoreCase(sameNameAsHost);
+    }
 
     private static Configuration config;
 
@@ -43,12 +51,23 @@ public final class SteamBridgeConfig {
                 0, 0, 65535,
                 "Virtual port for Steam network. 0 is default."
             );
-            rememberNetworkSettings = config.getBoolean(
-                "Remember Network Settings",
+
+            disableOnlineModeOnPublish = config.getBoolean(
+                "Disable Online Mode On Publish",
                 Configuration.CATEGORY_GENERAL,
                 true,
-                "Remember the last game mode / allow-commands choice on the Open for Steam screen, per world. Uses reflection into vanilla's own screen fields, so if another mod also messes with that screen and something looks off, turn this off."
+                "After opening the world for Steam, turn off Mojang online-mode."
             );
+            sameNameAsHost = config.getString(
+                "Same Name As Host",
+                Configuration.CATEGORY_GENERAL,
+                "allow",
+                "When a Steam guest uses the host Minecraft name: allow or kick."
+            );
+            timeoutInitialSec = config.getInt("Timeout Initial Seconds", Configuration.CATEGORY_GENERAL, 30, 5, 120, "Steam P2P initial route timeout in seconds.");
+            timeoutConnectedSec = config.getInt("Timeout Connected Seconds", Configuration.CATEGORY_GENERAL, 60, 10, 300, "Steam drop timeout after the connection is up, in seconds.");
+            stunServers = config.getString("Stun Servers", Configuration.CATEGORY_GENERAL, "stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302", "STUN servers for ICE.");
+
             if (config.hasChanged()) {
                 config.save();
             }
