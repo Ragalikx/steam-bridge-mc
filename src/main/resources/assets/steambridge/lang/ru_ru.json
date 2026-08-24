@@ -51,5 +51,6 @@
   "steambridge.gui.resync_timeout_hint": "Запустите Steam вручную и попробуйте снова.",
   "steambridge.gui.resync_countdown": "Ожидаем Steam... (%s сек)",
   "steambridge.gui.server_steam_motd": "Подключение через Steam Bridge",
-  "steambridge.gui.server_steam_status": "Steam"
+  "steambridge.gui.server_steam_status": "Steam",
+  "steambridge.disconnect.same_name_as_host": "Ваш ник совпадает с ником хоста. Смените ник и зайдите снова."
 }
