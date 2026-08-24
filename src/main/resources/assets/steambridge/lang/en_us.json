@@ -52,5 +52,6 @@
   "steambridge.gui.resync_success_hint_connect": "Connecting...",
   "steambridge.gui.resync_timeout": "Timed out - Steam did not start.",
   "steambridge.gui.resync_timeout_hint": "Launch Steam manually and try again.",
-  "steambridge.gui.resync_countdown": "Waiting for Steam... (%s sec)"
+  "steambridge.gui.resync_countdown": "Waiting for Steam... (%s sec)",
+  "steambridge.disconnect.same_name_as_host": "Your Minecraft name matches the host. Change your nickname and try again."
 }
