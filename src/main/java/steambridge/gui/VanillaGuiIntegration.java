@@ -34,6 +34,7 @@ import steambridge.SteamBridgeConfig;
 import steambridge.SteamBridgeMod;
 import steambridge.steam.SteamClient;
 import steambridge.steam.SteamManager;
+import steambridge.steam.HostAuth;
 import steambridge.steam.SteamServer;
 import steambridge.steam.SteamSocial;
 
@@ -190,27 +191,6 @@ public final class VanillaGuiIntegration {
         return false;
     }
 
-    private static void setShareToLanCommands(Screen gui, boolean value) {
-        for (Field f : gui.getClass().getDeclaredFields()) {
-            if (f.getType() == boolean.class) {
-                try {
-                    f.setAccessible(true);
-                    f.setBoolean(gui, value);
-                    return;
-                } catch (Exception ignored) {}
-            }
-        }
-    }
-
-    private static GameType getShareToLanGameType(Screen gui) {
-        GameType gt = findByType(gui, GameType.class);
-        return gt != null ? gt : GameType.SURVIVAL;
-    }
-
-    private static void setShareToLanGameType(Screen gui, GameType value) {
-        if (value == null) return;
-        setByType(gui, GameType.class, value);
-    }
 
     private static void setByType(Object owner, Class<?> type, Object value) {
         for (Field f : owner.getClass().getDeclaredFields()) {
@@ -221,24 +201,6 @@ public final class VanillaGuiIntegration {
         }
     }
 
-    /** After init(), force ShareToLan CycleButtons + fields to match saved host settings. */
-    @SuppressWarnings("unchecked")
-    private static void applySavedShareToLan(Screen gui, SteamSocial.Worlds.Settings saved) {
-        if (saved == null) return;
-        GameType gameType = SteamSocial.Worlds.parseGameType(saved.gametype);
-        setShareToLanGameType(gui, gameType);
-        setShareToLanCommands(gui, saved.allowCommands);
-
-        for (GuiEventListener l : gui.children()) {
-            if (!(l instanceof CycleButton<?> raw)) continue;
-            Object val = raw.getValue();
-            if (val instanceof Boolean) {
-                ((CycleButton<Boolean>) raw).setValue(saved.allowCommands);
-            } else if (val instanceof GameType) {
-                ((CycleButton<GameType>) raw).setValue(gameType);
-            }
-        }
-    }
 
     private static List<EditBox> findEditBoxes(Screen gui) {
         List<EditBox> boxes = new ArrayList<>();
@@ -530,8 +492,6 @@ private static void markAllSteamServers(JoinMultiplayerScreen gui) {
             SteamSocial.Worlds.Settings saved = SteamSocial.Worlds.get().load(worldKey(srv));
             pendingTransportMode = SteamSocial.Worlds.parseTransportMode(saved.transportMode);
             pendingAccessPolicy  = SteamSocial.Worlds.parseAccessPolicy(saved.accessPolicy);
-            // Restore after init() (it overwrites gameMode/commands from world data).
-            if (SteamBridgeConfig.rememberNetworkSettings) applySavedShareToLan(gui, saved);
         }
 
         EditBox portEdit = findByType(gui, EditBox.class);
@@ -656,10 +616,11 @@ private static void markAllSteamServers(JoinMultiplayerScreen gui) {
         boolean commands = getShareToLanCommands(gui);
 
         String worldKey = worldKey(srv);
-        SteamSocial.Worlds.get().save(worldKey, gameType, commands, pendingAccessPolicy, pendingTransportMode);
+        SteamSocial.Worlds.get().save(worldKey, pendingAccessPolicy, pendingTransportMode);
 
         int port = HttpUtil.getAvailablePort();
         boolean published = srv.publishServer(gameType, commands, port);
+        if (published) HostAuth.applyAfterPublish(srv);
 
         SteamServer server = new SteamServer(pendingAccessPolicy, worldKey);
         server.setTransportMode(pendingTransportMode);
@@ -683,9 +644,7 @@ private static void markAllSteamServers(JoinMultiplayerScreen gui) {
         Minecraft mc = Minecraft.getInstance();
         IntegratedServer srv = mc.getSingleplayerServer();
         if (srv == null) return;
-        GameType gameType = getShareToLanGameType(gui);
-        boolean commands = getShareToLanCommands(gui);
-        SteamSocial.Worlds.get().save(worldKey(srv), gameType, commands, pendingAccessPolicy, pendingTransportMode);
+        SteamSocial.Worlds.get().save(worldKey(srv), pendingAccessPolicy, pendingTransportMode);
     }
 
     private static SteamServer.TransportMode nextTransportMode(SteamServer.TransportMode mode) {

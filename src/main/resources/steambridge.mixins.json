@@ -5,7 +5,8 @@
   "client": [
     "MinecraftMixin",
     "MinecraftAccessor",
-    "ConnectScreenMixin"
+    "ConnectScreenMixin",
+    "ServerLoginHelloMixin"
   ],
   "injectors": {
     "defaultRequire": 1
