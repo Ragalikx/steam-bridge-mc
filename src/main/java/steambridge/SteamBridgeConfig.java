@@ -31,7 +31,15 @@ public final class SteamBridgeConfig {
      * world. Pokes at vanilla ShareToLanScreen internals through reflection, so if another
      * mod does something similar on the same screen, turn this off.
      */
-    public static boolean rememberNetworkSettings = true;
+    public static boolean disableOnlineModeOnPublish = true;
+    public static String  sameNameAsHost = "allow";
+    public static int     timeoutInitialSec = 30;
+    public static int     timeoutConnectedSec = 60;
+    public static String  stunServers = "stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302";
+
+    public static boolean kickOnSameNameAsHost() {
+        return "kick".equalsIgnoreCase(sameNameAsHost);
+    }
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final String FILE_NAME = "steambridge.json";
@@ -48,7 +56,19 @@ public final class SteamBridgeConfig {
             if (o.has("allowWithoutAuth")) allowWithoutAuth = o.get("allowWithoutAuth").getAsBoolean();
             if (o.has("virtualPort"))      virtualPort      = o.get("virtualPort").getAsInt();
             if (o.has("interceptUdp"))     interceptUdp     = o.get("interceptUdp").getAsBoolean();
-            if (o.has("rememberNetworkSettings")) rememberNetworkSettings = o.get("rememberNetworkSettings").getAsBoolean();
+            if (o.has("disableOnlineModeOnPublish")) disableOnlineModeOnPublish = o.get("disableOnlineModeOnPublish").getAsBoolean();
+            if (o.has("sameNameAsHost")) {
+                sameNameAsHost = o.get("sameNameAsHost").getAsString();
+                if (sameNameAsHost == null) sameNameAsHost = "allow";
+                sameNameAsHost = sameNameAsHost.trim().toLowerCase();
+                if (!sameNameAsHost.equals("allow") && !sameNameAsHost.equals("kick")) sameNameAsHost = "allow";
+            }
+            if (o.has("timeoutInitialSec")) timeoutInitialSec = o.get("timeoutInitialSec").getAsInt();
+            else if (o.has("timeoutInitialMs")) timeoutInitialSec = Math.max(1, o.get("timeoutInitialMs").getAsInt() / 1000);
+            if (o.has("timeoutConnectedSec")) timeoutConnectedSec = o.get("timeoutConnectedSec").getAsInt();
+            else if (o.has("timeoutConnectedMs")) timeoutConnectedSec = Math.max(1, o.get("timeoutConnectedMs").getAsInt() / 1000);
+            if (o.has("stunServers")) stunServers = o.get("stunServers").getAsString();
+
         } catch (Exception e) {
             SteamBridgeMod.LOG.warn("[SteamBridge] Failed to load config: {}", e.getMessage());
         }
@@ -60,7 +80,11 @@ public final class SteamBridgeConfig {
         o.addProperty("allowWithoutAuth", allowWithoutAuth);
         o.addProperty("virtualPort", virtualPort);
         o.addProperty("interceptUdp", interceptUdp);
-        o.addProperty("rememberNetworkSettings", rememberNetworkSettings);
+        o.addProperty("disableOnlineModeOnPublish", disableOnlineModeOnPublish);
+        o.addProperty("sameNameAsHost", sameNameAsHost);
+        o.addProperty("timeoutInitialSec", timeoutInitialSec);
+        o.addProperty("timeoutConnectedSec", timeoutConnectedSec);
+        o.addProperty("stunServers", stunServers);
         try {
             Files.createDirectories(path.getParent());
             try (Writer w = Files.newBufferedWriter(path)) {

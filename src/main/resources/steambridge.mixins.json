@@ -4,7 +4,8 @@
   "compatibilityLevel": "JAVA_21",
   "client": [
     "MinecraftMixin",
-    "ConnectScreenMixin"
+    "ConnectScreenMixin",
+    "ServerLoginHelloMixin"
   ],
   "injectors": {
     "defaultRequire": 1
