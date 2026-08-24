@@ -14,6 +14,7 @@ import steambridge.SteamBridgeConfig;
 import steambridge.SteamBridgeMod;
 import steambridge.steam.SteamClient;
 import steambridge.steam.SteamManager;
+import steambridge.steam.HostAuth;
 import steambridge.steam.SteamServer;
 import steambridge.steam.SteamSocial;
 
@@ -92,16 +93,6 @@ public final class VanillaGuiIntegration {
         if (next instanceof OpenToLanScreen) {
             if (isSteamHostSessionActive(mc)) {
                 return new GuiSteamHostManagement(mc.currentScreen);
-            }
-            if (mc.getServer() != null && SteamBridgeConfig.rememberNetworkSettings) {
-                try {
-                    String worldKey = worldKey(mc.getServer());
-                    SteamSocial.Worlds.Settings saved = SteamSocial.Worlds.get().load(worldKey);
-                    setByType(next, GameMode.class, SteamSocial.Worlds.parseGameType(saved.gametype));
-                    setByType(next, boolean.class, Boolean.valueOf(saved.allowCommands));
-                } catch (Exception e) {
-                    SteamBridgeMod.LOG.warn("Failed to load OpenToLan defaults", e);
-                }
             }
         }
         return next;
@@ -482,20 +473,6 @@ private static void markAllSteamServers(MultiplayerScreen gui) {
             SteamSocial.Worlds.Settings saved = SteamSocial.Worlds.get().load(worldKey(srv));
             pendingTransportMode = SteamSocial.Worlds.parseTransportMode(saved.transportMode);
             pendingAccessPolicy  = SteamSocial.Worlds.parseAccessPolicy(saved.accessPolicy);
-
-            // ShareToLan init overwrites commands from level.dat. If saved value differs, press once.
-            if (SteamBridgeConfig.rememberNetworkSettings && saved.allowCommands != findPrimitiveBoolean(gui)) {
-                String commandsLabel = I18n.translate("selectWorld.allowCommands");
-                for (ClickableWidget w : Screens.getButtons(gui)) {
-                    if (w instanceof ButtonWidget) {
-                        ButtonWidget btn = (ButtonWidget) w;
-                        if (btn.getMessage().getString().contains(commandsLabel)) {
-                            btn.onPress();
-                            break;
-                        }
-                    }
-                }
-            }
         }
 
         // Layout (same idea as 1.12.2 / 1.19.2):
@@ -668,15 +645,11 @@ private static void markAllSteamServers(MultiplayerScreen gui) {
         boolean commands = findPrimitiveBoolean(gui);
 
         String worldKey = worldKey(srv);
-        SteamSocial.Worlds.get().save(worldKey, gameType, commands, pendingAccessPolicy, pendingTransportMode);
+        SteamSocial.Worlds.get().save(worldKey, pendingAccessPolicy, pendingTransportMode);
 
         int port = NetworkUtils.findLocalPort();
         boolean published = srv.openToLan(gameType, commands, port);
-        // Steam friends often join offline/cracked; keep LAN offline even if the
-        // integrated server started with online-mode=true (1.16 openToLan does not flip it).
-        if (published) {
-            srv.setOnlineMode(false);
-        }
+        if (published) HostAuth.applyAfterPublish(srv);
 
         SteamServer server = new SteamServer(pendingAccessPolicy, worldKey, "World");
         server.setTransportMode(pendingTransportMode);
@@ -699,10 +672,7 @@ private static void markAllSteamServers(MultiplayerScreen gui) {
         MinecraftClient mc = MinecraftClient.getInstance();
         IntegratedServer srv = mc.getServer();
         if (srv == null) return;
-        GameMode gameType = findByType(gui, GameMode.class);
-        if (gameType == null) gameType = GameMode.SURVIVAL;
-        boolean commands = findPrimitiveBoolean(gui);
-        SteamSocial.Worlds.get().save(worldKey(srv), gameType, commands, pendingAccessPolicy, pendingTransportMode);
+        SteamSocial.Worlds.get().save(worldKey(srv), pendingAccessPolicy, pendingTransportMode);
     }
 
     // -- Labels ----------------------------------------------------------------

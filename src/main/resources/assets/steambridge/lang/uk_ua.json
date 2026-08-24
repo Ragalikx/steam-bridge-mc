@@ -20,7 +20,8 @@
   "steambridge.disconnect.friends_only": "Хост приймає лише друзів зі Steam",
   "steambridge.disconnect.mod_mismatch_hint": "З'єднання закрилось під час входу Forge - скоріш за все, ваші моди не збігаються з модами хоста. Встановіть той самий набір модів і спробуйте знову.",
   "steambridge.error.steam_shutdown": "Втрачено зв'язок зі Steam. Перевірте, чи запущено клієнт Steam.",
-  "steambridge.error.host_steam_shutdown": "Steam-міст відключився через помилку клієнта Steam - мультиплеєр більше недоступний.","steambridge.status.connecting": "Встановлюємо з'єднання через Steam...",
+  "steambridge.error.host_steam_shutdown": "Steam-міст відключився через помилку клієнта Steam - мультиплеєр більше недоступний.",
+  "steambridge.status.connecting": "Встановлюємо з'єднання через Steam...",
   "steambridge.status.waiting_route": "Шукаємо маршрут до хоста...",
   "steambridge.status.path_ready": "Маршрут знайдено - підключаємось до сервера...",
   "steambridge.status.steam_ready": "Підключено - входимо у світ...",
@@ -48,8 +49,9 @@
   "steambridge.gui.resync_starting_hint": "Це може зайняти кілька секунд",
   "steambridge.gui.resync_success": "Steam запущено!",
   "steambridge.gui.resync_success_hint": "Відкриваємо список друзів...",
-  "steambridge.gui.resync_success_hint_connect": "\u041f\u0456\u0434\u043a\u043b\u044e\u0447\u0430\u0454\u043c\u043e\u0441\u044f...",
+  "steambridge.gui.resync_success_hint_connect": "Підключаємося...",
   "steambridge.gui.resync_timeout": "Час вийшов - Steam так і не запустився.",
   "steambridge.gui.resync_timeout_hint": "Запустіть Steam вручну і спробуйте знову.",
-  "steambridge.gui.resync_countdown": "Очікуємо Steam... (%s сек)"
+  "steambridge.gui.resync_countdown": "Очікуємо Steam... (%s сек)",
+  "steambridge.disconnect.same_name_as_host": "Ваш нік збігається з ніком хоста. Змініть нік і зайдіть знову."
 }

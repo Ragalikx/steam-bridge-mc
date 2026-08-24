@@ -17,7 +17,8 @@
   "steambridge.disconnect.friends_only": "Host accepts Steam friends only",
   "steambridge.disconnect.mod_mismatch_hint": "Connection closed during the Forge handshake - your mods probably don't match the host's. Install the same modpack and try again.",
   "steambridge.error.steam_shutdown": "Lost connection to Steam. Make sure your Steam client is running.",
-  "steambridge.error.host_steam_shutdown": "Steam bridge disconnected due to a Steam client error - multiplayer is no longer available.","steambridge.status.connecting": "Connecting via Steam...",
+  "steambridge.error.host_steam_shutdown": "Steam bridge disconnected due to a Steam client error - multiplayer is no longer available.",
+  "steambridge.status.connecting": "Connecting via Steam...",
   "steambridge.status.waiting_route": "Looking for a route to the host...",
   "steambridge.status.path_ready": "Route found - connecting to server...",
   "steambridge.status.steam_ready": "Connected - logging into the world...",
@@ -51,5 +52,6 @@
   "steambridge.gui.resync_success_hint_connect": "Connecting...",
   "steambridge.gui.resync_timeout": "Timed out - Steam did not start.",
   "steambridge.gui.resync_timeout_hint": "Launch Steam manually and try again.",
-  "steambridge.gui.resync_countdown": "Waiting for Steam... (%s sec)"
+  "steambridge.gui.resync_countdown": "Waiting for Steam... (%s sec)",
+  "steambridge.disconnect.same_name_as_host": "Your Minecraft name matches the host. Change your nickname and try again."
 }
