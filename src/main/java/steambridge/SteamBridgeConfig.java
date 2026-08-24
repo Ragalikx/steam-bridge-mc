@@ -28,7 +28,32 @@ public class SteamBridgeConfig {
 
     @Config.Comment("Remember the last game mode / allow-commands choice on the Open for Steam screen, per world. Uses reflection into vanilla's own screen fields, so if another mod also messes with that screen and something looks off, turn this off.")
     @Config.Name("Remember Network Settings")
-    public static boolean rememberNetworkSettings = true;
+
+    @Config.Comment("After opening the world for Steam, turn off Mojang online-mode so cracked friends are not sent a licensed HELLO.")
+    @Config.Name("Disable Online Mode On Publish")
+    public static boolean disableOnlineModeOnPublish = true;
+
+    @Config.Comment("When a Steam guest uses the host Minecraft name: allow or kick.")
+    @Config.Name("Same Name As Host")
+    public static String sameNameAsHost = "allow";
+
+    @Config.Comment("Steam P2P initial route timeout in seconds.")
+    @Config.Name("Timeout Initial Seconds")
+    @Config.RangeInt(min = 5, max = 120)
+    public static int timeoutInitialSec = 30;
+
+    @Config.Comment("Steam drop timeout after the connection is up, in seconds.")
+    @Config.Name("Timeout Connected Seconds")
+    @Config.RangeInt(min = 10, max = 300)
+    public static int timeoutConnectedSec = 60;
+
+    @Config.Comment("Comma-separated STUN servers for ICE / direct P2P.")
+    @Config.Name("Stun Servers")
+    public static String stunServers = "stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302";
+
+    public static boolean kickOnSameNameAsHost() {
+        return sameNameAsHost != null && sameNameAsHost.equalsIgnoreCase("kick");
+    }
 
     // NOTE: the Steam App ID is intentionally NOT configurable. It is hardcoded to 480
     // (Spacewar) in SteamAppIdHelper. Letting users point it at a real game's App ID -
