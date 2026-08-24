@@ -52,5 +52,6 @@
   "steambridge.gui.resync_success_hint_connect": "Підключаємося...",
   "steambridge.gui.resync_timeout": "Час вийшов - Steam так і не запустився.",
   "steambridge.gui.resync_timeout_hint": "Запустіть Steam вручну і спробуйте знову.",
-  "steambridge.gui.resync_countdown": "Очікуємо Steam... (%s сек)"
+  "steambridge.gui.resync_countdown": "Очікуємо Steam... (%s сек)",
+  "steambridge.disconnect.same_name_as_host": "Ваш нік збігається з ніком хоста. Змініть нік і зайдіть знову."
 }

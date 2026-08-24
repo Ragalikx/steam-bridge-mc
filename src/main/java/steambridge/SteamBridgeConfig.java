@@ -43,14 +43,26 @@ public final class SteamBridgeConfig {
      * screen is possible in theory. Turning this off makes the screen behave exactly like
      * plain vanilla, no memory between sessions.
      */
-    public static boolean rememberNetworkSettings = true;
+    public static boolean disableOnlineModeOnPublish = true;
+    public static String  sameNameAsHost = "allow";
+    public static int     timeoutInitialSec = 30;
+    public static int     timeoutConnectedSec = 60;
+    public static String  stunServers = "stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302";
+
+    public static boolean kickOnSameNameAsHost() {
+        return "kick".equalsIgnoreCase(sameNameAsHost);
+    }
 
     // -- Spec definition -------------------------------------------------------
     public static final ForgeConfigSpec SPEC;
     private static final ForgeConfigSpec.BooleanValue ALLOW_WITHOUT_AUTH;
     private static final ForgeConfigSpec.IntValue     VIRTUAL_PORT;
     private static final ForgeConfigSpec.BooleanValue INTERCEPT_UDP;
-    private static final ForgeConfigSpec.BooleanValue REMEMBER_NETWORK_SETTINGS;
+    private static final ForgeConfigSpec.BooleanValue DISABLE_ONLINE_MODE;
+    private static final ForgeConfigSpec.ConfigValue<String> SAME_NAME_AS_HOST;
+    private static final ForgeConfigSpec.IntValue TIMEOUT_INITIAL_SEC;
+    private static final ForgeConfigSpec.IntValue TIMEOUT_CONNECTED_SEC;
+    private static final ForgeConfigSpec.ConfigValue<String> STUN_SERVERS;
 
     static {
         ForgeConfigSpec.Builder b = new ForgeConfigSpec.Builder();
@@ -72,12 +84,28 @@ public final class SteamBridgeConfig {
                    + "Takes effect only on launch - cannot be toggled at runtime.")
             .define("interceptUdp", true);
 
-        REMEMBER_NETWORK_SETTINGS = b
-            .comment("Remember the last game mode / allow-commands choice on the Open for "
-                   + "Steam screen, per world. Uses reflection into vanilla's own screen "
-                   + "fields, so if another mod also messes with that screen and something "
-                   + "looks off, turn this off.")
-            .define("rememberNetworkSettings", true);
+
+
+        DISABLE_ONLINE_MODE = b
+            .comment("After opening the world for Steam, turn off Mojang online-mode so cracked friends "
+                   + "are not sent a licensed HELLO. Leave on unless you need Mojang auth on LAN.")
+            .define("disableOnlineModeOnPublish", true);
+
+        SAME_NAME_AS_HOST = b
+            .comment("When a Steam guest uses the host Minecraft name: allow (offline UUID) or kick.")
+            .define("sameNameAsHost", "allow");
+
+        TIMEOUT_INITIAL_SEC = b
+            .comment("Steam P2P initial route timeout in seconds.")
+            .defineInRange("timeoutInitialSec", 30, 5, 120);
+
+        TIMEOUT_CONNECTED_SEC = b
+            .comment("Steam drop timeout after the connection is up, in seconds.")
+            .defineInRange("timeoutConnectedSec", 60, 10, 300);
+
+        STUN_SERVERS = b
+            .comment("Comma-separated STUN servers for ICE / direct P2P.")
+            .define("stunServers", "stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302");
 
         SPEC = b.build();
     }
@@ -87,7 +115,15 @@ public final class SteamBridgeConfig {
         allowWithoutAuth = ALLOW_WITHOUT_AUTH.get();
         virtualPort      = VIRTUAL_PORT.get();
         interceptUdp     = INTERCEPT_UDP.get();
-        rememberNetworkSettings = REMEMBER_NETWORK_SETTINGS.get();
+        disableOnlineModeOnPublish = DISABLE_ONLINE_MODE.get();
+        sameNameAsHost = SAME_NAME_AS_HOST.get();
+        if (sameNameAsHost == null) sameNameAsHost = "allow";
+        sameNameAsHost = sameNameAsHost.trim().toLowerCase();
+        if (!sameNameAsHost.equals("allow") && !sameNameAsHost.equals("kick")) sameNameAsHost = "allow";
+        timeoutInitialSec = TIMEOUT_INITIAL_SEC.get();
+        timeoutConnectedSec = TIMEOUT_CONNECTED_SEC.get();
+        stunServers = STUN_SERVERS.get();
+        if (stunServers == null) stunServers = "";
     }
 
     public static void onLoad(ModConfigEvent.Loading event) {
