@@ -1,0 +1,5 @@
+dependencies {
+    testImplementation('com.code-disaster.steamworks4j:steamworks4j:1.10.0') { transitive = false }
+    compileOnly 'com.google.code.gson:gson:2.8.9'
+    testImplementation "com.google.code.gson:gson:${findProperty('testGsonVersion') ?: '2.8.9'}"
+}

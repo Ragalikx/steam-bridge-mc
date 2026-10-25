@@ -1,0 +1,26 @@
+def lockRoot = project.findProperty('sbmRootDirectory') ?: rootDir
+def records = new groovy.json.JsonSlurper().parse(new File(lockRoot, 'tools/locked-dependencies.json'))
+repositories {
+    mavenCentral()
+    maven { url 'https://maven.maxhenkel.de/repository/public' }
+    maven { url 'https://repo.plasmoverse.com/releases' }
+}
+configurations { sbmLockedLibraries { transitive = false } }
+records.each { record -> dependencies.add('sbmLockedLibraries', record.coordinate) }
+def verifyLibraries = tasks.create('verifyLockedLibraries') {
+    doLast {
+        configurations.sbmLockedLibraries.resolvedConfiguration.resolvedArtifacts.each { artifact ->
+            def id = artifact.moduleVersion.id
+            def coordinate = "${id.group}:${id.name}:${id.version}"
+            def record = records.find { it.coordinate == coordinate }
+            if (record == null) throw new GradleException("Unlisted dependency: ${coordinate}")
+            def actual = java.security.MessageDigest.getInstance('SHA-256').digest(artifact.file.bytes).encodeHex().toString()
+            if (actual != record.sha256) throw new GradleException("Dependency checksum mismatch: ${coordinate}")
+        }
+    }
+}
+if (project == rootProject && rootProject.name == 'steam-bridge') {
+    subprojects { tasks.withType(JavaCompile) { dependsOn verifyLibraries } }
+} else {
+    tasks.withType(JavaCompile) { dependsOn verifyLibraries }
+}

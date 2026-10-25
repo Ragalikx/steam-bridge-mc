@@ -1,0 +1,19 @@
+def bridgeRoot = rootDir.toPath().resolve('../..').normalize().toFile()
+sourceSets.main.java.srcDir new File(bridgeRoot, 'core/src/main/java')
+sourceSets.main.java.srcDir new File(bridgeRoot, 'steam-jna/src/main/java')
+sourceSets.main.java.srcDir new File(bridgeRoot, 'transport-netty/src/main/java')
+sourceSets.main.java.srcDir new File(bridgeRoot, 'runtime/src/main/java')
+
+repositories { maven { url 'https://maven.maxhenkel.de/repository/public' } }
+dependencies { compileOnly 'de.maxhenkel.voicechat:voicechat-api:2.5.0' }
+
+repositories { maven { url 'https://repo.plasmoverse.com/releases' } }
+dependencies {
+    for (module in ['common', 'client', 'server', 'server-proxy-common']) {
+        compileOnly("su.plo.voice.api:${module}:2.1.17") { transitive = false }
+    }
+    compileOnly('su.plo.voice:protocol:2.1.17') { transitive = false }
+}
+
+ext.sbmRootDirectory = bridgeRoot
+apply from: new File(bridgeRoot, 'build-logic/dependency-checks.gradle')

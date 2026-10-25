@@ -1,0 +1,13 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "steambridge.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "ConnectScreenMixin",
+    "ServerLoginHelloMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

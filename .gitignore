@@ -2,6 +2,8 @@
 .gradle/
 build/
 tmp/
+dist/
+__pycache__/
 
 # IDE
 .idea/

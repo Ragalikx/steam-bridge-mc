@@ -1,0 +1,74 @@
+[
+  {
+    "coordinate": "com.code-disaster.steamworks4j:steamworks4j:1.10.0",
+    "url": "https://repo.maven.apache.org/maven2/com/code-disaster/steamworks4j/steamworks4j/1.10.0/steamworks4j-1.10.0.jar",
+    "sha256": "2da3d053f0405b6aeb68f94ab281f8eb827e7a9fc66230b7efb077be8aec2d64",
+    "bytes": 1116647
+  },
+  {
+    "coordinate": "net.java.dev.jna:jna:4.4.0",
+    "url": "https://repo.maven.apache.org/maven2/net/java/dev/jna/jna/4.4.0/jna-4.4.0.jar",
+    "sha256": "c4dadeeecaa90c8847902082aee5eb107fcf59c5d0e63a17fcaf273c0e2d2bd1",
+    "bytes": 1091208
+  },
+  {
+    "coordinate": "net.java.dev.jna:jna:5.12.1",
+    "url": "https://repo.maven.apache.org/maven2/net/java/dev/jna/jna/5.12.1/jna-5.12.1.jar",
+    "sha256": "91a814ac4f40d60dee91d842e1a8ad874c62197984403d0e3c30d39e55cf53b3",
+    "bytes": 1866196
+  },
+  {
+    "coordinate": "net.java.dev.jna:jna:5.14.0",
+    "url": "https://repo.maven.apache.org/maven2/net/java/dev/jna/jna/5.14.0/jna-5.14.0.jar",
+    "sha256": "34ed1e1f27fa896bca50dbc4e99cf3732967cec387a7a0d5e3486c09673fe8c6",
+    "bytes": 1878533
+  },
+  {
+    "coordinate": "de.maxhenkel.voicechat:voicechat-api:2.5.0",
+    "url": "https://maven.maxhenkel.de/repository/public/de/maxhenkel/voicechat/voicechat-api/2.5.0/voicechat-api-2.5.0.jar",
+    "sha256": "9fc050efc86ac4086c9e38da11aa76e971ae5978c6cfc130fc2c19f6b6b54ada",
+    "bytes": 44347
+  },
+  {
+    "coordinate": "su.plo.voice.api:common:2.1.17",
+    "url": "https://repo.plasmoverse.com/releases/su/plo/voice/api/common/2.1.17/common-2.1.17.jar",
+    "sha256": "af0d64f37ff6c71bf857435f5ff6ed796c01631327eac57c2db04b1252e7e4b9",
+    "bytes": 29279
+  },
+  {
+    "coordinate": "su.plo.voice.api:client:2.1.17",
+    "url": "https://repo.plasmoverse.com/releases/su/plo/voice/api/client/2.1.17/client-2.1.17.jar",
+    "sha256": "5fca1db510e7dc0fa2e61862a830d98d49aa264952d9a6eb886d4a6a50b3e22d",
+    "bytes": 100587
+  },
+  {
+    "coordinate": "su.plo.voice.api:server:2.1.17",
+    "url": "https://repo.plasmoverse.com/releases/su/plo/voice/api/server/2.1.17/server-2.1.17.jar",
+    "sha256": "6035e7b01ee08500318c5331b66608c438c6971708925fc402971271285037aa",
+    "bytes": 39028
+  },
+  {
+    "coordinate": "su.plo.voice.api:server-proxy-common:2.1.17",
+    "url": "https://repo.plasmoverse.com/releases/su/plo/voice/api/server-proxy-common/2.1.17/server-proxy-common-2.1.17.jar",
+    "sha256": "14ff8489cfa7f165641745c54747d0cf7a21687643d97d61fa2438e8e33dfbdd",
+    "bytes": 73126
+  },
+  {
+    "coordinate": "su.plo.voice:protocol:2.1.17",
+    "url": "https://repo.plasmoverse.com/releases/su/plo/voice/protocol/2.1.17/protocol-2.1.17.jar",
+    "sha256": "601444ecc7cdd41959b52810847502a5c5420c63fb9664295d0d2e6379eadec9",
+    "bytes": 109022
+  },
+  {
+    "coordinate": "org.ow2.asm:asm:9.11.1",
+    "url": "https://repo.maven.apache.org/maven2/org/ow2/asm/asm/9.11.1/asm-9.11.1.jar",
+    "sha256": "ae4e6e10d59d0a1500317764b21881ad883f8550e33c66e6142f7032c6fb566c",
+    "bytes": 131138
+  },
+  {
+    "coordinate": "org.ow2.asm:asm-tree:9.11.1",
+    "url": "https://repo.maven.apache.org/maven2/org/ow2/asm/asm-tree/9.11.1/asm-tree-9.11.1.jar",
+    "sha256": "2b15c3c1b288a9fad3bb2cd6d988ba9521554914ed1f2a2029141fa3f483154a",
+    "bytes": 51957
+  }
+]

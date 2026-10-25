@@ -1,0 +1,3 @@
+pluginManagement { repositories { gradlePluginPortal(); maven { url 'https://maven.neoforged.net/releases' } } }
+rootProject.name = 'steambridge-neoforge-26x'
+includeBuild('../../steam-panama')

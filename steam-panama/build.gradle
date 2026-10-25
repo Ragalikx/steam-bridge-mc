@@ -1,0 +1,74 @@
+plugins { id 'java-library' }
+group = 'steambridge'
+version = '0.0.0-dev'
+java.toolchain.languageVersion = JavaLanguageVersion.of(25)
+repositories {
+    mavenCentral()
+    maven { url 'https://maven.maxhenkel.de/repository/public' }
+    maven { url 'https://repo.plasmoverse.com/releases' }
+}
+dependencies {
+    implementation 'io.netty:netty-all:4.1.97.Final'
+    implementation 'org.apache.logging.log4j:log4j-api:2.17.2'
+    implementation 'com.google.code.gson:gson:2.8.9'
+    compileOnly 'de.maxhenkel.voicechat:voicechat-api:2.5.0'
+    testImplementation 'de.maxhenkel.voicechat:voicechat-api:2.5.0'
+    for (module in ['common', 'client', 'server', 'server-proxy-common']) {
+        compileOnly("su.plo.voice.api:${module}:2.1.17") { transitive = false }
+        testImplementation("su.plo.voice.api:${module}:2.1.17") { transitive = false }
+    }
+    compileOnly('su.plo.voice:protocol:2.1.17') { transitive = false }
+    testImplementation('su.plo.voice:protocol:2.1.17') { transitive = false }
+    testImplementation 'com.google.guava:guava:17.0'
+    testImplementation 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation('com.code-disaster.steamworks4j:steamworks4j:1.10.0') { transitive = false }
+}
+configurations { nativeFixture { transitive = false } }
+dependencies { nativeFixture 'com.code-disaster.steamworks4j:steamworks4j:1.10.0' }
+def generated = layout.buildDirectory.dir('generated/java')
+tasks.register('generateSharedSources', Exec) {
+    inputs.files(fileTree('../runtime/src/main/java'), fileTree('../steam-jna/src/main/java/steambridge/voice'),
+        fileTree('../steam-jna/src/main/java/steambridge/proxy'), file('../tools/generate_panama_sources.py'),
+        file('../steam-jna/src/main/java/steambridge/SteamBridgeConfig.java'),
+        file('../steam-jna/src/main/java/steambridge/steam/SteamConnectionStatus.java'))
+    outputs.dir(generated)
+    commandLine((findProperty('pythonExecutable') ?: 'python').toString(), '../tools/generate_panama_sources.py', generated.get().asFile)
+}
+sourceSets.main.java {
+    srcDir generated
+    srcDir '../core/src/main/java'
+    srcDir '../transport-netty/src/main/java'
+}
+tasks.named('compileJava') { dependsOn 'generateSharedSources'; options.encoding = 'UTF-8' }
+sourceSets.test.java {
+    srcDir '../core/src/test/java'
+    srcDir '../transport-netty/src/test/java'
+    srcDir '../runtime/src/test/java'
+    srcDir layout.buildDirectory.dir('generated/test')
+}
+tasks.register('generateVoiceTests', Exec) {
+    inputs.files(fileTree('../steam-jna/src/test/java/steambridge/voice'),
+        file('../steam-jna/src/test/java/steambridge/proxy/SteamUdpProxyTest.java'), file('../tools/generate_panama_sources.py'))
+    outputs.dir(layout.buildDirectory.dir('generated/test'))
+    commandLine((findProperty('pythonExecutable') ?: 'python').toString(), '../tools/generate_panama_sources.py',
+        layout.buildDirectory.dir('generated/test').get().asFile, '--tests')
+}
+tasks.named('compileTestJava') { dependsOn 'generateVoiceTests' }
+tasks.register('extractNativeFixture', Copy) {
+    inputs.property('platforms', ['windows-x64', 'linux-x64'])
+    from { configurations.nativeFixture.collect { zipTree(it) } }
+    include 'steam_api64.dll', 'libsteam_api.so'
+    into layout.buildDirectory.dir('fixtures')
+}
+test {
+    dependsOn 'extractNativeFixture'
+    useJUnit()
+    jvmArgs '--enable-native-access=ALL-UNNAMED'
+    def nativeName = System.getProperty('os.name').toLowerCase().startsWith('windows') ? 'steam_api64.dll' : 'libsteam_api.so'
+    systemProperty 'steambridge.test.library', layout.buildDirectory.file('fixtures/' + nativeName).get().asFile.absolutePath
+    systemProperty 'steambridge.test.windowsLibrary', layout.buildDirectory.file('fixtures/steam_api64.dll').get().asFile.absolutePath
+    systemProperty 'steambridge.test.linuxLibrary', layout.buildDirectory.file('fixtures/libsteam_api.so').get().asFile.absolutePath
+}
+ext.sbmRootDirectory = file('..')
+apply from: '../build-logic/dependency-checks.gradle'

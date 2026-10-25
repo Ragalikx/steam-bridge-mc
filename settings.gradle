@@ -1,0 +1,5 @@
+rootProject.name = 'steam-bridge'
+include 'core', 'steam-jna', 'transport-netty', 'runtime'
+
+include 'voice-contract'
+project(':voice-contract').projectDir = file('integrations/voice-contract')

@@ -1,0 +1,10 @@
+{
+  "api": 1,
+  "sdk": "1.62",
+  "platform": "linux-x64",
+  "file": "libsteam_api.so",
+  "resource": "/steambridge/linux-runtime/linux-x64/libsteam_api.so",
+  "url": "https://raw.githubusercontent.com/rlabrecque/SteamworksSDK/34d9338aa892213861bd9f84c4dd9c5b7fd23de7/redistributable_bin/linux64/libsteam_api.so",
+  "sha256": "0f2c41c20644503c17e13498203986493332fc8296dbd78493bc1fed352ec0cc",
+  "bytes": 388288
+}

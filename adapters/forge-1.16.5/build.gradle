@@ -1,0 +1,177 @@
+plugins {
+    id 'eclipse'
+    id 'maven-publish'
+    id 'net.minecraftforge.gradle' version '5.1.69'
+}
+
+// -- Versioning ----------------------------------------------------------------
+// Release (cmd):        gradlew build -PmodVersion=1.145
+// Release (PowerShell): .\gradlew.bat build "-PmodVersion=1.145"
+// Result: project.version / jar / mods.toml / BuildInfo = "1.145+mc1.16.5"
+// Dev (no -P):          "0.0.0-dev+mc1.16.5"
+def rawModVersion = (findProperty('modVersion') ?: '0.0.0-dev').toString().trim()
+if (rawModVersion.isEmpty()) {
+    throw new GradleException("modVersion is empty. Pass -PmodVersion=1.145 (or omit for 0.0.0-dev).")
+}
+if (rawModVersion.startsWith('v') || rawModVersion.startsWith('V')) {
+    rawModVersion = rawModVersion.substring(1)
+}
+if (rawModVersion.contains('+mc')) {
+    throw new GradleException(
+        "modVersion must be the mod release only (e.g. 1.145), not '${rawModVersion}'. " +
+        "Minecraft is appended automatically as +mc${minecraft_version}."
+    )
+}
+
+ext.modVersionOnly = rawModVersion
+version = "${rawModVersion}+mc${minecraft_version}"
+group   = project.mod_group
+archivesBaseName = project.mod_id
+
+logger.lifecycle("Steam Bridge (Forge 1.16.5) version: {}  (modVersion={}, minecraft={})",
+    version, rawModVersion, minecraft_version)
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(8)
+
+// -- Auto-generated BuildInfo -------------------------------------------------
+def generatedSrcDir = "${buildDir}/generated/java"
+
+sourceSets {
+    main { java { srcDir generatedSrcDir } }
+}
+
+task generateBuildInfo {
+    def verFull = project.version.toString()
+    def verMod  = project.ext.modVersionOnly.toString()
+    def verMc   = project.minecraft_version.toString()
+    inputs.property('version', verFull)
+    inputs.property('modVersion', verMod)
+    inputs.property('minecraftVersion', verMc)
+    outputs.dir(generatedSrcDir)
+    doFirst {
+        def f = new File("${generatedSrcDir}/steambridge/BuildInfo.java")
+        f.parentFile.mkdirs()
+        f.text = """\
+package steambridge;
+/** Auto-generated at build time. Do not edit or commit. */
+public final class BuildInfo {
+    /** Full release id, e.g. {@code 1.145+mc1.16.5}. */
+    public static final String VERSION     = "${verFull}";
+    /** Mod-only version from {@code -PmodVersion}, e.g. {@code 1.145}. */
+    public static final String MOD_VERSION = "${verMod}";
+    /** Target Minecraft version baked at build time. */
+    public static final String MC_VERSION  = "${verMc}";
+    /** Embedded in bytecode - visible in hex/strings dump of the jar. */
+    public static final String AUTHOR      = "Ragalikx";
+    public static final String GITHUB      = "https://github.com/Ragalikx/steam-bridge-mc";
+    private BuildInfo() {}
+}
+"""
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    dependsOn generateBuildInfo
+    options.encoding = 'UTF-8'
+}
+
+minecraft {
+    mappings channel: project.mappings_channel, version: project.mappings_version
+    accessTransformer = file('src/main/resources/META-INF/accesstransformer.cfg')
+
+    runs {
+        client {
+            workingDirectory project.file('run')
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.console.level', 'debug'
+            mods {
+                "${project.mod_id}" {
+                    source sourceSets.main
+                }
+            }
+        }
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+configurations {
+    steamBundle { transitive = false }
+}
+
+dependencies {
+    minecraft "net.minecraftforge:forge:${project.forge_version}"
+
+    // steamworks4j API is shaded flat into the mod jar (see jar task).
+    // JNA: compileOnly against the same 4.4.0 Forge already puts on the game classpath.
+    implementation("com.code-disaster.steamworks4j:steamworks4j:${project.steamworks4j_version}") {
+        exclude group: 'net.java.dev.jna'
+    }
+    compileOnly "net.java.dev.jna:jna:${project.jna_version}"
+
+    steamBundle "com.code-disaster.steamworks4j:steamworks4j:${project.steamworks4j_version}"
+}
+
+// -- Resource templating (mods.toml version substitution) ---------------------
+processResources {
+    var replaceProperties = [
+        mod_id           : project.mod_id,
+        mod_name         : project.mod_name,
+        mod_version      : project.version,
+        minecraft_version: project.minecraft_version,
+        forge_version    : project.forge_version
+    ]
+    inputs.properties replaceProperties
+    filesMatching(['META-INF/mods.toml', 'pack.mcmeta']) {
+        expand replaceProperties
+    }
+}
+
+jar {
+    // steamworks4j API + win64 natives at jar root
+    from({ project.configurations.steamBundle.collect { zipTree(it) } }) {
+        include 'com/codedisaster/**'
+        include 'steam_api64.dll', 'steamworks4j64.dll', 'libsteam_api.so', 'libsteamworks4j.so'
+        exclude 'com/codedisaster/steamworks/SteamController*'
+        exclude 'com/codedisaster/steamworks/SteamHTTP*'
+        exclude 'com/codedisaster/steamworks/SteamLeaderboard*'
+        exclude 'com/codedisaster/steamworks/SteamMatchmaking*'
+        exclude 'com/codedisaster/steamworks/SteamNetworking*'
+        exclude 'com/codedisaster/steamworks/SteamPublishedFile*'
+        exclude 'com/codedisaster/steamworks/SteamRemoteStorage*'
+        exclude 'com/codedisaster/steamworks/SteamScreenshot*'
+        exclude 'com/codedisaster/steamworks/SteamServer*'
+        exclude 'com/codedisaster/steamworks/SteamUGC*'
+        exclude 'com/codedisaster/steamworks/SteamUserStats*'
+    exclude 'com/codedisaster/steamworks/SteamApps*'
+    }
+    // JNA is NOT shaded: Forge 1.16.5 already provides jna-4.4.0 on the library path.
+    from('third_party_licenses') {
+        into 'META-INF/licenses'
+    }
+    from('LICENSE') {
+        into 'META-INF/licenses'
+        rename { 'STEAMBRIDGE_MIT.txt' }
+    }
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+    manifest {
+        attributes([
+            'Specification-Title'   : project.mod_id,
+            'Implementation-Title'  : project.mod_id,
+            'Implementation-Version': project.version,
+            'Implementation-Vendor' : 'Ragalikx',
+            'Implementation-URL'    : 'https://github.com/Ragalikx/steam-bridge-mc',
+            'Built-By'              : 'Ragalikx'
+        ])
+    }
+}
+
+jar.finalizedBy('reobfJar')
+
+apply from: '../../build-logic/shared-sources.gradle'
+
+apply from: '../../build-logic/packaging.gradle'
+

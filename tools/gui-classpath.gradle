@@ -1,0 +1,9 @@
+gradle.projectsEvaluated {
+    rootProject.tasks.register('sbmGuiClasspath') {
+        doLast {
+            def output = new File(rootProject.findProperty('guiClasspathOutput').toString())
+            output.parentFile.mkdirs()
+            output.text = rootProject.sourceSets.main.compileClasspath.files.collect { it.absolutePath }.join('\n')
+        }
+    }
+}

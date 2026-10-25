@@ -1,0 +1,19 @@
+{
+  "api": 1,
+  "backend": "jna",
+  "coordinate": "com.code-disaster.steamworks4j:steamworks4j:1.10.0",
+  "files": [
+    {
+      "file": "libsteam_api.so",
+      "resource": "/steambridge/linux-runtime/linux-x64/libsteam_api.so",
+      "bytes": 388288,
+      "sha256": "0f2c41c20644503c17e13498203986493332fc8296dbd78493bc1fed352ec0cc"
+    },
+    {
+      "file": "libsteamworks4j.so",
+      "resource": "/steambridge/linux-runtime/linux-x64/libsteamworks4j.so",
+      "bytes": 310528,
+      "sha256": "4d255292c9ee257087053f8b1c0f0ab5a8f831193d3e6f37a10e5c046d6e1886"
+    }
+  ]
+}

@@ -1,0 +1,59 @@
+[
+  {
+    "java": 8,
+    "variants": [
+      "forge-1.7.10",
+      "forge-1.8.9",
+      "forge-1.12.2",
+      "forge-1.16.5",
+      "fabric-1.16.5"
+    ],
+    "fabric": [
+      "1.16.5"
+    ],
+    "forge": [
+      "1.16.5"
+    ]
+  },
+  {
+    "java": 17,
+    "variants": [
+      "forge-1.19.2",
+      "fabric-1.19.2",
+      "fabric-1.20.1",
+      "neoforge-1.20.1"
+    ],
+    "fabric": [
+      "1.19.2",
+      "1.20.1"
+    ],
+    "forge": [
+      "1.19.2",
+      "1.20.1"
+    ]
+  },
+  {
+    "java": 21,
+    "variants": [
+      "fabric-1.21.1",
+      "neoforge-1.21.1"
+    ],
+    "fabric": [
+      "1.21.1"
+    ],
+    "neoforge": [
+      "1.21.1"
+    ]
+  },
+  {
+    "java": 25,
+    "variants": [
+      "neoforge-26.x"
+    ],
+    "neoforge": [
+      "26.1",
+      "26.2",
+      "26.3"
+    ]
+  }
+]

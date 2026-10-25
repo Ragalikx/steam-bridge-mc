@@ -1,202 +1,40 @@
-buildscript {
+plugins {
+    id 'base'
+}
+
+allprojects {
+    group = 'steambridge'
+    version = findProperty('modVersion') ?: '0.0.0-dev'
     repositories {
-        maven { url = 'https://maven.minecraftforge.net' }
         mavenCentral()
+        maven { url 'https://repo.plasmoverse.com/releases' }
+        maven { url 'https://repo.spongepowered.org/repository/maven-public' }
+        maven { url 'https://maven.maxhenkel.de/repository/public' }
+    }
+}
+
+subprojects {
+    apply plugin: 'java-library'
+    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_1_8
+    tasks.withType(JavaCompile).configureEach {
+        options.encoding = 'UTF-8'
+        options.release = 8
     }
     dependencies {
-        classpath group: 'net.minecraftforge.gradle', name: 'ForgeGradle', version: '3.+', changing: true
+        testImplementation 'junit:junit:4.13.2'
     }
-}
-
-apply plugin: 'net.minecraftforge.gradle'
-apply plugin: 'java'
-
-// -- Versioning ----------------------------------------------------------------
-// Release (cmd):        gradlew build -PmodVersion=1.145
-// Release (PowerShell): .\gradlew.bat build "-PmodVersion=1.145"
-// Result: project.version / jar / mcmod.info / BuildInfo = "1.145+mc1.12.2"
-// Dev (no -P):          "0.0.0-dev+mc1.12.2"
-// Optional leading "v" is stripped (CI: -PmodVersion=v1.145).
-ext.minecraft_version = '1.12.2'
-def rawModVersion = (findProperty('modVersion') ?: '0.0.0-dev').toString().trim()
-if (rawModVersion.isEmpty()) {
-    throw new GradleException("modVersion is empty. Pass -PmodVersion=1.145 (or omit for 0.0.0-dev).")
-}
-if (rawModVersion.startsWith('v') || rawModVersion.startsWith('V')) {
-    rawModVersion = rawModVersion.substring(1)
-}
-if (rawModVersion.contains('+mc')) {
-    throw new GradleException(
-        "modVersion must be the mod release only (e.g. 1.145), not '${rawModVersion}'. " +
-        "Minecraft is appended automatically as +mc${minecraft_version}."
-    )
-}
-ext.modVersionOnly = rawModVersion
-version          = "${rawModVersion}+mc${minecraft_version}"
-group            = 'steambridge'
-archivesBaseName = 'steambridge'
-
-logger.lifecycle("Steam Bridge (Forge 1.12.2) version: {}  (modVersion={}, minecraft={})",
-    version, rawModVersion, minecraft_version)
-
-sourceCompatibility = JavaVersion.VERSION_1_8
-targetCompatibility = JavaVersion.VERSION_1_8
-
-def generatedSrcDir = "$buildDir/generated/java"
-
-sourceSets {
-    main { java { srcDir generatedSrcDir } }
-}
-
-task generateBuildInfo {
-    def verFull = project.version.toString()
-    def verMod  = project.ext.modVersionOnly.toString()
-    def verMc   = project.ext.minecraft_version.toString()
-    inputs.property('version', verFull)
-    inputs.property('modVersion', verMod)
-    inputs.property('minecraftVersion', verMc)
-    outputs.dir(generatedSrcDir)
-    doFirst {
-        def f = new File("${generatedSrcDir}/steambridge/BuildInfo.java")
-        f.parentFile.mkdirs()
-        f.text = """\
-package steambridge;
-/** Auto-generated at build time. Do not edit or commit. */
-public final class BuildInfo {
-    /** Full release id, e.g. {@code 1.145+mc1.12.2}. */
-    public static final String VERSION     = "${verFull}";
-    /** Mod-only version from {@code -PmodVersion}, e.g. {@code 1.145}. */
-    public static final String MOD_VERSION = "${verMod}";
-    /** Target Minecraft version baked at build time. */
-    public static final String MC_VERSION  = "${verMc}";
-    /** Embedded in bytecode - visible in hex/strings dump of the jar. */
-    public static final String AUTHOR      = "Ragalikx";
-    public static final String GITHUB      = "https://github.com/Ragalikx/steam-bridge-mc";
-    private BuildInfo() {}
-}
-"""
-    }
-}
-
-tasks.withType(JavaCompile) {
-    dependsOn generateBuildInfo
-    options.encoding = 'UTF-8'
-}
-
-minecraft {
-    mappings channel: 'stable', version: '39-1.12'
-    accessTransformer = file('src/main/resources/META-INF/accesstransformer.cfg')
-    runs {
-        client {
-            workingDirectory project.file('run')
-            property 'forge.logging.markers', 'SCAN,REGISTRIES,REGISTRYDUMP'
-            property 'forge.logging.console.level', 'debug'
-            mods { steambridge { source sourceSets.main } }
+    tasks.withType(Test).configureEach {
+        useJUnit()
+        testLogging { events 'failed', 'skipped'; exceptionFormat 'full' }
+        if (System.getenv('SBM_TEST_JAVA_HOME')) {
+            executable = new File(System.getenv('SBM_TEST_JAVA_HOME'),
+                    System.getProperty('os.name').toLowerCase().contains('win') ? 'bin/java.exe' : 'bin/java')
         }
     }
 }
 
-repositories {
-    mavenCentral()
-}
+tasks.named('check') { dependsOn subprojects.collect { it.tasks.named('check') } }
+tasks.named('assemble') { dependsOn subprojects.collect { it.tasks.named('assemble') } }
 
-configurations {
-    shade
-    compile.extendsFrom shade
-}
-
-dependencies {
-    minecraft 'net.minecraftforge:forge:1.12.2-14.23.5.2860'
-    shade('com.code-disaster.steamworks4j:steamworks4j:1.10.0') { transitive = false }
-    shade('net.java.dev.jna:jna:5.14.0')                        { transitive = false }
-}
-
-jar {
-    from('third_party_licenses') { into 'META-INF/licenses' }
-    from('LICENSE') { into 'META-INF/licenses'; rename { 'STEAMBRIDGE_MIT.txt' } }
-    exclude 'module-info.class'
-    exclude 'META-INF/versions/**'
-
-    // JNA slim: keep win32-x86-64 jnidispatch + needed classes only (same idea as Fabric).
-    exclude 'com/sun/jna/darwin*/**'
-    exclude 'com/sun/jna/linux*/**'
-    exclude 'com/sun/jna/sunos*/**'
-    exclude 'com/sun/jna/freebsd*/**'
-    exclude 'com/sun/jna/openbsd*/**'
-    exclude 'com/sun/jna/aix*/**'
-    exclude 'com/sun/jna/win32-x86/**'
-    exclude 'com/sun/jna/win32-aarch64/**'
-    exclude '**/ELFAnalyser*'
-    exclude 'com/sun/jna/win32/**'
-    exclude '**/Native$AWT*'
-    exclude '**/ptr/ShortByReference*'
-    exclude '**/ptr/DoubleByReference*'
-    exclude '**/ptr/ByteByReference*'
-    exclude '**/ptr/FloatByReference*'
-    exclude '**/ptr/IntByReference*'
-    exclude '**/ptr/NativeLongByReference*'
-    exclude '**/NativeLong.class'
-    exclude '**/WString.class'
-    exclude 'META-INF/AL2.0'
-    exclude 'META-INF/LGPL2.1'
-
-    exclude 'libsteam_api.dylib'
-    exclude 'libsteamworks4j.dylib'
-    exclude 'libsteam_api.so'
-    exclude 'libsteamworks4j.so'
-    exclude 'steam_api.dll'
-    exclude 'steamworks4j.dll'
-
-    exclude 'com/codedisaster/steamworks/SteamController*'
-    exclude 'com/codedisaster/steamworks/SteamHTTP*'
-    exclude 'com/codedisaster/steamworks/SteamLeaderboard*'
-    exclude 'com/codedisaster/steamworks/SteamMatchmaking*'
-    exclude 'com/codedisaster/steamworks/SteamNetworking*'
-    exclude 'com/codedisaster/steamworks/SteamPublishedFile*'
-    exclude 'com/codedisaster/steamworks/SteamRemoteStorage*'
-    exclude 'com/codedisaster/steamworks/SteamScreenshot*'
-    exclude 'com/codedisaster/steamworks/SteamServer*'
-    exclude 'com/codedisaster/steamworks/SteamUGC*'
-    exclude 'com/codedisaster/steamworks/SteamUserStats*'
-    exclude 'com/codedisaster/steamworks/SteamApps*'
-
-    manifest {
-        attributes([
-            "Specification-Title"   : "steambridge",
-            "Implementation-Title"  : "steambridge",
-            "Implementation-Version": version,
-            "Implementation-Vendor" : "Ragalikx",
-            "Implementation-URL"    : "https://github.com/Ragalikx/steam-bridge-mc",
-            "Built-By"              : "Ragalikx"
-        ])
-    }
-    from { configurations.shade.collect { it.isDirectory() ? it : zipTree(it) } }
-}
-
-processResources {
-    inputs.property 'version', project.version
-    inputs.property 'mcversion', project.ext.minecraft_version
-    from(sourceSets.main.resources.srcDirs) {
-        include 'mcmod.info'
-        expand 'version': project.version, 'mcversion': project.ext.minecraft_version
-    }
-    from(sourceSets.main.resources.srcDirs) { exclude 'mcmod.info' }
-}
-
-tasks.matching { it.name == 'build' }.configureEach {
-    doLast {
-        def libs = file("${buildDir}/libs")
-        def jars = libs.exists()
-            ? libs.listFiles({ d, n -> n.endsWith('.jar') && !n.endsWith('-sources.jar') } as FilenameFilter)
-            : null
-        logger.lifecycle("------------------------------------------------------------")
-        logger.lifecycle(" Steam Bridge (Forge {})  version = {}", project.ext.minecraft_version, project.version)
-        logger.lifecycle(" BuildInfo.VERSION / mcmod.info / jar Implementation-Version")
-        if (jars != null) {
-            jars.sort { a, b -> a.name <=> b.name }.each { j ->
-                logger.lifecycle(" Artifact: {}", j.absolutePath)
-            }
-        }
-        logger.lifecycle("------------------------------------------------------------")
-    }
-}
+apply from: 'build-logic/dependency-checks.gradle'

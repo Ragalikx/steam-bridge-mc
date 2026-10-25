@@ -1,0 +1,33 @@
+modLoader="javafml"
+loaderVersion="[1,)"
+license="MIT"
+issueTrackerURL="https://github.com/Ragalikx/steam-bridge-mc/issues"
+
+[[mods]]
+modId="steambridge_linux_runtime"
+version="${mod_version}"
+displayName="SBM Linux Runtime"
+authors="Ragalikx"
+displayTest="IGNORE_ALL_VERSION"
+description='''Linux x64 Steam library for Steam Bridge on NeoForge 26.1, 26.2 and 26.3. Requires Steam Bridge.'''
+
+[[dependencies.steambridge_linux_runtime]]
+modId="steambridge"
+type="required"
+versionRange="[0,)"
+ordering="NONE"
+side="CLIENT"
+
+[[dependencies.steambridge_linux_runtime]]
+modId="neoforge"
+type="required"
+versionRange="[26.1,26.4)"
+ordering="NONE"
+side="CLIENT"
+
+[[dependencies.steambridge_linux_runtime]]
+modId="minecraft"
+type="required"
+versionRange="[26.1,26.4)"
+ordering="NONE"
+side="CLIENT"

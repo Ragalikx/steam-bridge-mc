@@ -1,0 +1,92 @@
+[
+  {
+    "id": "forge-1.7.10",
+    "sourceBranch": "Forge-1.7.10",
+    "sourceCommit": "067fee7181d86971081d5e0de287519f36e24ead",
+    "runtimeJava": 8,
+    "buildJava": 8
+  },
+  {
+    "id": "forge-1.8.9",
+    "sourceBranch": "Forge-1.8.9",
+    "sourceCommit": "25189cab419a3a5647f0cf61e65f32e72b741593",
+    "runtimeJava": 8,
+    "buildJava": 8
+  },
+  {
+    "id": "forge-1.12.2",
+    "sourceBranch": "Forge-1.12.2",
+    "sourceCommit": "a090f5d35285aa7d0972fd9a07155081a8daad26",
+    "runtimeJava": 8,
+    "buildJava": 8
+  },
+  {
+    "id": "forge-1.16.5",
+    "sourceBranch": "Forge-1.16.5",
+    "sourceCommit": "6f5d802c95c1421681ae41308f92daac83f958bb",
+    "runtimeJava": 8,
+    "buildJava": 17
+  },
+  {
+    "id": "forge-1.19.2",
+    "sourceBranch": "Forge-1.19.2",
+    "sourceCommit": "f4d899a1166b9d494e354b3852d9a6d5a0e188af",
+    "runtimeJava": 17,
+    "buildJava": 17
+  },
+  {
+    "id": "fabric-1.16.5",
+    "sourceBranch": "Fabric-1.16.5",
+    "sourceCommit": "45e2f37dc59f90054a2b68e46dfdfd453f14d534",
+    "runtimeJava": 8,
+    "buildJava": 17
+  },
+  {
+    "id": "fabric-1.19.2",
+    "sourceBranch": "Fabric-1.19.2",
+    "sourceCommit": "5abb95c420cbeb0aa468e240a47bb69e02798061",
+    "runtimeJava": 17,
+    "buildJava": 17
+  },
+  {
+    "id": "fabric-1.20.1",
+    "sourceBranch": "Fabric-1.20.1",
+    "sourceCommit": "44ec5685278073125efca964dc43f8805cbacbdb",
+    "runtimeJava": 17,
+    "buildJava": 17
+  },
+  {
+    "id": "fabric-1.21.1",
+    "sourceBranch": "Fabric-1.21.1",
+    "sourceCommit": "24408a6c4f63edb01b338e29f91172933b396bc4",
+    "runtimeJava": 21,
+    "buildJava": 21
+  },
+  {
+    "id": "neoforge-1.20.1",
+    "sourceBranch": "NeoForge-1.20.1",
+    "sourceCommit": "806249bb970893031d7b4caa387e71a9b18fd878",
+    "runtimeJava": 17,
+    "buildJava": 17
+  },
+  {
+    "id": "neoforge-1.21.1",
+    "sourceBranch": "NeoForge-1.21.1",
+    "sourceCommit": "a9d3a33c5c5a12194562bb41f69b4ba8b262c9f1",
+    "runtimeJava": 21,
+    "buildJava": 21
+  },
+  {
+    "id": "neoforge-26.x",
+    "sourceBranch": "26.x",
+    "sourceCommit": null,
+    "runtimeJava": 25,
+    "buildJava": 25,
+    "nativeBackend": "panama",
+    "minecraftVersions": [
+      "26.1",
+      "26.2",
+      "26.3"
+    ]
+  }
+]

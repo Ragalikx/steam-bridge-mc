@@ -1,0 +1,116 @@
+plugins {
+    id 'java-library'
+    id 'net.neoforged.moddev' version '2.0.148'
+}
+
+def targets = new groovy.json.JsonSlurper().parse(file('targets.json'))
+def target = (findProperty('mcTarget') ?: '26.1').toString()
+if (!targets.containsKey(target)) throw new GradleException("Unsupported Minecraft target: ${target}")
+layout.buildDirectory = file('build/targets/' + target)
+group = 'steambridge'
+version = (findProperty('modVersion') ?: '0.0.0-dev').toString().replaceFirst('^v', '') + '+mc26x'
+base { archivesName = 'steambridge-neoforge-26x' }
+java.toolchain.languageVersion = JavaLanguageVersion.of(25)
+neoForge {
+    version = targets[target]
+    runs { client { client() } }
+    mods { steambridge { sourceSet(sourceSets.main) } }
+}
+repositories { mavenCentral() }
+configurations { steamBundle }
+dependencies {
+    implementation 'steambridge:steambridge-panama:0.0.0-dev'
+    steamBundle 'com.code-disaster.steamworks4j:steamworks4j:1.10.0'
+
+}
+tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
+tasks.register('generateBuildInfo') {
+    def output = layout.buildDirectory.dir('generated/java')
+    outputs.dir(output)
+    inputs.property('version', project.version)
+    doLast {
+        def source = new File(output.get().asFile, 'steambridge/BuildInfo.java')
+        source.parentFile.mkdirs()
+        source.text = """package steambridge;
+public final class BuildInfo {
+    public static final String VERSION = "${project.version}";
+    public static final String MOD_VERSION = "${project.version.toString().split('\\+')[0]}";
+    public static final String MC_VERSION = "26.x";
+    public static final String AUTHOR = "Ragalikx";
+    public static final String GITHUB = "https://github.com/Ragalikx/steam-bridge-mc";
+    private BuildInfo() {}
+}
+"""
+    }
+}
+def adapterSources = layout.buildDirectory.dir('generated/adapter')
+tasks.register('generateVersionAdapter', Exec) {
+    inputs.files(fileTree('src/main/java'), file('../../tools/generate_26x_adapter.py'))
+    inputs.property('target', target)
+    outputs.dir(adapterSources)
+    commandLine((findProperty('pythonExecutable') ?: 'python').toString(), '../../tools/generate_26x_adapter.py', target, adapterSources.get().asFile)
+}
+sourceSets.main.java.setSrcDirs(['src/bootstrap/java', layout.buildDirectory.dir('generated/java'), adapterSources])
+
+sourceSets {
+    linuxRuntime {
+        java.setSrcDirs(['src/linuxRuntime/java'])
+        resources.setSrcDirs(['src/linuxRuntime/resources'])
+        compileClasspath += sourceSets.main.compileClasspath
+    }
+}
+
+tasks.named('processLinuxRuntimeResources') {
+    inputs.property('mod_version', project.version)
+    filesMatching('META-INF/neoforge.mods.toml') { expand(mod_version: project.version) }
+}
+
+def linuxLock = new groovy.json.JsonSlurper().parse(file('../../tools/linux-runtime.json'))
+tasks.register('verifyLinuxNative') {
+    inputs.files(configurations.steamBundle, file('../../tools/linux-runtime.json'))
+    doLast {
+        new java.util.zip.ZipFile(configurations.steamBundle.singleFile).withCloseable { archive ->
+            def bytes = archive.getInputStream(archive.getEntry(linuxLock.file)).withCloseable { it.bytes }
+            def digest = java.security.MessageDigest.getInstance('SHA-256').digest(bytes).encodeHex().toString()
+            if (digest != linuxLock.sha256 || bytes.length != linuxLock.bytes)
+                throw new GradleException('SBM Linux native checksum mismatch')
+        }
+    }
+}
+
+tasks.register('linuxRuntimeJar', Jar) {
+    dependsOn tasks.named('linuxRuntimeClasses'), tasks.named('verifyLinuxNative')
+    archiveBaseName = 'steambridge-linux-runtime-neoforge-26x'
+    from sourceSets.linuxRuntime.output
+    from({ configurations.steamBundle.collect { zipTree(it) } }) {
+        include linuxLock.file
+        into 'steambridge/linux-runtime/linux-x64'
+    }
+    from('third_party_licenses') { into 'META-INF/licenses' }
+    from('LICENSE') { into 'META-INF/licenses'; rename { 'STEAMBRIDGE_MIT.txt' } }
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+    manifest { attributes('Implementation-Vendor':'Ragalikx', 'Implementation-Version':project.version,
+            'Automatic-Module-Name':'steambridge.linuxruntime') }
+}
+tasks.named('build') { dependsOn tasks.named('linuxRuntimeJar') }
+tasks.named('compileJava') { dependsOn 'generateVersionAdapter' }
+tasks.named('compileJava') { dependsOn 'generateBuildInfo' }
+tasks.named('processResources') {
+    def properties = [mod_id:'steambridge', mod_name:'Steam Bridge', mod_version:project.version,
+        loader_version_range:'[1,)', neo_version_range:'[26.1,26.4)', minecraft_version_range:'[26.1,26.4)']
+    inputs.properties(properties)
+    filesMatching(['META-INF/neoforge.mods.toml', 'pack.mcmeta']) { expand(properties) }
+}
+jar {
+    dependsOn configurations.runtimeClasspath
+    from({ configurations.steamBundle.collect { zipTree(it) } }) {
+        include 'steam_api64.dll'
+    }
+    from('third_party_licenses') { into 'META-INF/licenses' }
+    from('LICENSE') { into 'META-INF/licenses'; rename { 'STEAMBRIDGE_MIT.txt' } }
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    manifest { attributes('Implementation-Vendor':'Ragalikx', 'Implementation-Version':project.version) }
+}
+jar { from { zipTree(configurations.runtimeClasspath.find { it.name == 'steambridge-panama-0.0.0-dev.jar' }) } }
+apply from: '../../build-logic/packaging.gradle'

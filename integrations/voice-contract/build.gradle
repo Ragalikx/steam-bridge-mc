@@ -1,0 +1,12 @@
+dependencies {
+    testImplementation project(':steam-jna')
+    testImplementation 'org.ow2.asm:asm-tree:9.11.1'
+}
+
+tasks.register('verifyVoiceTargets', JavaExec) {
+    dependsOn tasks.named('testClasses'), project(':steam-jna').tasks.named('classes')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'steambridge.voice.contract.VoiceContractProbe'
+    args(findProperty('voiceAdapterClasses') ?: project(':steam-jna').sourceSets.main.output.classesDirs.singleFile.absolutePath)
+    args((findProperty('voiceTargetJars') ?: '').split(java.io.File.pathSeparator).findAll { it })
+}

@@ -1,0 +1,26 @@
+def nativePlatform = (findProperty('nativePlatform') ?: 'windows-x64').toString()
+if (nativePlatform != 'windows-x64') {
+    throw new GradleException('Only windows-x64 packages are currently supported')
+}
+def steamNatives = ['steam_api64.dll', 'steamworks4j64.dll']
+def jnaNativeFolder = 'win32-x86-64'
+
+tasks.withType(AbstractArchiveTask) {
+    def archivePlatform = name == 'linuxRuntimeJar' ? 'linux-x64' : nativePlatform
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+    inputs.property('nativePlatform', archivePlatform)
+    inputs.property('jnaBootstrapPlatforms', ['win32-x86-64', 'linux-x86-64'])
+    exclude { entry ->
+        if (archivePlatform == 'linux-x64') return false
+        def path = entry.relativePath.pathString
+        if (path.startsWith('com/sun/jna/') && (path.endsWith('.dll') || path.endsWith('.so') || path.endsWith('.jnilib') || path.endsWith('.a'))) {
+            return !path.startsWith("com/sun/jna/${jnaNativeFolder}/") && !path.startsWith('com/sun/jna/linux-x86-64/')
+        }
+        if (path ==~ /(?:lib)?steam(?:_api|works4j)(?:64)?\.(?:dll|so|dylib)/) return !steamNatives.contains(path)
+        return false
+    }
+}
+tasks.withType(JavaCompile) {
+    options.debugOptions.debugLevel = 'source,lines'
+}

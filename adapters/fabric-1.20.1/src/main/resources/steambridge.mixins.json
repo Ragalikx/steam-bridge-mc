@@ -1,0 +1,14 @@
+{
+  "required": true,
+  "package": "steambridge.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "client": [
+    "MinecraftMixin",
+    "MinecraftAccessor",
+    "ConnectScreenMixin",
+    "ServerLoginHelloMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

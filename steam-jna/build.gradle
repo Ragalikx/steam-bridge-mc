@@ -1,0 +1,21 @@
+dependencies {
+    for (module in ['common', 'client', 'server', 'server-proxy-common']) {
+        compileOnly("su.plo.voice.api:${module}:2.1.17") { transitive = false }
+        testImplementation("su.plo.voice.api:${module}:2.1.17") { transitive = false }
+    }
+    compileOnly('su.plo.voice:protocol:2.1.17') { transitive = false }
+    testImplementation('su.plo.voice:protocol:2.1.17') { transitive = false }
+    testImplementation 'com.google.guava:guava:17.0'
+    testImplementation 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
+    api project(':core')
+    compileOnly 'de.maxhenkel.voicechat:voicechat-api:2.5.0'
+    testImplementation 'de.maxhenkel.voicechat:voicechat-api:2.5.0'
+    api 'net.java.dev.jna:jna:4.4.0'
+    compileOnly 'com.code-disaster.steamworks4j:steamworks4j:1.10.0'
+    compileOnly 'io.netty:netty-all:4.0.23.Final'
+    compileOnly 'org.apache.logging.log4j:log4j-api:2.17.2'
+    testImplementation 'com.code-disaster.steamworks4j:steamworks4j:1.10.0'
+    testImplementation "net.java.dev.jna:jna:${findProperty('testJnaVersion') ?: '5.12.1'}"
+    testImplementation "io.netty:netty-all:${findProperty('testNettyVersion') ?: '4.0.23.Final'}"
+    testImplementation 'org.apache.logging.log4j:log4j-api:2.17.2'
+}
