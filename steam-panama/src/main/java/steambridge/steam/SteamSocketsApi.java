@@ -349,21 +349,10 @@ public final class SteamSocketsApi {
                                                     JAVA_INT,
                                                     SteamOffsets.REALTIME_PENDING_RELIABLE))
                             : 0,
-                    0,
                     ready ? metrics.get(JAVA_INT, SteamOffsets.REALTIME_PING) : -1,
-                    info.m_idPOPRemote,
-                    info.m_idPOPRelay,
-                    ready
-                            ? Math.max(
-                                    0, metrics.get(JAVA_FLOAT, SteamOffsets.REALTIME_RECEIVE_BYTES))
-                            : 0,
-                    ready
-                            ? Math.max(0, metrics.get(JAVA_FLOAT, SteamOffsets.REALTIME_SEND_BYTES))
-                            : 0,
                     ready
                             ? Math.max(0, metrics.get(JAVA_LONG, SteamOffsets.REALTIME_QUEUE_TIME))
-                            : 0,
-                    cString(info.m_szConnectionDescription));
+                            : 0);
         }
     }
 

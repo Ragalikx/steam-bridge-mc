@@ -56,15 +56,6 @@ public abstract class SteamProfileCache {
         }
     }
 
-    public void invalidate(long steamId) {
-        if (steamId == 0L) return;
-        personaNameBySteamId.remove(steamId);
-        releaseAvatar(steamId);
-        avatarIconBytesBySteamId.remove(steamId);
-        avatarIconB64BySteamId.remove(steamId);
-        avatarRetryAt.remove(steamId);
-    }
-
     public void invalidateAvatar(long steamId) {
         if (steamId == 0L) return;
         releaseAvatar(steamId);

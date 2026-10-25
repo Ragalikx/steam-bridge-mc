@@ -46,14 +46,8 @@ public class SteamReceiveLoopTest {
                     0,
                     "secret-ticket",
                     4096,
-                    0,
                     42,
-                    0,
-                    0,
-                    0,
-                    0,
-                    12000,
-                    "private-address");
+                    12000);
         }
     }
 

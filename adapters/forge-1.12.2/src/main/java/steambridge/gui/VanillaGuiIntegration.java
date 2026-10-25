@@ -696,7 +696,7 @@ public class VanillaGuiIntegration {
                     return;
                 }
 
-                SteamServer server = new SteamServer(pendingAccessPolicy, worldKey, "World");
+                SteamServer server = new SteamServer(pendingAccessPolicy, worldKey);
                 server.setTransportMode(pendingTransportMode);
                 if (port != null) {
                     try {

@@ -53,7 +53,7 @@ public class SteamUdpProxyTest {
 
     private SteamConnectionStatus status(int handle, int state) {
         return new SteamConnectionStatus(
-                1, handle, true, false, false, false, state, 1000, "", 0, 0, -1, 0, 0, 0, 0, 0, "");
+                1, handle, true, false, false, false, state, 1000, "", 0, -1, 0);
     }
 
     @Test

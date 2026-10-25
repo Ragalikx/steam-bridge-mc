@@ -706,7 +706,7 @@ public class VanillaGuiIntegration {
                 // Prefer binding Steam first so a listen-socket failure does not leave the
                 // world permanently published with a dead Open-to-LAN button. If the world
                 // is already public (retry after a previous partial start), skip re-publish.
-                SteamServer server = new SteamServer(pendingAccessPolicy, worldKey, "World");
+                SteamServer server = new SteamServer(pendingAccessPolicy, worldKey);
                 server.setTransportMode(pendingTransportMode);
                 boolean alreadyPublic = mc.getIntegratedServer().getPublic();
                 String port = null;

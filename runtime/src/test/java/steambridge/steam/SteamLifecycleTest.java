@@ -15,7 +15,7 @@ public class SteamLifecycleTest {
 
     private SteamConnectionStatus status(int handle, int state) {
         return new SteamConnectionStatus(
-                1, handle, true, false, false, false, state, 1000, "", 0, 0, -1, 0, 0, 0, 0, 0, "");
+                1, handle, true, false, false, false, state, 1000, "", 0, -1, 0);
     }
 
     @Test
@@ -202,7 +202,7 @@ public class SteamLifecycleTest {
         final SteamBanStore bans;
 
         FakeServer(FakeRuntime runtime, File file) {
-            super(AccessPolicy.EVERYONE, "world", "World");
+            super(AccessPolicy.EVERYONE, "world");
             this.runtime = runtime;
             bans =
                     new SteamBanStore() {

@@ -9,6 +9,8 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 import steambridge.core.InboundMessage;
 import steambridge.core.MemoryBudget;
 import steambridge.core.QueueLimits;
+import steambridge.core.SendQueueState;
+import steambridge.core.SendWindow;
 
 import java.util.ArrayDeque;
 import java.util.concurrent.ScheduledFuture;
@@ -23,8 +25,8 @@ public final class LoopbackBridge extends ChannelInboundHandlerAdapter {
     public interface Driver {
         int sendMessageFromByteBuf(int connection, ByteBuf data, int length);
 
-        default steambridge.core.SendQueueState sendQueueState(int connection) {
-            return steambridge.core.SendQueueState.UNKNOWN;
+        default SendQueueState sendQueueState(int connection) {
+            return SendQueueState.UNKNOWN;
         }
 
         void onBridgeClosed(LoopbackBridge bridge, boolean closeSteam, String reason);
@@ -43,7 +45,7 @@ public final class LoopbackBridge extends ChannelInboundHandlerAdapter {
     private final long inboundLimit;
     private final long outboundLimit;
     private final MemoryBudget memory;
-    private final steambridge.core.SendWindow sendWindow = new steambridge.core.SendWindow();
+    private final SendWindow sendWindow = new SendWindow();
     private final AtomicBoolean closed = new AtomicBoolean();
     private final AtomicInteger finishing = new AtomicInteger();
     private final AtomicLong inboundBytes = new AtomicLong();
@@ -194,7 +196,7 @@ public final class LoopbackBridge extends ChannelInboundHandlerAdapter {
             try {
                 long now = System.nanoTime();
                 if (sendWindow.pollDue(now)) {
-                    steambridge.core.SendQueueState state = driver.sendQueueState(connection);
+                    SendQueueState state = driver.sendQueueState(connection);
                     sendWindow.update(state, now);
                     if (state != null && state.known) {
                         peakQueueMicros = Math.max(peakQueueMicros, state.queueMicros);

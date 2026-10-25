@@ -19,14 +19,8 @@ public class SteamCallbackTest {
                         0,
                         "",
                         0,
-                        0,
                         20,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        "");
+                        0);
         SteamOffsets.SteamNetConnectionStatusChangedCallback event =
                 new SteamOffsets.SteamNetConnectionStatusChangedCallback();
         event.m_info.m_eState = SteamSocketsApi.STATE_CLOSED_BY_PEER;

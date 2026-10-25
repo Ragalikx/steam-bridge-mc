@@ -54,7 +54,6 @@ public final class SteamTransport {
 
     private SteamTransport() {}
 
-    private static volatile java.lang.reflect.Field CACHED_NM_CHANNEL_FIELD = null;
     private static volatile java.lang.reflect.Field CACHED_NM_SOCKET_FIELD = null;
 
     private static java.lang.reflect.Field findFieldByType(Class<?> clazz, Class<?> type) {
@@ -66,16 +65,6 @@ public final class SteamTransport {
         }
         throw new RuntimeException(
                 "Could not find field of type " + type.getName() + " in " + clazz.getName());
-    }
-
-    private static void setNmChannel(NetworkManager nm, Channel ch) {
-        try {
-            if (CACHED_NM_CHANNEL_FIELD == null)
-                CACHED_NM_CHANNEL_FIELD = findFieldByType(NetworkManager.class, Channel.class);
-            CACHED_NM_CHANNEL_FIELD.set(nm, ch);
-        } catch (IllegalAccessException e) {
-            throw new RuntimeException("Failed to set NetworkManager channel field", e);
-        }
     }
 
     private static void setNmSocketAddress(NetworkManager nm, java.net.SocketAddress addr) {
@@ -251,7 +240,7 @@ public final class SteamTransport {
 
             SteamBridgeMod.LOG.info(
                     "[LoopbackBridge][Client] Connected to loopback proxy. proxyPort={} conn={}"
-                        + " steamID={}",
+                            + " steamID={}",
                     proxyPort,
                     connectionHandle,
                     remoteSteamID);

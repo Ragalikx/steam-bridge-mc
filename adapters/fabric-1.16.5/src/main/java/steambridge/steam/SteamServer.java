@@ -6,11 +6,7 @@ public final class SteamServer extends SteamServerBase {
     }
 
     public SteamServer(AccessPolicy policy, String key) {
-        super(policy, key, key);
-    }
-
-    public SteamServer(AccessPolicy policy, String key, String name) {
-        super(policy, key, name);
+        super(policy, key);
     }
 
     @Override

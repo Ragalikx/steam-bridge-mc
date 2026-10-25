@@ -50,9 +50,6 @@ public abstract class SteamServerBase implements SteamGameServer {
         private final long steamId;
         private final String steamName;
         private final String minecraftName;
-        private final int connectionHandle;
-        private final int localProxyPort;
-        private final long connectedAtMs;
         private final long kickRemainingMs;
         private final SteamConnectionStatus connectionStatus;
 
@@ -60,17 +57,11 @@ public abstract class SteamServerBase implements SteamGameServer {
                 long steamId,
                 String steamName,
                 String minecraftName,
-                int connectionHandle,
-                int localProxyPort,
-                long connectedAtMs,
                 long kickRemainingMs,
                 SteamConnectionStatus connectionStatus) {
             this.steamId = steamId;
             this.steamName = steamName;
             this.minecraftName = minecraftName;
-            this.connectionHandle = connectionHandle;
-            this.localProxyPort = localProxyPort;
-            this.connectedAtMs = connectedAtMs;
             this.kickRemainingMs = kickRemainingMs;
             this.connectionStatus = connectionStatus;
         }
@@ -87,18 +78,6 @@ public abstract class SteamServerBase implements SteamGameServer {
             return minecraftName;
         }
 
-        public int getConnectionHandle() {
-            return connectionHandle;
-        }
-
-        public int getLocalProxyPort() {
-            return localProxyPort;
-        }
-
-        public long getConnectedAtMs() {
-            return connectedAtMs;
-        }
-
         public long getKickRemainingMs() {
             return kickRemainingMs;
         }
@@ -110,10 +89,8 @@ public abstract class SteamServerBase implements SteamGameServer {
 
     private static final class PlayerSession {
         private final long steamId;
-        private final long connectedAtMs = System.currentTimeMillis();
 
         private volatile int connectionHandle;
-        private volatile int localProxyPort = -1;
         private volatile String minecraftName = "";
 
         private PlayerSession(long steamId, int connectionHandle) {
@@ -137,10 +114,9 @@ public abstract class SteamServerBase implements SteamGameServer {
     private volatile int mcPort = 25565;
     private volatile boolean running = false;
     private volatile int listenSocket = 0;
-    private volatile AccessPolicy accessPolicy = AccessPolicy.EVERYONE;
+    private final AccessPolicy accessPolicy;
     private volatile TransportMode transportMode = TransportMode.AUTO;
-    private volatile String worldKey = "__default_world__";
-    private volatile String worldDisplayName = "World";
+    private final String worldKey;
 
     private final ConcurrentMap<Integer, Long> steamIdByConnection = new ConcurrentHashMap<>();
     private final ConcurrentMap<Long, Integer> connectionBySteamId = new ConcurrentHashMap<>();
@@ -150,11 +126,13 @@ public abstract class SteamServerBase implements SteamGameServer {
     private final ConcurrentMap<Long, Long> kickBlockedUntilBySteamId = new ConcurrentHashMap<>();
     private final Set<Integer> acceptedConnections = ConcurrentHashMap.newKeySet();
 
-    protected SteamServerBase() {}
+    protected SteamServerBase() {
+        this(AccessPolicy.EVERYONE, "__default_world__");
+    }
 
-    protected SteamServerBase(AccessPolicy accessPolicy, String worldKey, String worldDisplayName) {
+    protected SteamServerBase(AccessPolicy accessPolicy, String worldKey) {
         this.accessPolicy = accessPolicy != null ? accessPolicy : AccessPolicy.EVERYONE;
-        setWorldIdentity(worldKey, worldDisplayName);
+        this.worldKey = sanitizeWorldValue(worldKey, "__default_world__");
     }
 
     public void setMcPort(int port) {
@@ -163,37 +141,12 @@ public abstract class SteamServerBase implements SteamGameServer {
         steambridge.proxy.SteamUdpProxy.getInstance().setHostGamePort(port);
     }
 
-    public int getMcPort() {
-        return mcPort;
-    }
-
-    public void setAccessPolicy(AccessPolicy accessPolicy) {
-        this.accessPolicy = accessPolicy != null ? accessPolicy : AccessPolicy.EVERYONE;
-    }
-
-    public AccessPolicy getAccessPolicy() {
-        return accessPolicy;
-    }
-
     public void setTransportMode(TransportMode mode) {
         this.transportMode = mode != null ? mode : TransportMode.AUTO;
     }
 
-    public TransportMode getTransportMode() {
-        return transportMode;
-    }
-
-    public void setWorldIdentity(String worldKey, String worldDisplayName) {
-        this.worldKey = sanitizeWorldValue(worldKey, "__default_world__");
-        this.worldDisplayName = sanitizeWorldValue(worldDisplayName, "World");
-    }
-
     public String getWorldKey() {
         return worldKey;
-    }
-
-    public String getWorldDisplayName() {
-        return worldDisplayName;
     }
 
     protected synchronized boolean startHost() {
@@ -331,22 +284,6 @@ public abstract class SteamServerBase implements SteamGameServer {
             createBridge(connection, steamID);
             return;
         }
-
-        if (status.isTerminal()) {
-            LOG.info(
-                    "[SteamServer] Terminal state for conn={} steamID={} err={}",
-                    connection,
-                    steamID,
-                    status.getLastError());
-            String name = displayName(steamID);
-            String err = status.getLastError();
-            LOG.info(
-                    "Disconnected: {} (steamID={}){}",
-                    steambridge.core.LogText.safe(name),
-                    steamID,
-                    err.isEmpty() ? "" : " - " + steambridge.core.LogText.safe(err));
-            cleanupConnection(connection, steamID);
-        }
     }
 
     public void onMessageReceived(int connection, long steamID, byte[] data) {
@@ -370,14 +307,6 @@ public abstract class SteamServerBase implements SteamGameServer {
         return running;
     }
 
-    public int getPlayerCount() {
-        return sessionsBySteamId.size();
-    }
-
-    public List<Long> getConnectedSteamIDs() {
-        return new ArrayList<>(connectionBySteamId.keySet());
-    }
-
     public SteamConnectionStatus getConnectionStatus(long steamID) {
         return runtime().getConnectionStatus(steamID);
     }
@@ -394,9 +323,6 @@ public abstract class SteamServerBase implements SteamGameServer {
                             session.steamId,
                             displayName(session.steamId),
                             session.minecraftName,
-                            session.connectionHandle,
-                            session.localProxyPort,
-                            session.connectedAtMs,
                             kickRemaining,
                             status));
         }
@@ -555,7 +481,6 @@ public abstract class SteamServerBase implements SteamGameServer {
                                         steamID,
                                         mcPort,
                                         localPort -> {
-                                            session.localProxyPort = localPort;
                                             steamIdByProxyPort.put(localPort, steamID);
                                             proxyPortByConnection.put(connection, localPort);
                                         });

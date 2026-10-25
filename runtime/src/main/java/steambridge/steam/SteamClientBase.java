@@ -8,6 +8,10 @@ package steambridge.steam;
 import com.codedisaster.steamworks.SteamID;
 import com.codedisaster.steamworks.SteamNativeHandle;
 
+import steambridge.core.Attempt;
+import steambridge.core.ConnectionRegistry;
+import steambridge.core.LogText;
+
 import java.util.Locale;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -27,7 +31,7 @@ public abstract class SteamClientBase<T> implements SteamGameClient {
 
     protected void clearMinecraftConnection() {}
 
-    private final steambridge.core.Attempt attempt = new steambridge.core.Attempt();
+    private final Attempt attempt = new Attempt();
     private final AtomicBoolean started = new AtomicBoolean();
 
     public enum State {
@@ -124,7 +128,7 @@ public abstract class SteamClientBase<T> implements SteamGameClient {
                                     host,
                                     steambridge.SteamBridgeConfig.settings().virtualPort,
                                     this,
-                                    steambridge.core.ConnectionRegistry.Kind.GAME);
+                                    ConnectionRegistry.Kind.GAME);
             final int createdHandle = connectionHandle;
             if (!isAttemptActive()) {
                 runtime()
@@ -318,7 +322,7 @@ public abstract class SteamClientBase<T> implements SteamGameClient {
                         + ")";
         LOG.info(
                 "[SteamClient] Minecraft world joined successfully. player={} dimension={} conn={}",
-                steambridge.core.LogText.safe(safeText(playerName, "?")),
+                LogText.safe(safeText(playerName, "?")),
                 dimension,
                 connectionHandle);
     }
@@ -331,14 +335,14 @@ public abstract class SteamClientBase<T> implements SteamGameClient {
             LOG.error(
                     "[SteamClient] Minecraft/Forge login rejected due to mod mismatch. reason='{}'"
                             + " details='{}'",
-                    steambridge.core.LogText.safe(cleanReason),
-                    steambridge.core.LogText.safe(cleanDetails));
+                    LogText.safe(cleanReason),
+                    LogText.safe(cleanDetails));
         } else {
             LOG.error(
                     "[SteamClient] Minecraft disconnect while using Steam transport. reason='{}'"
                             + " details='{}'",
-                    steambridge.core.LogText.safe(cleanReason),
-                    steambridge.core.LogText.safe(cleanDetails));
+                    LogText.safe(cleanReason),
+                    LogText.safe(cleanDetails));
         }
 
         if (state != State.IN_WORLD && state != State.IDLE) {
@@ -368,16 +372,8 @@ public abstract class SteamClientBase<T> implements SteamGameClient {
         connect(host, null);
     }
 
-    public SteamID getHostSteamID() {
-        return hostSteamID;
-    }
-
     public boolean isConnected() {
         return state == State.IN_WORLD;
-    }
-
-    public boolean isConnectingOrConnected() {
-        return isAlive();
     }
 
     public void setStatusMsg(String value) {
@@ -398,7 +394,7 @@ public abstract class SteamClientBase<T> implements SteamGameClient {
         if (!alive.compareAndSet(true, false)) return;
         attempt.cancel();
 
-        LOG.error("[SteamClient] FAIL: {}", steambridge.core.LogText.safe(msg));
+        LOG.error("[SteamClient] FAIL: {}", LogText.safe(msg));
         state = State.FAILED;
         statusMsg = TextColors.RED + msg;
         alive.set(false);

@@ -17,14 +17,8 @@ public final class SteamConnectionStatus {
     private final int endReason;
     private final String lastError;
     private final int bytesQueuedForSend;
-    private final int packetsQueuedForSend;
     private final int pingMs;
-    private final int remotePopId;
-    private final int relayPopId;
-    private final float inBytesPerSecond;
-    private final float outBytesPerSecond;
     private final long queueTimeMicros;
-    private final String description;
 
     public SteamConnectionStatus(
             long steamID,
@@ -37,14 +31,8 @@ public final class SteamConnectionStatus {
             int endReason,
             String lastError,
             int bytesQueuedForSend,
-            int packetsQueuedForSend,
             int pingMs,
-            int remotePopId,
-            int relayPopId,
-            float inBytesPerSecond,
-            float outBytesPerSecond,
-            long queueTimeMicros,
-            String description) {
+            long queueTimeMicros) {
         this.steamID = steamID;
         this.connectionHandle = connectionHandle;
         this.sessionKnown = sessionKnown;
@@ -55,14 +43,8 @@ public final class SteamConnectionStatus {
         this.endReason = endReason;
         this.lastError = lastError != null ? lastError : "";
         this.bytesQueuedForSend = bytesQueuedForSend;
-        this.packetsQueuedForSend = packetsQueuedForSend;
         this.pingMs = pingMs;
-        this.remotePopId = remotePopId;
-        this.relayPopId = relayPopId;
-        this.inBytesPerSecond = inBytesPerSecond;
-        this.outBytesPerSecond = outBytesPerSecond;
         this.queueTimeMicros = queueTimeMicros;
-        this.description = description != null ? description : "";
     }
 
     public static SteamConnectionStatus unavailable(long steamID, int connectionHandle) {
@@ -77,14 +59,8 @@ public final class SteamConnectionStatus {
                 0,
                 "",
                 0,
-                0,
                 -1,
-                0,
-                0,
-                0f,
-                0f,
-                0L,
-                "");
+                0L);
     }
 
     public static SteamConnectionStatus fromCallback(
@@ -111,14 +87,8 @@ public final class SteamConnectionStatus {
                 info.m_eEndReason,
                 error,
                 metrics.bytesQueuedForSend,
-                metrics.packetsQueuedForSend,
                 metrics.pingMs,
-                info.m_idPOPRemote,
-                info.m_idPOPRelay,
-                metrics.inBytesPerSecond,
-                metrics.outBytesPerSecond,
-                metrics.queueTimeMicros,
-                metrics.description);
+                metrics.queueTimeMicros);
     }
 
     public long getSteamID() {

@@ -373,14 +373,6 @@ public final class SteamClientEvents {
                 || screen instanceof TitleScreen;
     }
 
-    private static boolean isGenericDisconnectDuringLogin(SteamClient client) {
-        if (client == null) {
-            return false;
-        }
-        SteamClient.State state = client.getState();
-        return state == SteamClient.State.STEAM_READY || state == SteamClient.State.NEGOTIATING;
-    }
-
     private static DisconnectedScreen createModMismatchHintScreen() {
         return new DisconnectedScreen(
                 new JoinMultiplayerScreen(new TitleScreen()),

@@ -15,10 +15,6 @@ public final class SteamID {
         return value;
     }
 
-    public boolean isValid() {
-        return value != 0;
-    }
-
     @Override
     public String toString() {
         return Long.toUnsignedString(value);

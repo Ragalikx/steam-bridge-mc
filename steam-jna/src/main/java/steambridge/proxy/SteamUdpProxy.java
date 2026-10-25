@@ -491,11 +491,6 @@ public final class SteamUdpProxy implements steambridge.core.VoiceTransport {
         LOG.info("[UdpProxy] Client detected server voice port: {}", port);
     }
 
-    void setActiveClientImpl(steambridge.core.VoiceClient impl) {
-        activeClientImpl.set(impl);
-        loggedMissingClientImpl = false;
-    }
-
     steambridge.core.VoiceClient getActiveClientImpl() {
         return activeClientImpl.get();
     }

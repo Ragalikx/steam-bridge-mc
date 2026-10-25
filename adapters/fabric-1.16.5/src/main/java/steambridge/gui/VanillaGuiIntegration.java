@@ -665,7 +665,7 @@ public final class VanillaGuiIntegration {
         }
         HostAuth.applyAfterPublish(srv);
 
-        SteamServer server = new SteamServer(pendingAccessPolicy, worldKey, "World");
+        SteamServer server = new SteamServer(pendingAccessPolicy, worldKey);
         server.setTransportMode(pendingTransportMode);
         server.setMcPort(srv.getServerPort());
         server.start();

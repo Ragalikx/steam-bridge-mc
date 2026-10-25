@@ -7,7 +7,6 @@ package steambridge.proxy;
 
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
-import java.util.concurrent.atomic.AtomicLong;
 
 /** Host-side per-client UDP relay to local voice service. */
 final class UdpHostRelay {
@@ -25,8 +24,7 @@ final class UdpHostRelay {
     private volatile boolean running;
     private boolean stopped;
 
-    private final AtomicLong fromSteam = new AtomicLong();
-    private final AtomicLong toSteam = new AtomicLong();
+    private boolean loggedFirstReply;
     private volatile boolean loggedFirstForward;
     private volatile int lastTargetPort;
 
@@ -76,14 +74,6 @@ final class UdpHostRelay {
         if (t != null) t.interrupt();
     }
 
-    long packetsFromSteam() {
-        return fromSteam.get();
-    }
-
-    long packetsToSteam() {
-        return toSteam.get();
-    }
-
     void forwardToLocalService(byte[] data) {
         DatagramSocket s = socket;
         if (s == null || s.isClosed()) return;
@@ -100,7 +90,6 @@ final class UdpHostRelay {
                         proxy.describeVoiceTarget(),
                         data != null ? data.length : 0);
             }
-            fromSteam.incrementAndGet();
             s.send(new DatagramPacket(data, data.length, target));
         } catch (Exception e) {
             if (running) {
@@ -123,9 +112,9 @@ final class UdpHostRelay {
                 if (!packet.getSocketAddress().equals(proxy.resolveVoiceTarget())) continue;
                 byte[] data = new byte[packet.getLength()];
                 System.arraycopy(packet.getData(), packet.getOffset(), data, 0, packet.getLength());
-                long n = toSteam.incrementAndGet();
                 proxy.noteServerVoiceOut();
-                if (n == 1) {
+                if (!loggedFirstReply) {
+                    loggedFirstReply = true;
                     LOG.info(
                             "[UdpRelay] First svc->steam reply conn={} steamID={} bytes={}",
                             steamConn,

@@ -19,6 +19,14 @@ import com.codedisaster.steamworks.SteamUserCallback;
 import com.codedisaster.steamworks.SteamUtils;
 import com.codedisaster.steamworks.SteamUtilsCallback;
 
+import steambridge.core.CloseReason;
+import steambridge.core.ConnectionRegistry;
+import steambridge.core.DiagnosticReport;
+import steambridge.core.InboundMessage;
+import steambridge.core.LogText;
+import steambridge.core.NativeCallGate;
+import steambridge.core.ReceiveBackoff;
+import steambridge.core.SendQueueState;
 import steambridge.steam.SteamOffsets.SteamNetConnectionStatusChangedCallback;
 
 import java.util.Map;
@@ -38,11 +46,9 @@ public abstract class SteamRuntime<C extends SteamGameClient, S extends SteamGam
         return true;
     }
 
-    protected volatile steambridge.core.NativeCallGate jniGate =
-            new steambridge.core.NativeCallGate();
+    protected volatile NativeCallGate jniGate = new NativeCallGate();
     private final Object connectionLock = new Object();
-    private final steambridge.core.ConnectionRegistry connectionOwners =
-            new steambridge.core.ConnectionRegistry();
+    private final ConnectionRegistry connectionOwners = new ConnectionRegistry();
     private boolean openingConnection;
     private final java.util.ArrayDeque<SteamNetConnectionStatusChangedCallback> earlyStatuses =
             new java.util.ArrayDeque<SteamNetConnectionStatusChangedCallback>();
@@ -105,7 +111,7 @@ public abstract class SteamRuntime<C extends SteamGameClient, S extends SteamGam
             return running.get();
         }
 
-        jniGate = new steambridge.core.NativeCallGate();
+        jniGate = new NativeCallGate();
         LOG.info("[SteamManager] Loading Steam native libraries...");
         try {
             if (!loadNativeLibraries()) {
@@ -185,7 +191,7 @@ public abstract class SteamRuntime<C extends SteamGameClient, S extends SteamGam
         return true;
     }
 
-    private void scheduleShutdown(final steambridge.core.NativeCallGate runtime) {
+    private void scheduleShutdown(final NativeCallGate runtime) {
         Thread cleanup =
                 new Thread(
                         () -> {
@@ -277,7 +283,7 @@ public abstract class SteamRuntime<C extends SteamGameClient, S extends SteamGam
     }
 
     private void startCallbackThread() {
-        final steambridge.core.NativeCallGate runtime = jniGate;
+        final NativeCallGate runtime = jniGate;
         callbackThread =
                 new Thread(
                         () -> {
@@ -310,13 +316,12 @@ public abstract class SteamRuntime<C extends SteamGameClient, S extends SteamGam
     }
 
     private void startReceiveThread() {
-        final steambridge.core.NativeCallGate runtime = jniGate;
+        final NativeCallGate runtime = jniGate;
         receiveThread =
                 new Thread(
                         () -> {
                             LOG.info("[SteamManager] Receive thread started.");
-                            steambridge.core.ReceiveBackoff backoff =
-                                    new steambridge.core.ReceiveBackoff();
+                            ReceiveBackoff backoff = new ReceiveBackoff();
                             while (running.get()) {
                                 try {
 
@@ -390,7 +395,7 @@ public abstract class SteamRuntime<C extends SteamGameClient, S extends SteamGam
         }
     }
 
-    protected steambridge.core.InboundMessage[] pollMessages(int connection, int maximum) {
+    protected InboundMessage[] pollMessages(int connection, int maximum) {
         SteamSocketsApi api = socketsApi;
         return api == null ? null : api.receiveMessages(connection, maximum);
     }
@@ -420,7 +425,7 @@ public abstract class SteamRuntime<C extends SteamGameClient, S extends SteamGam
                 if (peerClosing.containsKey(connection)) return false;
                 int maximum = bridge.receiveBatchLimit(64);
                 if (maximum == 0) return false;
-                steambridge.core.InboundMessage[] batch = pollMessages(connection, maximum);
+                InboundMessage[] batch = pollMessages(connection, maximum);
                 if (batch == null || batch.length == 0) return false;
                 bridge.deliverBatchFromSteam(batch);
                 return true;
@@ -429,9 +434,9 @@ public abstract class SteamRuntime<C extends SteamGameClient, S extends SteamGam
         steambridge.proxy.SteamUdpProxy proxy = steambridge.proxy.SteamUdpProxy.getInstance();
         boolean client = proxy.ownsClientConn(connection);
         if (!client && !proxy.ownsServerConn(connection)) return false;
-        steambridge.core.InboundMessage[] batch = pollMessages(connection, 64);
+        InboundMessage[] batch = pollMessages(connection, 64);
         if (batch == null || batch.length == 0) return false;
-        for (steambridge.core.InboundMessage message : batch) {
+        for (InboundMessage message : batch) {
             if (message == null || message.getData().length == 0) continue;
             if (client) proxy.deliverFromSteamToClient(message.getData());
             else proxy.deliverFromSteamToServer(connection, message.getData());
@@ -447,8 +452,7 @@ public abstract class SteamRuntime<C extends SteamGameClient, S extends SteamGam
             for (int attempt = 0; attempt < 4; attempt++) {
                 int maximum = bridge.receiveBatchLimit(64);
                 if (maximum == 0) return false;
-                steambridge.core.InboundMessage[] batch =
-                        pollMessages(bridge.connectionHandle(), maximum);
+                InboundMessage[] batch = pollMessages(bridge.connectionHandle(), maximum);
                 if (batch == null || batch.length == 0) return true;
                 bridge.deliverBatchFromSteam(batch);
             }
@@ -583,9 +587,8 @@ public abstract class SteamRuntime<C extends SteamGameClient, S extends SteamGam
             signalReceiveWake();
         }
         if (status.getSteamID() != 0L) {
-            steambridge.core.ConnectionRegistry.Entry owner =
-                    connectionOwners.get(status.getConnectionHandle());
-            if ((owner != null && owner.kind() == steambridge.core.ConnectionRegistry.Kind.GAME)
+            ConnectionRegistry.Entry owner = connectionOwners.get(status.getConnectionHandle());
+            if ((owner != null && owner.kind() == ConnectionRegistry.Kind.GAME)
                     || (activeServer != null
                             && activeServer.ownsConnection(status.getConnectionHandle()))) {
                 connectionBySteamId.put(status.getSteamID(), status.getConnectionHandle());
@@ -606,7 +609,7 @@ public abstract class SteamRuntime<C extends SteamGameClient, S extends SteamGam
     }
 
     public boolean isFriend(long remoteSteamID) {
-        try (steambridge.core.NativeCallGate.Lease nativeLease = acquireNativeCall()) {
+        try (NativeCallGate.Lease nativeLease = acquireNativeCall()) {
             if (nativeLease == null) return false;
 
             SteamFriends friends = steamFriends;
@@ -628,7 +631,7 @@ public abstract class SteamRuntime<C extends SteamGameClient, S extends SteamGam
     }
 
     public void requestUserInformation(long remoteSteamID) {
-        try (steambridge.core.NativeCallGate.Lease nativeLease = acquireNativeCall()) {
+        try (NativeCallGate.Lease nativeLease = acquireNativeCall()) {
             if (nativeLease == null) return;
 
             SteamFriends friends = steamFriends;
@@ -665,24 +668,20 @@ public abstract class SteamRuntime<C extends SteamGameClient, S extends SteamGam
     }
 
     @Override
-    public steambridge.core.SendQueueState sendQueueState(int connection) {
+    public SendQueueState sendQueueState(int connection) {
         SteamSocketsApi api = socketsApi;
-        return api == null
-                ? steambridge.core.SendQueueState.UNKNOWN
-                : api.querySendQueue(connection);
+        return api == null ? SendQueueState.UNKNOWN : api.querySendQueue(connection);
     }
 
     public String diagnosticReport() {
         StringBuilder report = new StringBuilder("Steam Bridge diagnostics\n");
         report.append("java=")
-                .append(
-                        steambridge.core.LogText.safe(
-                                System.getProperty("java.runtime.version", "?")))
+                .append(LogText.safe(System.getProperty("java.runtime.version", "?")))
                 .append('\n');
         report.append("os=")
-                .append(steambridge.core.LogText.safe(System.getProperty("os.name", "?")))
+                .append(LogText.safe(System.getProperty("os.name", "?")))
                 .append(" arch=")
-                .append(steambridge.core.LogText.safe(System.getProperty("os.arch", "?")))
+                .append(LogText.safe(System.getProperty("os.arch", "?")))
                 .append('\n');
         report.append("initialized=")
                 .append(initialized)
@@ -737,7 +736,7 @@ public abstract class SteamRuntime<C extends SteamGameClient, S extends SteamGam
     public boolean saveDiagnostics() {
         try {
             java.nio.file.Path file =
-                    steambridge.core.DiagnosticReport.write(
+                    DiagnosticReport.write(
                             steambridge.SteamBridgeConfig.gameDirectory(), diagnosticReport());
             LOG.info("[SteamBridge] Diagnostics saved to {}", file);
             return true;
@@ -954,8 +953,7 @@ public abstract class SteamRuntime<C extends SteamGameClient, S extends SteamGam
         }
     }
 
-    public int connectP2P(
-            SteamID remote, int port, Object owner, steambridge.core.ConnectionRegistry.Kind kind) {
+    public int connectP2P(SteamID remote, int port, Object owner, ConnectionRegistry.Kind kind) {
         int handle;
         java.util.ArrayList<SteamNetConnectionStatusChangedCallback> pending;
         synchronized (connectionLock) {
@@ -1002,12 +1000,11 @@ public abstract class SteamRuntime<C extends SteamGameClient, S extends SteamGam
     private void finishBridge(
             LoopbackBridge bridge, boolean closeSteam, String reason, boolean linger) {
         int handle = bridge.connectionHandle();
-        lastBridgeOutcome =
-                steambridge.core.CloseReason.classify(reason) + " " + bridge.diagnosticSummary();
+        lastBridgeOutcome = CloseReason.classify(reason) + " " + bridge.diagnosticSummary();
         LOG.info(
                 "[SteamBridge] Bridge closed: conn={} reason={} {}",
                 handle,
-                steambridge.core.LogText.safe(reason),
+                LogText.safe(reason),
                 bridge.diagnosticSummary());
         if (peerClosing.remove(handle, bridge)) {
             SteamSocketsApi api = socketsApi;
@@ -1024,7 +1021,7 @@ public abstract class SteamRuntime<C extends SteamGameClient, S extends SteamGam
         if (server != null) server.onLocalBridgeClosed(handle);
     }
 
-    public steambridge.core.NativeCallGate.Lease acquireNativeCall() {
+    public NativeCallGate.Lease acquireNativeCall() {
         if (!initialized || !running.get()) return null;
         return jniGate.enter();
     }

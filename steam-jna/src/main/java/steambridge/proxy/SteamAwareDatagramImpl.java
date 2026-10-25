@@ -5,9 +5,6 @@ import steambridge.core.SteamDatagramSocketImpl;
 import java.net.InetAddress;
 
 final class SteamAwareDatagramImpl extends SteamDatagramSocketImpl {
-    private static final org.apache.logging.log4j.Logger LOG =
-            org.apache.logging.log4j.LogManager.getLogger("steambridge");
-
     SteamAwareDatagramImpl(final boolean voiceSocket) {
         super(
                 new Endpoint() {
