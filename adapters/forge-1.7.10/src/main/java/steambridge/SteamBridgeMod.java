@@ -33,7 +33,7 @@ public class SteamBridgeMod {
     public static final String NAME = "Steam Bridge";
     public static final String VERSION = BuildInfo.VERSION;
 
-    public static final Logger LOG = LogManager.getLogger(MODID);
+    public static final Logger LOG = LogManager.getLogger("steambridge");
 
     /**
      * Neutralises log4j message-lookup syntax in untrusted strings before logging (1.7.10 ships a
@@ -56,20 +56,20 @@ public class SteamBridgeMod {
 
     @Mod.EventHandler
     public void preInit(FMLPreInitializationEvent event) {
-        LOG.info("=== Steam Bridge pre-init (Forge {}) v{} ===", BuildInfo.MC_VERSION, VERSION);
+        LOG.debug("=== Steam Bridge pre-init (Forge {}) v{} ===", BuildInfo.MC_VERSION, VERSION);
         SteamBridgeConfig.load(event.getSuggestedConfigurationFile().getParentFile().toPath());
         proxy.preInit(event);
     }
 
     @Mod.EventHandler
     public void init(FMLInitializationEvent event) {
-        LOG.info("=== SteamBridge init (v{}) ===", VERSION);
+        LOG.debug("=== SteamBridge init (v{}) ===", VERSION);
         proxy.init(event);
     }
 
     @Mod.EventHandler
     public void postInit(FMLPostInitializationEvent event) {
-        LOG.info("=== SteamBridge postInit (v{}) ===", VERSION);
+        LOG.debug("=== SteamBridge postInit (v{}) ===", VERSION);
         proxy.postInit(event);
     }
 }

@@ -29,7 +29,7 @@ public class SteamClient extends SteamClientBase<Screen> {
             return;
         }
 
-        SteamBridgeMod.LOG.info(
+        SteamBridgeMod.LOG.debug(
                 "[SteamClient] Loopback proxy ready: conn={} steamID={} addr={}",
                 conn,
                 remoteSteamID,
@@ -67,7 +67,7 @@ public class SteamClient extends SteamClientBase<Screen> {
                                         return;
                                     }
                                     markSteamReady();
-                                    SteamBridgeMod.LOG.info(
+                                    SteamBridgeMod.LOG.debug(
                                             "[SteamClient] Loopback mode active - Steam"
                                                     + " transport is ready.");
                                 } else {

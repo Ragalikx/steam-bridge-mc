@@ -5,11 +5,16 @@
  */
 package steambridge.proxy;
 
+import steambridge.core.LogLimiter;
+import steambridge.core.ProblemLog;
+
 import java.io.IOException;
 import java.net.DatagramSocketImpl;
 import java.net.DatagramSocketImplFactory;
 
 public final class UdpInterceptFactory implements DatagramSocketImplFactory {
+    private static final LogLimiter LOG_LIMITER = new LogLimiter(32, 30_000);
+
     private static final org.apache.logging.log4j.Logger LOG =
             org.apache.logging.log4j.LogManager.getLogger("steambridge");
 
@@ -20,11 +25,14 @@ public final class UdpInterceptFactory implements DatagramSocketImplFactory {
         try {
             java.net.DatagramSocket.setDatagramSocketImplFactory(new UdpInterceptFactory());
             installed = true;
-            LOG.info(
+            LOG.debug(
                     "[UdpProxy] DatagramSocket factory installed - voice UDP sockets can use Steam"
                             + " tunnelling.");
         } catch (IOException e) {
-            LOG.warn(
+            ProblemLog.warn(
+                    LOG,
+                    LOG_LIMITER,
+                    "UdpInterceptFactory-warn-1",
                     "[UdpProxy] Failed to install DatagramSocket factory: {}. Another mod may have"
                             + " claimed it first. Voice tunnelling is unavailable.",
                     e.getMessage());

@@ -9,6 +9,8 @@ import net.minecraft.server.MinecraftServer;
 
 import steambridge.SteamBridgeConfig;
 import steambridge.SteamBridgeMod;
+import steambridge.core.LogLimiter;
+import steambridge.core.ProblemLog;
 
 /**
  * Auth policy for a world published over Steam.
@@ -19,6 +21,7 @@ import steambridge.SteamBridgeMod;
  * profile. We turn online-mode off after publish instead.
  */
 public final class HostAuth {
+    private static final LogLimiter LOG_LIMITER = new LogLimiter(32, 30_000);
 
     private HostAuth() {}
 
@@ -28,9 +31,14 @@ public final class HostAuth {
         }
         try {
             server.setOnlineMode(false);
-            SteamBridgeMod.LOG.info("[SteamHost] Online-mode disabled for Steam LAN.");
+            SteamBridgeMod.LOG.debug("[SteamHost] Online-mode disabled for Steam LAN.");
         } catch (Throwable t) {
-            SteamBridgeMod.LOG.warn("[SteamHost] Could not disable online-mode: {}", t.toString());
+            ProblemLog.warn(
+                    SteamBridgeMod.LOG,
+                    LOG_LIMITER,
+                    "HostAuth-warn-1",
+                    "[SteamHost] Could not disable online-mode: {}",
+                    t.toString());
         }
     }
 }

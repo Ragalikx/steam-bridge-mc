@@ -36,7 +36,7 @@ public class ConnectScreenMixin {
             TransferState transferState,
             CallbackInfo ci) {
         if (VanillaGuiIntegration.trySteamConnectFromServerData(parent, serverData)) {
-            SteamBridgeMod.LOG.info(
+            SteamBridgeMod.LOG.debug(
                     "Mixin: cancelled ConnectScreen.startConnecting for Steam address {}",
                     serverData != null ? serverData.ip : "?");
             ci.cancel();

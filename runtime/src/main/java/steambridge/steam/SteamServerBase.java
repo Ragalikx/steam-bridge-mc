@@ -5,6 +5,9 @@
  */
 package steambridge.steam;
 
+import steambridge.core.LogLimiter;
+import steambridge.core.ProblemLog;
+
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -15,6 +18,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 public abstract class SteamServerBase implements SteamGameServer {
+    private final LogLimiter LOG_LIMITER = new LogLimiter(32, 30_000);
+
     private static final org.apache.logging.log4j.Logger LOG =
             org.apache.logging.log4j.LogManager.getLogger("steambridge");
 
@@ -137,7 +142,7 @@ public abstract class SteamServerBase implements SteamGameServer {
 
     public void setMcPort(int port) {
         mcPort = port;
-        LOG.info("[SteamServer] MC port updated to {}", port);
+        LOG.debug("[SteamServer] MC port updated to {}", port);
         steambridge.proxy.SteamUdpProxy.getInstance().setHostGamePort(port);
     }
 
@@ -151,14 +156,14 @@ public abstract class SteamServerBase implements SteamGameServer {
 
     protected synchronized boolean startHost() {
         if (running) {
-            LOG.warn("[SteamServer] start() while already running - ignoring.");
+            LOG.debug("[SteamServer] start() while already running - ignoring.");
             return true;
         }
 
         SteamGameServer previous = runtime().getActiveServer();
         if (previous != null && previous != this && previous.isRunning()) previous.stop();
         if (!runtime().claimActiveServer(this)) {
-            LOG.warn("[SteamServer] Another host is starting.");
+            LOG.debug("[SteamServer] Another host is starting.");
             return false;
         }
         running = true;
@@ -185,19 +190,19 @@ public abstract class SteamServerBase implements SteamGameServer {
         if (voiceSupported() && steambridge.SteamBridgeConfig.settings().interceptUdp) {
             steambridge.proxy.SteamUdpProxy.getInstance().startServer();
         }
-        LOG.info(
+        LOG.debug(
                 "[SteamServer] Started. listenSocket={} SteamChannel (direct, no TCP) world={}"
                         + " access={}",
                 listenSocket,
                 worldKey,
                 accessPolicy);
-        LOG.info("Server started. World=" + worldKey + " access=" + accessPolicy);
+        LOG.debug("Server started. World=" + worldKey + " access=" + accessPolicy);
         return true;
     }
 
     public synchronized void stop() {
         if (!running) {
-            LOG.warn("[SteamServer] stop() while already stopped - ignoring.");
+            LOG.debug("[SteamServer] stop() while already stopped - ignoring.");
             return;
         }
 
@@ -223,7 +228,7 @@ public abstract class SteamServerBase implements SteamGameServer {
         proxyPortByConnection.clear();
         kickBlockedUntilBySteamId.clear();
         acceptedConnections.clear();
-        LOG.info("[SteamServer] Stopped.");
+        LOG.debug("[SteamServer] Stopped.");
     }
 
     public void onConnectionStatusChanged(
@@ -244,7 +249,7 @@ public abstract class SteamServerBase implements SteamGameServer {
         rememberConnection(connection, steamID);
         runtime().requestUserInformation(steamID);
 
-        LOG.info(
+        LOG.debug(
                 "[SteamServer] Connection callback: conn={} steamID={} state={} route={}",
                 connection,
                 steamID,
@@ -253,7 +258,7 @@ public abstract class SteamServerBase implements SteamGameServer {
 
         AccessDecision decision = evaluateAccess(steamID);
         if (!decision.allowed) {
-            LOG.info(
+            LOG.debug(
                     "[SteamServer] Rejecting conn={} steamID={} reason={}",
                     connection,
                     steamID,
@@ -266,13 +271,14 @@ public abstract class SteamServerBase implements SteamGameServer {
                 || status.getState() == SteamSocketsApi.STATE_FINDING_ROUTE) {
             if (acceptedConnections.add(connection)) {
                 boolean accepted = runtime().acceptConnection(connection);
-                LOG.info(
+                LOG.debug(
                         "[SteamServer] Accept incoming conn={} steamID={} accepted={}",
                         connection,
                         steamID,
                         accepted);
                 String name = displayName(steamID);
-                LOG.info("Incoming: {} (steamID={})", steambridge.core.LogText.safe(name), steamID);
+                LOG.debug(
+                        "Incoming: {} (steamID={})", steambridge.core.LogText.safe(name), steamID);
                 if (!accepted) {
                     closeAndCleanup(connection, steamID, "AcceptConnection failed");
                 }
@@ -295,7 +301,10 @@ public abstract class SteamServerBase implements SteamGameServer {
             return;
         }
 
-        LOG.warn(
+        ProblemLog.warn(
+                LOG,
+                LOG_LIMITER,
+                "SteamServerBase-warn-1",
                 "[SteamServer] Received {} byte(s) for conn={} steamID={} but no channel is"
                         + " registered.",
                 data.length,
@@ -345,7 +354,7 @@ public abstract class SteamServerBase implements SteamGameServer {
         String minecraftName = session != null ? session.minecraftName : "";
         bans().ban(worldKey, steamId, steamName, minecraftName);
         disconnectSteamPeer(steamId, "steambridge.disconnect.banned");
-        LOG.warn(
+        LOG.debug(
                 "Banned: {} (steamID={}){}",
                 steambridge.core.LogText.safe(steamName),
                 steamId,
@@ -358,7 +367,7 @@ public abstract class SteamServerBase implements SteamGameServer {
     public boolean unbanPlayer(long steamId) {
         boolean removed = steamId != 0L && bans().unban(worldKey, steamId);
         if (removed)
-            LOG.info(
+            LOG.debug(
                     "Unbanned: {} (steamID={})",
                     steambridge.core.LogText.safe(displayName(steamId)),
                     steamId);
@@ -376,7 +385,7 @@ public abstract class SteamServerBase implements SteamGameServer {
         kickBlockedUntilBySteamId.put(steamId, System.currentTimeMillis() + KICK_BLOCK_DURATION_MS);
         disconnectSteamPeer(steamId, "steambridge.disconnect.kicked");
 
-        LOG.info(
+        LOG.debug(
                 "Kicked: {} (steamID={}){}",
                 steambridge.core.LogText.safe(steamName),
                 steamId,
@@ -414,12 +423,12 @@ public abstract class SteamServerBase implements SteamGameServer {
         }
 
         session.minecraftName = minecraftName != null ? minecraftName.trim() : "";
-        LOG.info(
+        LOG.debug(
                 "[SteamServer] Attached MC identity '{}' to steamID={} via local port {}",
                 steambridge.core.LogText.safe(session.minecraftName),
                 steamId,
                 remoteAddress.getPort());
-        LOG.info(
+        LOG.debug(
                 "Player joined: {} (Steam: {}, steamID={})",
                 steambridge.core.LogText.safe(session.minecraftName),
                 steambridge.core.LogText.safe(displayName(steamId)),
@@ -456,7 +465,7 @@ public abstract class SteamServerBase implements SteamGameServer {
                         Integer oldConn = connectionBySteamId.get(steamID);
                         if (oldConn != null && oldConn != connection) {
                             if (runtime().isLoopbackRegistered(oldConn)) {
-                                LOG.info(
+                                LOG.debug(
                                         "[SteamServer] Proactively closing stale loopback bridge"
                                                 + " conn={} for reconnecting steamID={}",
                                         oldConn,
@@ -503,7 +512,7 @@ public abstract class SteamServerBase implements SteamGameServer {
                             return;
                         }
                         rememberConnection(connection, steamID);
-                        LOG.info(
+                        LOG.debug(
                                 "[SteamServer] Loopback bridge ready for conn={} steamID={}",
                                 connection,
                                 steamID);

@@ -36,6 +36,8 @@ import net.minecraft.world.level.storage.LevelResource;
 
 import steambridge.SteamAppIdHelper;
 import steambridge.SteamBridgeMod;
+import steambridge.core.LogLimiter;
+import steambridge.core.ProblemLog;
 import steambridge.steam.HostAuth;
 import steambridge.steam.SteamClient;
 import steambridge.steam.SteamManager;
@@ -46,6 +48,7 @@ import java.util.List;
 
 /** Injects Steam Bridge controls into vanilla multiplayer/LAN screens. */
 public final class VanillaGuiIntegration {
+    private static final LogLimiter LOG_LIMITER = new LogLimiter(32, 30_000);
 
     private VanillaGuiIntegration() {}
 
@@ -94,7 +97,7 @@ public final class VanillaGuiIntegration {
                 final String addr = sd.ip;
                 if (!SteamManager.getInstance().isInitialized()
                         && !SteamManager.getInstance().reinit()) {
-                    SteamBridgeMod.LOG.info(
+                    SteamBridgeMod.LOG.debug(
                             "Steam not running; opening launch screen before connect to {}", addr);
                     return new GuiSteamResync(
                             p,
@@ -163,7 +166,12 @@ public final class VanillaGuiIntegration {
             Button.OnPress original = GuiFields.BUTTON_PRESS.get(button);
             GuiFields.BUTTON_PRESS.set(button, wrapper.apply(original));
         } catch (RuntimeException failure) {
-            SteamBridgeMod.LOG.warn("Failed to wrap button onPress", failure);
+            ProblemLog.warn(
+                    SteamBridgeMod.LOG,
+                    LOG_LIMITER,
+                    "VanillaGuiIntegration-warn-1",
+                    "Failed to wrap button onPress",
+                    failure);
         }
     }
 
@@ -173,7 +181,7 @@ public final class VanillaGuiIntegration {
 
     private static GuiSteamConnecting beginSteamConnect(Screen parent, String steamAddr) {
         long steamId = Long.parseLong(extractSteamId(steamAddr));
-        SteamBridgeMod.LOG.info("Intercepted connection to SteamID: {}", steamId);
+        SteamBridgeMod.LOG.debug("Intercepted connection to SteamID: {}", steamId);
         SteamClient active = SteamManager.getInstance().getActiveClient();
         if (active != null) active.disconnect();
         SteamClient client = new SteamClient();
@@ -185,7 +193,7 @@ public final class VanillaGuiIntegration {
         Minecraft mc = Minecraft.getInstance();
         if (!SteamManager.getInstance().isInitialized()) {
             if (!SteamManager.getInstance().reinit()) {
-                SteamBridgeMod.LOG.info(
+                SteamBridgeMod.LOG.debug(
                         "Steam not running; opening launch screen before connect to {}", steamAddr);
                 mc.setScreen(
                         new GuiSteamResync(
@@ -210,7 +218,12 @@ public final class VanillaGuiIntegration {
                 GuiFields.CONNECT_CONNECTION.set(screen, null);
             }
         } catch (RuntimeException failure) {
-            SteamBridgeMod.LOG.warn("Could not abort ConnectScreen", failure);
+            ProblemLog.warn(
+                    SteamBridgeMod.LOG,
+                    LOG_LIMITER,
+                    "VanillaGuiIntegration-warn-2",
+                    "Could not abort ConnectScreen",
+                    failure);
         }
     }
 
@@ -554,8 +567,12 @@ public final class VanillaGuiIntegration {
                     SteamAppIdHelper.ensureAppId(mc.gameDirectory);
                     SteamAppIdHelper.launchSteam();
                 } catch (Exception e) {
-                    SteamBridgeMod.LOG.warn(
-                            "[SteamHost] Failed to launch Steam: {}", e.getMessage());
+                    ProblemLog.warn(
+                            SteamBridgeMod.LOG,
+                            LOG_LIMITER,
+                            "VanillaGuiIntegration-warn-3",
+                            "[SteamHost] Failed to launch Steam: {}",
+                            e.getMessage());
                 }
                 if (mc.player != null) {
                     mc.player.displayClientMessage(

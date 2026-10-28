@@ -19,6 +19,8 @@ import net.minecraftforge.client.event.GuiScreenEvent;
 
 import steambridge.SteamAppIdHelper;
 import steambridge.SteamBridgeMod;
+import steambridge.core.LogLimiter;
+import steambridge.core.ProblemLog;
 import steambridge.steam.HostAuth;
 import steambridge.steam.SteamClient;
 import steambridge.steam.SteamManager;
@@ -29,6 +31,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class VanillaGuiIntegration {
+    private static final LogLimiter LOG_LIMITER = new LogLimiter(32, 30_000);
 
     private static final int BTN_FRIENDS = 9002;
     private static final int BTN_STEAM_HOST = 9003;
@@ -88,8 +91,14 @@ public class VanillaGuiIntegration {
             f.setAccessible(true);
             return f;
         } catch (Exception e) {
-            SteamBridgeMod.LOG.warn(
-                    "Reflection field not found on {}: {}", owner.getSimpleName(), names[0], e);
+            ProblemLog.warn(
+                    SteamBridgeMod.LOG,
+                    LOG_LIMITER,
+                    "VanillaGuiIntegration-warn-1",
+                    "Reflection field not found on {}: {}",
+                    owner.getSimpleName(),
+                    names[0],
+                    e);
             return null;
         }
     }
@@ -102,7 +111,7 @@ public class VanillaGuiIntegration {
      */
     private static void beginSteamConnect(GuiScreen parent, String steamAddr) {
         long steamId = Long.parseLong(extractSteamId(steamAddr));
-        SteamBridgeMod.LOG.info("Intercepted connection to SteamID: {}", steamId);
+        SteamBridgeMod.LOG.debug("Intercepted connection to SteamID: {}", steamId);
         SteamClient active = SteamManager.getInstance().getActiveClient();
         if (active != null) active.disconnect();
         SteamClient client = new SteamClient();
@@ -374,7 +383,7 @@ public class VanillaGuiIntegration {
 
                 if (!SteamManager.getInstance().isInitialized()
                         && !SteamManager.getInstance().reinit()) {
-                    SteamBridgeMod.LOG.info(
+                    SteamBridgeMod.LOG.debug(
                             "Steam not running; opening launch screen before connect to {}",
                             steamAddr);
                     event.setCanceled(true);
@@ -387,7 +396,7 @@ public class VanillaGuiIntegration {
                 }
 
                 long steamId = Long.parseLong(extractSteamId(steamAddr));
-                SteamBridgeMod.LOG.info("Intercepted connection to SteamID: {}", steamId);
+                SteamBridgeMod.LOG.debug("Intercepted connection to SteamID: {}", steamId);
                 SteamClient active = SteamManager.getInstance().getActiveClient();
                 if (active != null) active.disconnect();
                 SteamClient client = new SteamClient();
@@ -669,8 +678,12 @@ public class VanillaGuiIntegration {
                             SteamAppIdHelper.ensureAppId(mc.mcDataDir);
                             SteamAppIdHelper.launchSteam();
                         } catch (Exception e) {
-                            SteamBridgeMod.LOG.warn(
-                                    "[SteamHost] Failed to launch Steam: {}", e.getMessage());
+                            ProblemLog.warn(
+                                    SteamBridgeMod.LOG,
+                                    LOG_LIMITER,
+                                    "VanillaGuiIntegration-warn-2",
+                                    "[SteamHost] Failed to launch Steam: {}",
+                                    e.getMessage());
                         }
                         mc.ingameGUI
                                 .getChatGUI()
@@ -699,7 +712,7 @@ public class VanillaGuiIntegration {
                 // Drop any leftover host before publishing / binding a new listen socket.
                 SteamServer existing = SteamManager.getInstance().getActiveServer();
                 if (existing != null && existing.isRunning()) {
-                    SteamBridgeMod.LOG.info("[SteamHost] Stopping leftover host before re-open.");
+                    SteamBridgeMod.LOG.debug("[SteamHost] Stopping leftover host before re-open.");
                     existing.stop();
                 }
 
@@ -745,7 +758,7 @@ public class VanillaGuiIntegration {
                 if (!alreadyPublic) {
                     try {
                         port = mc.getIntegratedServer().shareToLAN(gameType, ac);
-                        SteamBridgeMod.LOG.info("[SteamHost] shareToLAN returned port={}", port);
+                        SteamBridgeMod.LOG.debug("[SteamHost] shareToLAN returned port={}", port);
                         if (port != null) {
                             try {
                                 server.setMcPort(Integer.parseInt(port));

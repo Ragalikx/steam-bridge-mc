@@ -30,7 +30,7 @@ public class SteamBridgeMod {
     public static final String NAME = "Steam Bridge";
     public static final String VERSION = BuildInfo.VERSION;
 
-    public static final Logger LOG = LogManager.getLogger(MODID);
+    public static final Logger LOG = LogManager.getLogger("steambridge");
 
     /**
      * Neutralises log4j message-lookup syntax in untrusted strings before logging (Minecraft 1.8.9
@@ -52,23 +52,23 @@ public class SteamBridgeMod {
 
     @Mod.EventHandler
     public void preInit(FMLPreInitializationEvent event) {
-        LOG.info("=== Steam Bridge pre-init (Forge {}) v{} ===", BuildInfo.MC_VERSION, VERSION);
+        LOG.debug("=== Steam Bridge pre-init (Forge {}) v{} ===", BuildInfo.MC_VERSION, VERSION);
         SteamBridgeConfig.load(event.getSuggestedConfigurationFile().getParentFile().toPath());
         proxy.preInit(event);
     }
 
     @Mod.EventHandler
     public void init(FMLInitializationEvent event) {
-        LOG.info("=== SteamBridge init (v{}) ===", VERSION);
+        LOG.debug("=== SteamBridge init (v{}) ===", VERSION);
         proxy.init(event);
     }
 
     @Mod.EventHandler
     public void postInit(FMLPostInitializationEvent event) {
-        LOG.info("=== SteamBridge postInit (v{}) - initializing Steam... ===", VERSION);
+        LOG.debug("=== SteamBridge postInit (v{}) - initializing Steam... ===", VERSION);
         // No DatagramSocket intercept / voice tunnel on 1.8.9.
         SteamAppIdHelper.ensureAppId(Minecraft.getMinecraft().mcDataDir);
         boolean ok = SteamManager.getInstance().init();
-        LOG.info("=== Steam init result: {} ===", ok ? "SUCCESS" : "FAILED");
+        LOG.debug("=== Steam init result: {} ===", ok ? "SUCCESS" : "FAILED");
     }
 }

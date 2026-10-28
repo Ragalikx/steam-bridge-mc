@@ -8,6 +8,8 @@ package steambridge.proxy;
 import com.codedisaster.steamworks.SteamID;
 
 import steambridge.SteamBridgeConfig;
+import steambridge.core.LogLimiter;
+import steambridge.core.ProblemLog;
 import steambridge.steam.SteamConnectionStatus;
 import steambridge.steam.SteamSocketsApi;
 
@@ -23,6 +25,8 @@ import java.util.concurrent.atomic.AtomicLong;
 
 /** UDP/voice tunnel on Steam virtual port (MC port + 1). */
 public final class SteamUdpProxy implements steambridge.core.VoiceTransport {
+    private static final LogLimiter LOG_LIMITER = new LogLimiter(32, 30_000);
+
     private static final org.apache.logging.log4j.Logger LOG =
             org.apache.logging.log4j.LogManager.getLogger("steambridge");
     private volatile steambridge.core.GameAttemptOwner gameOwner;
@@ -102,14 +106,19 @@ public final class SteamUdpProxy implements steambridge.core.VoiceTransport {
         serverVoicePacketsOut.set(0);
         udpListenSocket = driver.createListenSocketP2P(udpVirtualPort);
         if (udpListenSocket == 0) {
-            LOG.warn("[UdpProxy] Failed to open listen socket on virtual port {}.", udpVirtualPort);
+            ProblemLog.warn(
+                    LOG,
+                    LOG_LIMITER,
+                    "SteamUdpProxy-warn-1",
+                    "[UdpProxy] Failed to open listen socket on virtual port {}.",
+                    udpVirtualPort);
         } else {
-            LOG.info(
+            LOG.debug(
                     "[UdpProxy] Listen socket open: handle={} virtualPort={}",
                     udpListenSocket,
                     udpVirtualPort);
         }
-        LOG.info(
+        LOG.debug(
                 "[UdpProxy] Voice target: detected={} gamePort={} resolved={}",
                 boundVoiceAddress(),
                 hostGamePort.get(),
@@ -134,7 +143,7 @@ public final class SteamUdpProxy implements steambridge.core.VoiceTransport {
         }
         for (VoiceSession session : closing) closeVoiceSession(session, "UDP proxy stopped");
         if (ls != 0) driver.closeListenSocket(ls);
-        LOG.info(
+        LOG.debug(
                 "[UdpProxy] Server stopped. voicePkts in={} out={}",
                 serverVoicePacketsIn.get(),
                 serverVoicePacketsOut.get());
@@ -260,7 +269,7 @@ public final class SteamUdpProxy implements steambridge.core.VoiceTransport {
     public void deliverFromSteamToServer(int conn, byte[] data) {
         UdpHostRelay relay = relayByConn.get(conn);
         if (relay == null) {
-            LOG.warn(
+            LOG.debug(
                     "[UdpProxy] Drop voice pkt from Steam: no relay for conn={} bytes={}",
                     conn,
                     data != null ? data.length : 0);
@@ -283,7 +292,12 @@ public final class SteamUdpProxy implements steambridge.core.VoiceTransport {
     @Override
     public void registerBoundAddress(Object owner, InetSocketAddress address) {
         if (address == null || address.isUnresolved() || address.getPort() == 0) {
-            LOG.warn("[UdpProxy] Ignoring invalid voice bind address {}", address);
+            ProblemLog.warn(
+                    LOG,
+                    LOG_LIMITER,
+                    "SteamUdpProxy-warn-2",
+                    "[UdpProxy] Ignoring invalid voice bind address {}",
+                    address);
             return;
         }
         InetAddress target = address.getAddress();
@@ -304,7 +318,7 @@ public final class SteamUdpProxy implements steambridge.core.VoiceTransport {
         } while (!voiceServerAddress.compareAndSet(previous, new VoiceBinding(owner, endpoint)));
         InetSocketAddress oldAddress = previous == null ? null : previous.address;
         if (!endpoint.equals(oldAddress))
-            LOG.info(
+            LOG.debug(
                     "[UdpProxy] Voice server address registered: {} (was {})",
                     endpoint,
                     oldAddress);
@@ -331,7 +345,7 @@ public final class SteamUdpProxy implements steambridge.core.VoiceTransport {
         if (port <= 0 || port > 65535) return;
         int prev = hostGamePort.getAndSet(port);
         if (prev != port) {
-            LOG.info(
+            LOG.debug(
                     "[UdpProxy] Host game port set: {} (was {}) resolved={}",
                     port,
                     prev == 0 ? "none" : prev,
@@ -393,9 +407,13 @@ public final class SteamUdpProxy implements steambridge.core.VoiceTransport {
             return;
         }
         if (udpClientConn == 0) {
-            LOG.warn("[UdpProxy] Failed to start P2P connection.");
+            ProblemLog.warn(
+                    LOG,
+                    LOG_LIMITER,
+                    "SteamUdpProxy-warn-3",
+                    "[UdpProxy] Failed to start P2P connection.");
         } else {
-            LOG.info(
+            LOG.debug(
                     "[UdpProxy] P2P connecting: conn={} virtualPort={}",
                     udpClientConn,
                     udpVirtualPort);
@@ -424,7 +442,7 @@ public final class SteamUdpProxy implements steambridge.core.VoiceTransport {
                     && gameOwner.isAlive()
                     && driver.ownsConnectionOwner(conn, this)) udpClientConn = conn;
             if (udpClientConn != conn) return;
-            LOG.info(
+            LOG.debug(
                     "[UdpProxy] Client conn={} state={} route={} oldState={}",
                     conn,
                     status.describeState(),
@@ -445,7 +463,7 @@ public final class SteamUdpProxy implements steambridge.core.VoiceTransport {
         if (impl == null) {
             if (!loggedMissingClientImpl) {
                 loggedMissingClientImpl = true;
-                LOG.warn(
+                LOG.debug(
                         "[UdpProxy] Drop voice pkt from host: client socket not intercepted yet"
                                 + " (bytes={})",
                         data != null ? data.length : 0);
@@ -458,7 +476,12 @@ public final class SteamUdpProxy implements steambridge.core.VoiceTransport {
             clientVoicePacketsIn.incrementAndGet();
             impl.receiveVoice(data, loopback, port);
         } catch (Exception e) {
-            LOG.warn("[UdpProxy] deliverFromSteamToClient error: {}", e.getMessage());
+            ProblemLog.warn(
+                    LOG,
+                    LOG_LIMITER,
+                    "SteamUdpProxy-warn-4",
+                    "[UdpProxy] deliverFromSteamToClient error: {}",
+                    e.getMessage());
         }
     }
 
@@ -472,7 +495,7 @@ public final class SteamUdpProxy implements steambridge.core.VoiceTransport {
         if (conn == 0) {
             if (!loggedMissingClientConn) {
                 loggedMissingClientConn = true;
-                LOG.warn(
+                LOG.debug(
                         "[UdpProxy] Drop voice pkt to host: UDP P2P conn not ready (bytes={})",
                         data != null ? data.length : 0);
             }
@@ -488,7 +511,7 @@ public final class SteamUdpProxy implements steambridge.core.VoiceTransport {
 
     void setServerVoicePort(int port) {
         serverVoicePort = port;
-        LOG.info("[UdpProxy] Client detected server voice port: {}", port);
+        LOG.debug("[UdpProxy] Client detected server voice port: {}", port);
     }
 
     steambridge.core.VoiceClient getActiveClientImpl() {
@@ -514,7 +537,7 @@ public final class SteamUdpProxy implements steambridge.core.VoiceTransport {
         if (conn != 0)
             driver.closeConnection(
                     conn, SteamSocketsApi.APP_CLOSE_NORMAL, "UDP proxy disconnected");
-        LOG.info(
+        LOG.debug(
                 "[UdpProxy] Client stopped. voicePkts in={} out={}",
                 clientVoicePacketsIn.get(),
                 clientVoicePacketsOut.get());

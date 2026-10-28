@@ -3,6 +3,9 @@ package steambridge.steam;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
+import steambridge.core.LogLimiter;
+import steambridge.core.ProblemLog;
+
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
@@ -10,6 +13,8 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 public abstract class SteamBanStore {
+    private static final LogLimiter LOG_LIMITER = new LogLimiter(32, 30_000);
+
     private static final org.apache.logging.log4j.Logger LOG =
             org.apache.logging.log4j.LogManager.getLogger("steambridge");
 
@@ -101,7 +106,13 @@ public abstract class SteamBanStore {
             }
         } catch (Exception e) {
             preserveFile = true;
-            LOG.warn("[Bans] Failed to load from {}: {}", storageFile, e.getMessage());
+            ProblemLog.warn(
+                    LOG,
+                    LOG_LIMITER,
+                    "SteamBanStore-warn-1",
+                    "[Bans] Failed to load from {}: {}",
+                    storageFile,
+                    e.getMessage());
         }
     }
 
@@ -136,7 +147,13 @@ public abstract class SteamBanStore {
                 Files.move(tmp.toPath(), storageFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
             }
         } catch (Exception e) {
-            LOG.warn("[Bans] Failed to save to {}: {}", storageFile, e.getMessage());
+            ProblemLog.warn(
+                    LOG,
+                    LOG_LIMITER,
+                    "SteamBanStore-warn-2",
+                    "[Bans] Failed to save to {}: {}",
+                    storageFile,
+                    e.getMessage());
         }
     }
 

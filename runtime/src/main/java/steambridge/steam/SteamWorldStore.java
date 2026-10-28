@@ -3,12 +3,17 @@ package steambridge.steam;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
+import steambridge.core.LogLimiter;
+import steambridge.core.ProblemLog;
+
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
 
 public abstract class SteamWorldStore {
+    private static final LogLimiter LOG_LIMITER = new LogLimiter(32, 30_000);
+
     private static final org.apache.logging.log4j.Logger LOG =
             org.apache.logging.log4j.LogManager.getLogger("steambridge");
 
@@ -91,7 +96,12 @@ public abstract class SteamWorldStore {
                 store = loaded;
             } catch (Exception e) {
                 preserveFile = true;
-                LOG.warn("[Worlds] Failed to load settings: {}", e.getMessage());
+                ProblemLog.warn(
+                        LOG,
+                        LOG_LIMITER,
+                        "SteamWorldStore-warn-1",
+                        "[Worlds] Failed to load settings: {}",
+                        e.getMessage());
             }
         }
     }
@@ -118,7 +128,12 @@ public abstract class SteamWorldStore {
                 Files.move(tmp.toPath(), storageFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
             }
         } catch (Exception e) {
-            LOG.warn("[Worlds] Failed to save settings: {}", e.getMessage());
+            ProblemLog.warn(
+                    LOG,
+                    LOG_LIMITER,
+                    "SteamWorldStore-warn-2",
+                    "[Worlds] Failed to save settings: {}",
+                    e.getMessage());
         }
     }
 

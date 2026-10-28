@@ -5,8 +5,6 @@
  */
 package steambridge;
 
-import com.mojang.logging.LogUtils;
-
 import net.minecraft.client.Minecraft;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.eventbus.api.IEventBus;
@@ -14,7 +12,8 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 
-import org.slf4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import steambridge.event.SteamClientEvents;
 import steambridge.steam.SteamManager;
@@ -32,11 +31,11 @@ public class SteamBridgeMod {
     public static final String NAME = "Steam Bridge";
     public static final String VERSION = BuildInfo.VERSION;
 
-    public static final Logger LOG = LogUtils.getLogger();
+    public static final Logger LOG = LogManager.getLogger("steambridge");
 
     public SteamBridgeMod() {
         SteamBridgeConfig.load(net.minecraftforge.fml.loading.FMLPaths.CONFIGDIR.get());
-        LOG.info("=== Steam Bridge pre-init (NeoForge 1.20.1) v{} ===", VERSION);
+        LOG.debug("=== Steam Bridge pre-init (NeoForge 1.20.1) v{} ===", VERSION);
 
         IEventBus modBus = FMLJavaModLoadingContext.get().getModEventBus();
         modBus.addListener(this::onClientSetup);
@@ -48,7 +47,7 @@ public class SteamBridgeMod {
     private void onClientSetup(FMLClientSetupEvent event) {
         event.enqueueWork(
                 () -> {
-                    LOG.info("=== SteamBridge client setup - initializing Steam... ===");
+                    LOG.debug("=== SteamBridge client setup - initializing Steam... ===");
                     // Install UDP intercept factory before any voice mod creates DatagramSockets.
                     if (steambridge.voice.VoiceIntegration.needsLegacyFactory()) {
                         steambridge.proxy.UdpInterceptFactory.install();
@@ -56,7 +55,7 @@ public class SteamBridgeMod {
                     // Ensure steam_appid.txt exists in the game dir before SteamAPI.init()
                     SteamAppIdHelper.ensureAppId(Minecraft.getInstance().gameDirectory);
                     boolean ok = SteamManager.getInstance().init();
-                    LOG.info("=== Steam init result: {} ===", ok ? "SUCCESS" : "FAILED");
+                    LOG.debug("=== Steam init result: {} ===", ok ? "SUCCESS" : "FAILED");
                 });
     }
 

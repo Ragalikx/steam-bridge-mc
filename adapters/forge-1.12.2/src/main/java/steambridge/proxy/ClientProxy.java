@@ -25,6 +25,8 @@ import net.minecraftforge.fml.common.network.FMLNetworkEvent;
 import net.minecraftforge.fml.relauncher.ReflectionHelper;
 
 import steambridge.SteamBridgeMod;
+import steambridge.core.LogLimiter;
+import steambridge.core.ProblemLog;
 import steambridge.gui.GuiSteamConnecting;
 import steambridge.steam.SteamClient;
 import steambridge.steam.SteamManager;
@@ -35,6 +37,7 @@ import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 
 public class ClientProxy extends CommonProxy {
+    private static final LogLimiter LOG_LIMITER = new LogLimiter(32, 30_000);
 
     private static final int TRANSIENT_DISCONNECT_GRACE_TICKS = 160;
     private static final String MOD_MISMATCH_HINT_KEY = "steambridge.disconnect.mod_mismatch_hint";
@@ -89,9 +92,9 @@ public class ClientProxy extends CommonProxy {
                             isGenericDisconnectScreen(mc.currentScreen)
                                     && !isGenericDisconnectScreen(next);
                     if (!mayReplaceGeneric) {
-                        SteamBridgeMod.LOG.info(
+                        SteamBridgeMod.LOG.debug(
                                 "[SteamBridge] Ignoring secondary GuiDisconnected to preserve"
-                                    + " original error screen.");
+                                        + " original error screen.");
                         event.setCanceled(true);
                         return;
                     }
@@ -138,9 +141,9 @@ public class ClientProxy extends CommonProxy {
         if (server != null && server.isRunning()) {
             if (shouldDeferSteamServerStop(mc)) {
                 deferredServerStopTicks = TRANSIENT_DISCONNECT_GRACE_TICKS;
-                SteamBridgeMod.LOG.info(
+                SteamBridgeMod.LOG.debug(
                         "[SteamBridge] Deferring Steam host shutdown after client disconnect;"
-                            + " screen={} world={} integratedServer={}",
+                                + " screen={} world={} integratedServer={}",
                         screenName(mc.currentScreen),
                         mc.world != null,
                         mc.getIntegratedServer() != null);
@@ -158,9 +161,9 @@ public class ClientProxy extends CommonProxy {
                 showLoginMismatchHint(mc, client);
             } else if (shouldDeferSteamClientDisconnect(mc, client)) {
                 deferredClientDisconnectTicks = TRANSIENT_DISCONNECT_GRACE_TICKS;
-                SteamBridgeMod.LOG.info(
+                SteamBridgeMod.LOG.debug(
                         "[SteamBridge] Deferring Steam client disconnect; possible dimension"
-                            + " transfer. screen={} world={} player={} channelOpen={}",
+                                + " transfer. screen={} world={} player={} channelOpen={}",
                         screenName(mc.currentScreen),
                         mc.world != null,
                         mc.player != null,
@@ -191,13 +194,14 @@ public class ClientProxy extends CommonProxy {
                 if (mc.world == null
                         && mc.getIntegratedServer() == null
                         && !(mc.currentScreen instanceof GuiDownloadTerrain)) {
-                    SteamBridgeMod.LOG.info("[SteamBridge] World closed, stopping Steam server...");
+                    SteamBridgeMod.LOG.debug(
+                            "[SteamBridge] World closed, stopping Steam server...");
                     deferredServerStopTicks = -1;
                     server.stop();
                 } else if (shouldStopHostForWorldChange(mc, server)) {
-                    SteamBridgeMod.LOG.info(
+                    SteamBridgeMod.LOG.debug(
                             "[SteamBridge] Integrated world changed (was '{}'), stopping leftover"
-                                + " Steam host.",
+                                    + " Steam host.",
                             server.getWorldKey());
                     deferredServerStopTicks = -1;
                     server.stop();
@@ -287,7 +291,7 @@ public class ClientProxy extends CommonProxy {
             // any GuiDisconnected is a real server-side drop and must be shown - otherwise
             // the player is left in limbo with an unresponsive screen.
             if (client.getState() == SteamClient.State.CONNECTING) {
-                SteamBridgeMod.LOG.info(
+                SteamBridgeMod.LOG.debug(
                         "[SteamBridge] Ignoring secondary GuiDisconnected from vanilla background"
                             + " thread (e.g. UnknownHost) while Steam connection is negotiating.");
                 event.setCanceled(true);
@@ -295,9 +299,12 @@ public class ClientProxy extends CommonProxy {
                 deferredClientDisconnectTicks = -1;
                 DisconnectedInfo info = extractDisconnectedInfo((GuiDisconnected) next);
                 if (isGenericDisconnectDuringLogin(client, info)) {
-                    SteamBridgeMod.LOG.warn(
+                    ProblemLog.warn(
+                            SteamBridgeMod.LOG,
+                            LOG_LIMITER,
+                            "ClientProxy-warn-1",
                             "[SteamBridge] Replacing generic login disconnect with mod mismatch"
-                                + " hint. state={} reason='{}' details='{}'",
+                                    + " hint. state={} reason='{}' details='{}'",
                             client.getState(),
                             SteamBridgeMod.safeLog(compactText(info.reason)),
                             SteamBridgeMod.safeLog(compactText(info.message)));
@@ -364,9 +371,12 @@ public class ClientProxy extends CommonProxy {
 
     private void showLoginMismatchHint(Minecraft mc, SteamClient client) {
         String details = modMismatchHintText();
-        SteamBridgeMod.LOG.warn(
+        ProblemLog.warn(
+                SteamBridgeMod.LOG,
+                LOG_LIMITER,
+                "ClientProxy-warn-2",
                 "[SteamBridge] Minecraft connection closed during Steam/Forge login before a"
-                    + " detailed disconnect screen appeared. screen={} state={}",
+                        + " detailed disconnect screen appeared. screen={} state={}",
                 screenName(mc.currentScreen),
                 client.getState());
         client.closeAfterMinecraftFailure("connect.failed", details);
@@ -405,23 +415,23 @@ public class ClientProxy extends CommonProxy {
                 deferredClientDisconnectTicks = -1;
             } else if (shouldCloseDeferredClient(mc, client)) {
                 deferredClientDisconnectTicks = -1;
-                SteamBridgeMod.LOG.info(
+                SteamBridgeMod.LOG.debug(
                         "[SteamBridge] Deferred Steam client disconnect resolved as real"
-                            + " disconnect. screen={} channelOpen={}",
+                                + " disconnect. screen={} channelOpen={}",
                         screenName(mc.currentScreen),
                         client.isSteamChannelOpen());
                 client.disconnect();
             } else if (mc.world != null && mc.player != null && client.isSteamChannelOpen()) {
                 deferredClientDisconnectTicks = -1;
-                SteamBridgeMod.LOG.info(
+                SteamBridgeMod.LOG.debug(
                         "[SteamBridge] Preserved Steam client across transient world reload."
-                            + " dim={}",
+                                + " dim={}",
                         mc.player.dimension);
             } else if (--deferredClientDisconnectTicks <= 0) {
                 deferredClientDisconnectTicks = TRANSIENT_DISCONNECT_GRACE_TICKS;
-                SteamBridgeMod.LOG.info(
+                SteamBridgeMod.LOG.debug(
                         "[SteamBridge] Still waiting on transient Steam client disconnect."
-                            + " screen={} channelOpen={}",
+                                + " screen={} channelOpen={}",
                         screenName(mc.currentScreen),
                         client.isSteamChannelOpen());
             }
@@ -433,28 +443,28 @@ public class ClientProxy extends CommonProxy {
                 deferredServerStopTicks = -1;
             } else if (shouldStopHostForWorldChange(mc, server)) {
                 deferredServerStopTicks = -1;
-                SteamBridgeMod.LOG.info(
+                SteamBridgeMod.LOG.debug(
                         "[SteamBridge] Deferred host stop: world changed to a different save,"
-                            + " stopping Steam.");
+                                + " stopping Steam.");
                 server.stop();
             } else if (shouldCloseDeferredServer(mc)) {
                 deferredServerStopTicks = -1;
-                SteamBridgeMod.LOG.info(
+                SteamBridgeMod.LOG.debug(
                         "[SteamBridge] Deferred Steam host shutdown resolved as real disconnect."
-                            + " screen={}",
+                                + " screen={}",
                         screenName(mc.currentScreen));
                 server.stop();
             } else if (mc.getIntegratedServer() != null
                     && mc.world != null
                     && isSameHostedWorld(mc, server)) {
                 deferredServerStopTicks = -1;
-                SteamBridgeMod.LOG.info(
+                SteamBridgeMod.LOG.debug(
                         "[SteamBridge] Preserved Steam host across transient world reload.");
             } else if (--deferredServerStopTicks <= 0) {
                 deferredServerStopTicks = -1;
-                SteamBridgeMod.LOG.info(
+                SteamBridgeMod.LOG.debug(
                         "[SteamBridge] Deferred Steam host shutdown timed out. screen={}"
-                            + " integratedServer={}",
+                                + " integratedServer={}",
                         screenName(mc.currentScreen),
                         mc.getIntegratedServer() != null);
                 server.stop();
@@ -603,8 +613,12 @@ public class ClientProxy extends CommonProxy {
                     reason != null ? reason : "",
                     message != null ? message.getUnformattedText() : "");
         } catch (Throwable t) {
-            SteamBridgeMod.LOG.warn(
-                    "[SteamBridge] Failed to inspect GuiDisconnected details: {}", t.toString());
+            ProblemLog.warn(
+                    SteamBridgeMod.LOG,
+                    LOG_LIMITER,
+                    "ClientProxy-warn-3",
+                    "[SteamBridge] Failed to inspect GuiDisconnected details: {}",
+                    t.toString());
             return new DisconnectedInfo("disconnect", "");
         }
     }

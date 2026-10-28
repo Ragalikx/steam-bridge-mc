@@ -31,7 +31,7 @@ public class SteamBridgeMod {
     public static final String NAME = "Steam Bridge";
     public static final String VERSION = BuildInfo.VERSION;
 
-    public static final Logger LOG = LogManager.getLogger(MODID);
+    public static final Logger LOG = LogManager.getLogger("steambridge");
 
     static {
         // Forge 1.16.5 puts JNA 4.4.0 on the game library path. If a newer/mismatched
@@ -45,7 +45,7 @@ public class SteamBridgeMod {
 
     public SteamBridgeMod() {
         SteamBridgeConfig.load(net.minecraftforge.fml.loading.FMLPaths.CONFIGDIR.get());
-        LOG.info("=== Steam Bridge pre-init (Forge 1.16.5) v{} ===", VERSION);
+        LOG.debug("=== Steam Bridge pre-init (Forge 1.16.5) v{} ===", VERSION);
 
         IEventBus modBus = FMLJavaModLoadingContext.get().getModEventBus();
         modBus.addListener(this::onClientSetup);
@@ -56,13 +56,13 @@ public class SteamBridgeMod {
     private void onClientSetup(FMLClientSetupEvent event) {
         event.enqueueWork(
                 () -> {
-                    LOG.info("=== SteamBridge client setup - initializing Steam... ===");
+                    LOG.debug("=== SteamBridge client setup - initializing Steam... ===");
                     if (steambridge.voice.VoiceIntegration.needsLegacyFactory()) {
                         steambridge.proxy.UdpInterceptFactory.install();
                     }
                     SteamAppIdHelper.ensureAppId(Minecraft.getInstance().gameDirectory);
                     boolean ok = SteamManager.getInstance().init();
-                    LOG.info("=== Steam init result: {} ===", ok ? "SUCCESS" : "FAILED");
+                    LOG.debug("=== Steam init result: {} ===", ok ? "SUCCESS" : "FAILED");
                 });
     }
 

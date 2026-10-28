@@ -10,7 +10,9 @@ import com.codedisaster.steamworks.SteamNativeHandle;
 
 import steambridge.core.Attempt;
 import steambridge.core.ConnectionRegistry;
+import steambridge.core.LogLimiter;
 import steambridge.core.LogText;
+import steambridge.core.ProblemLog;
 
 import java.util.Locale;
 import java.util.concurrent.CountDownLatch;
@@ -18,6 +20,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public abstract class SteamClientBase<T> implements SteamGameClient {
+    private final LogLimiter LOG_LIMITER = new LogLimiter(32, 30_000);
     private static final org.apache.logging.log4j.Logger LOG =
             org.apache.logging.log4j.LogManager.getLogger("steambridge");
 
@@ -45,6 +48,9 @@ public abstract class SteamClientBase<T> implements SteamGameClient {
 
     protected volatile State state = State.IDLE;
     protected volatile String statusMsg = "";
+    private volatile String lastRoute = "unknown";
+    private volatile int lastNativeState;
+    private volatile int lastEndReason;
     protected final AtomicBoolean alive = new AtomicBoolean(false);
 
     protected volatile SteamID hostSteamID;
@@ -59,7 +65,7 @@ public abstract class SteamClientBase<T> implements SteamGameClient {
         if (attempt.isCancelled()
                 || !started.compareAndSet(false, true)
                 || !alive.compareAndSet(false, true)) {
-            LOG.warn("[SteamClient] connect() called while already active.");
+            LOG.debug("[SteamClient] connect() called while already active.");
             return;
         }
 
@@ -71,7 +77,7 @@ public abstract class SteamClientBase<T> implements SteamGameClient {
         runtime().setActiveClient(this);
 
         long hostKey = SteamNativeHandle.getNativeHandle(host);
-        LOG.info("[SteamClient] Connecting to host SteamID={}", hostKey);
+        LOG.debug("[SteamClient] Connecting to host SteamID={}", hostKey);
 
         Thread thread = new Thread(() -> doConnect(host), "SteamBridge-ClientConnect");
         thread.setDaemon(true);
@@ -91,9 +97,10 @@ public abstract class SteamClientBase<T> implements SteamGameClient {
     private void closeSteamTransport(String steamCloseReason, boolean resetStatus) {
         attempt.cancel();
         runtime().clearActiveClient(this);
-        LOG.info(
+        boolean wasAlive = alive.getAndSet(false);
+        LOG.debug(
                 "[SteamClient] closeSteamTransport() called. wasAlive={} resetStatus={}",
-                alive.getAndSet(false),
+                wasAlive,
                 resetStatus);
 
         if (resetStatus) {
@@ -115,7 +122,7 @@ public abstract class SteamClientBase<T> implements SteamGameClient {
 
         connectionHandle = 0;
         clearMinecraftConnection();
-        LOG.info("[SteamClient] Steam transport closed.");
+        LOG.debug("[SteamClient] Steam transport closed.");
     }
 
     private void doConnect(SteamID host) {
@@ -152,7 +159,7 @@ public abstract class SteamClientBase<T> implements SteamGameClient {
 
             statusMsg =
                     i18n("steambridge.status.waiting_route", "Waiting for Steam route to host...");
-            LOG.info("[SteamClient] ConnectP2P started. hostSteamID={} conn={}", hostKey, conn);
+            LOG.debug("[SteamClient] ConnectP2P started. hostSteamID={} conn={}", hostKey, conn);
 
             boolean connected =
                     connectLatch.await(
@@ -164,7 +171,7 @@ public abstract class SteamClientBase<T> implements SteamGameClient {
                                                             .timeoutInitialSec))
                                     + 5,
                             TimeUnit.SECONDS);
-            LOG.info(
+            LOG.debug(
                     "[SteamClient] connectLatch.await() returned: connected={} alive={} conn={}",
                     connected,
                     alive.get(),
@@ -182,7 +189,7 @@ public abstract class SteamClientBase<T> implements SteamGameClient {
                 runtime()
                         .closeConnection(
                                 conn, SteamSocketsApi.APP_CLOSE_NORMAL, "Cancelled attempt");
-                LOG.info(
+                LOG.debug(
                         "[SteamClient] Connect attempt ended before pipeline activation. conn={}"
                                 + " state={}",
                         conn,
@@ -201,11 +208,12 @@ public abstract class SteamClientBase<T> implements SteamGameClient {
 
             activateLoopback(conn, remoteSteamID, screen);
 
-            LOG.info("[SteamClient] Loopback proxy ready: conn={} steamID={}", conn, remoteSteamID);
+            LOG.debug(
+                    "[SteamClient] Loopback proxy ready: conn={} steamID={}", conn, remoteSteamID);
 
         } catch (Exception e) {
             if (alive.get()) {
-                LOG.error(
+                LOG.debug(
                         "[SteamClient] doConnect error: {} - {}",
                         e.getClass().getSimpleName(),
                         e.getMessage(),
@@ -221,8 +229,11 @@ public abstract class SteamClientBase<T> implements SteamGameClient {
             connectionHandle = connection;
         }
         if (!ownsConnection(connection, remoteSteamID)) return;
+        lastRoute = status.describeRoute();
+        lastNativeState = status.getState();
+        lastEndReason = status.getEndReason();
 
-        LOG.info(
+        LOG.debug(
                 "[SteamClient] Connection callback: conn={} steamID={} state={} route={} old={}",
                 connection,
                 remoteSteamID,
@@ -289,7 +300,7 @@ public abstract class SteamClientBase<T> implements SteamGameClient {
                 i18n(
                         "steambridge.status.handshake",
                         "Steam ready - Minecraft/Forge handshake in progress...");
-        LOG.info(
+        LOG.debug(
                 "[SteamClient] Minecraft handshake started. connectionType={} conn={}",
                 safeText(connectionType, "unknown"),
                 connectionHandle);
@@ -305,7 +316,7 @@ public abstract class SteamClientBase<T> implements SteamGameClient {
 
         state = State.NEGOTIATING;
         statusMsg = i18n("steambridge.status.loading_world", "Login accepted - loading world...");
-        LOG.info("[SteamClient] Minecraft accepted the login. Loading world...");
+        LOG.debug("[SteamClient] Minecraft accepted the login. Loading world...");
     }
 
     public void onMinecraftWorldJoined(String playerName, int dimension) {
@@ -320,7 +331,7 @@ public abstract class SteamClientBase<T> implements SteamGameClient {
                         + " (dim "
                         + dimension
                         + ")";
-        LOG.info(
+        LOG.debug(
                 "[SteamClient] Minecraft world joined successfully. player={} dimension={} conn={}",
                 LogText.safe(safeText(playerName, "?")),
                 dimension,
@@ -331,18 +342,24 @@ public abstract class SteamClientBase<T> implements SteamGameClient {
         String cleanReason = safeText(reason, "Disconnected");
         String cleanDetails = compact(details);
 
-        if (looksLikeModMismatch(cleanReason, cleanDetails)) {
-            LOG.error(
-                    "[SteamClient] Minecraft/Forge login rejected due to mod mismatch. reason='{}'"
-                            + " details='{}'",
+        if (!alive.get() || state == State.IDLE) {
+            LOG.debug(
+                    "[SteamClient] Minecraft disconnect after transport stop: {} {}",
                     LogText.safe(cleanReason),
                     LogText.safe(cleanDetails));
         } else {
-            LOG.error(
-                    "[SteamClient] Minecraft disconnect while using Steam transport. reason='{}'"
-                            + " details='{}'",
-                    LogText.safe(cleanReason),
-                    LogText.safe(cleanDetails));
+            ProblemLog.warn(
+                    LOG,
+                    LOG_LIMITER,
+                    "minecraft-disconnect",
+                    "[SteamClient] Minecraft disconnected phase={} conn={} route={}"
+                            + " modMismatchReported={} reason={} details={}",
+                    state,
+                    connectionHandle,
+                    lastRoute,
+                    looksLikeModMismatch(cleanReason, cleanDetails),
+                    cleanReason,
+                    cleanDetails);
         }
 
         if (state != State.IN_WORLD && state != State.IDLE) {
@@ -394,7 +411,18 @@ public abstract class SteamClientBase<T> implements SteamGameClient {
         if (!alive.compareAndSet(true, false)) return;
         attempt.cancel();
 
-        LOG.error("[SteamClient] FAIL: {}", LogText.safe(msg));
+        ProblemLog.warn(
+                LOG,
+                LOG_LIMITER,
+                "connection-failed",
+                "[SteamClient] Connection failed phase={} conn={} route={}"
+                        + " nativeState={} endReason={} reason={}",
+                state,
+                connectionHandle,
+                lastRoute,
+                lastNativeState,
+                lastEndReason,
+                msg);
         state = State.FAILED;
         statusMsg = TextColors.RED + msg;
         alive.set(false);

@@ -24,6 +24,8 @@ import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.network.protocol.login.ServerboundHelloPacket;
 
 import steambridge.SteamBridgeMod;
+import steambridge.core.LogLimiter;
+import steambridge.core.ProblemLog;
 
 import java.net.InetSocketAddress;
 import java.util.concurrent.ThreadFactory;
@@ -35,6 +37,7 @@ import java.util.function.IntConsumer;
  * pipeline connects to the proxy; the proxy forwards bytes over Steam.
  */
 public final class SteamTransport {
+    private static final LogLimiter LOG_LIMITER = new LogLimiter(32, 30_000);
 
     static final NioEventLoopGroup NIO_GROUP =
             new NioEventLoopGroup(
@@ -74,7 +77,7 @@ public final class SteamTransport {
             if (f.isSuccess()) {
                 InetSocketAddress local = (InetSocketAddress) f.channel().localAddress();
                 if (onLocalPort != null) onLocalPort.accept(local.getPort());
-                SteamBridgeMod.LOG.info(
+                SteamBridgeMod.LOG.debug(
                         "[LoopbackBridge][Server] Bridge started: conn={} steamID={} localPort={}",
                         conn,
                         steamID,
@@ -113,7 +116,7 @@ public final class SteamTransport {
             if (f.isSuccess()) {
                 bridge.setServerChannel(f.channel());
                 int port = ((InetSocketAddress) f.channel().localAddress()).getPort();
-                SteamBridgeMod.LOG.info(
+                SteamBridgeMod.LOG.debug(
                         "[LoopbackBridge][Client] Proxy listening on port {}", port);
                 return port;
             }
@@ -191,12 +194,15 @@ public final class SteamTransport {
                 f.setAccessible(true);
                 f.set(mc, connection);
             } catch (Exception e) {
-                SteamBridgeMod.LOG.warn(
+                ProblemLog.warn(
+                        SteamBridgeMod.LOG,
+                        LOG_LIMITER,
+                        "SteamTransport-warn-1",
                         "[LoopbackBridge][Client] Could not set pendingConnection: {}",
                         e.getMessage());
             }
 
-            SteamBridgeMod.LOG.info(
+            SteamBridgeMod.LOG.debug(
                     "[LoopbackBridge][Client] Connected to loopback proxy. proxyPort={} conn={}"
                             + " steamID={}",
                     proxyPort,

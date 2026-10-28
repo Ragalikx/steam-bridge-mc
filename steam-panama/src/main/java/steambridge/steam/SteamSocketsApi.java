@@ -6,7 +6,9 @@ import static java.lang.foreign.ValueLayout.*;
 
 import io.netty.buffer.ByteBuf;
 
+import steambridge.core.LogLimiter;
 import steambridge.core.NativeCallGate;
+import steambridge.core.ProblemLog;
 import steambridge.core.QueueLimits;
 import steambridge.panama.SteamAPI;
 
@@ -16,6 +18,8 @@ import java.lang.invoke.MethodType;
 import java.nio.charset.StandardCharsets;
 
 public final class SteamSocketsApi {
+    private final LogLimiter LOG_LIMITER = new LogLimiter(32, 30_000);
+
     private static final ReceivedMessage[] NO_MESSAGES = new ReceivedMessage[0];
     public static final int RESULT_OK = 1, RESULT_LIMIT_EXCEEDED = 25;
     public static final int STATE_NONE = 0,
@@ -100,8 +104,12 @@ public final class SteamSocketsApi {
             if (target != null)
                 target.onConnectionStatusChanged(SteamOffsets.readCallback(pointer));
         } catch (Throwable failure) {
-            org.apache.logging.log4j.LogManager.getLogger("steambridge")
-                    .error("Steam FFM callback failed", failure);
+            ProblemLog.error(
+                    org.apache.logging.log4j.LogManager.getLogger("steambridge"),
+                    LOG_LIMITER,
+                    "native-status-callback",
+                    "Steam FFM callback failed",
+                    failure);
         }
     }
 
@@ -120,8 +128,12 @@ public final class SteamSocketsApi {
                                                         MemorySegment.NULL)
                                         != 0;
                     } catch (RuntimeException | LinkageError failure) {
-                        org.apache.logging.log4j.LogManager.getLogger("steambridge")
-                                .warn("Steam callback removal failed", failure);
+                        ProblemLog.warn(
+                                org.apache.logging.log4j.LogManager.getLogger("steambridge"),
+                                LOG_LIMITER,
+                                "SteamSocketsApi-warn-1",
+                                "Steam callback removal failed",
+                                failure);
                     }
                     if (removed) callbacks.close();
                     else retainedCallbacks.add(callbacks);

@@ -11,6 +11,8 @@ import net.minecraft.client.resources.I18n;
 
 import steambridge.SteamAppIdHelper;
 import steambridge.SteamBridgeMod;
+import steambridge.core.LogLimiter;
+import steambridge.core.ProblemLog;
 import steambridge.steam.SteamManager;
 
 import java.util.function.Consumer;
@@ -20,6 +22,7 @@ import java.util.function.Consumer;
  * for {@link SteamManager#reinit()}, then runs {@code onSteamReady}.
  */
 public class GuiSteamResync extends GuiScreen {
+    private static final LogLimiter LOG_LIMITER = new LogLimiter(32, 30_000);
 
     private static final int TIMEOUT_SECONDS = 40;
     private static final int POLL_INTERVAL_TICKS = 40;
@@ -87,7 +90,12 @@ public class GuiSteamResync extends GuiScreen {
             statusLine1 = "\u00a7e" + I18n.format("steambridge.gui.resync_starting");
             statusLine2 = "\u00a77" + I18n.format("steambridge.gui.resync_starting_hint");
         } catch (Exception e) {
-            SteamBridgeMod.LOG.warn("[Resync] Failed to launch Steam: {}", e.getMessage());
+            ProblemLog.warn(
+                    SteamBridgeMod.LOG,
+                    LOG_LIMITER,
+                    "GuiSteamResync-warn-1",
+                    "[Resync] Failed to launch Steam: {}",
+                    e.getMessage());
             state = State.WAITING;
         }
     }
@@ -108,7 +116,7 @@ public class GuiSteamResync extends GuiScreen {
         if (ticksElapsed >= nextCheckTick) {
             nextCheckTick = ticksElapsed + POLL_INTERVAL_TICKS;
 
-            SteamBridgeMod.LOG.info("[Resync] Attempting Steam reinit... elapsed={}s", elapsedSec);
+            SteamBridgeMod.LOG.debug("[Resync] Attempting Steam reinit... elapsed={}s", elapsedSec);
             boolean ok = SteamManager.getInstance().reinit();
             if (ok) {
                 state = State.SUCCESS;

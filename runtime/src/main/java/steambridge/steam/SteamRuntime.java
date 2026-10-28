@@ -23,8 +23,10 @@ import steambridge.core.CloseReason;
 import steambridge.core.ConnectionRegistry;
 import steambridge.core.DiagnosticReport;
 import steambridge.core.InboundMessage;
+import steambridge.core.LogLimiter;
 import steambridge.core.LogText;
 import steambridge.core.NativeCallGate;
+import steambridge.core.ProblemLog;
 import steambridge.core.ReceiveBackoff;
 import steambridge.core.SendQueueState;
 import steambridge.steam.SteamOffsets.SteamNetConnectionStatusChangedCallback;
@@ -35,6 +37,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public abstract class SteamRuntime<C extends SteamGameClient, S extends SteamGameServer>
         implements LoopbackBridge.Driver, steambridge.voice.VoiceNativeDriver {
+    private final LogLimiter LOG_LIMITER = new LogLimiter(32, 30_000);
+
     protected static final org.apache.logging.log4j.Logger LOG =
             org.apache.logging.log4j.LogManager.getLogger("steambridge");
 
@@ -100,26 +104,31 @@ public abstract class SteamRuntime<C extends SteamGameClient, S extends SteamGam
         try {
             shutdownNativeApi();
         } catch (RuntimeException | LinkageError failure) {
-            LOG.warn("[SteamManager] Failed to clean up Steam initialization", failure);
+            ProblemLog.warn(
+                    LOG,
+                    LOG_LIMITER,
+                    "SteamRuntime-warn-1",
+                    "[SteamManager] Failed to clean up Steam initialization",
+                    failure);
         }
     }
 
     public synchronized boolean init() {
         if (voiceSupported()) steambridge.proxy.SteamUdpProxy.getInstance().install(this);
         if (initialized) {
-            LOG.warn("[SteamManager] init() called but already initialized.");
+            LOG.debug("[SteamManager] init() called but already initialized.");
             return running.get();
         }
 
         jniGate = new NativeCallGate();
-        LOG.info("[SteamManager] Loading Steam native libraries...");
+        LOG.debug("[SteamManager] Loading Steam native libraries...");
         try {
             if (!loadNativeLibraries()) {
                 LOG.error("[SteamManager] Failed to load Steam native libraries.");
                 cleanupFailedInitialization();
                 return false;
             }
-            LOG.info("[SteamManager] Calling SteamAPI.init()...");
+            LOG.debug("[SteamManager] Calling SteamAPI.init()...");
             if (!initNativeApi()) {
                 LOG.error(
                         "[SteamManager] SteamAPI.init() returned false. Check Steam and"
@@ -184,7 +193,7 @@ public abstract class SteamRuntime<C extends SteamGameClient, S extends SteamGam
         startCallbackThread();
         startReceiveThread();
 
-        LOG.info(
+        LOG.debug(
                 "[SteamManager] Steam initialized OK. My SteamID={}"
                         + " transport=ISteamNetworkingSockets",
                 SteamNativeHandle.getNativeHandle(mySteamID));
@@ -214,7 +223,7 @@ public abstract class SteamRuntime<C extends SteamGameClient, S extends SteamGam
                 return;
             }
 
-            LOG.info("[SteamManager] Shutting down...");
+            LOG.debug("[SteamManager] Shutting down...");
             running.set(false);
             signalReceiveWake();
 
@@ -271,12 +280,12 @@ public abstract class SteamRuntime<C extends SteamGameClient, S extends SteamGam
                     });
             clearProfiles();
             initialized = false;
-            LOG.info("[SteamManager] Shutdown complete.");
+            LOG.debug("[SteamManager] Shutdown complete.");
         }
     }
 
     public synchronized boolean reinit() {
-        LOG.info("[SteamManager] reinit() requested.");
+        LOG.debug("[SteamManager] reinit() requested.");
         shutdown();
         if (initialized) return false;
         return init();
@@ -287,7 +296,7 @@ public abstract class SteamRuntime<C extends SteamGameClient, S extends SteamGam
         callbackThread =
                 new Thread(
                         () -> {
-                            LOG.info("[SteamManager] Callback thread started.");
+                            LOG.debug("[SteamManager] Callback thread started.");
                             while (running.get()) {
                                 try {
                                     SteamAPI.runCallbacks();
@@ -301,13 +310,15 @@ public abstract class SteamRuntime<C extends SteamGameClient, S extends SteamGam
                                     Thread.currentThread().interrupt();
                                     break;
                                 } catch (Exception e) {
-                                    LOG.error(
-                                            "[SteamManager] Callback loop error: {}",
-                                            e.getMessage(),
+                                    ProblemLog.error(
+                                            LOG,
+                                            LOG_LIMITER,
+                                            "callback-loop",
+                                            "[SteamManager] Callback loop failed",
                                             e);
                                 }
                             }
-                            LOG.info("[SteamManager] Callback thread stopped.");
+                            LOG.debug("[SteamManager] Callback thread stopped.");
                             if (initialized && !running.get()) scheduleShutdown(runtime);
                         },
                         "SteamBridge-Callbacks");
@@ -320,7 +331,7 @@ public abstract class SteamRuntime<C extends SteamGameClient, S extends SteamGam
         receiveThread =
                 new Thread(
                         () -> {
-                            LOG.info("[SteamManager] Receive thread started.");
+                            LOG.debug("[SteamManager] Receive thread started.");
                             ReceiveBackoff backoff = new ReceiveBackoff();
                             while (running.get()) {
                                 try {
@@ -358,13 +369,15 @@ public abstract class SteamRuntime<C extends SteamGameClient, S extends SteamGam
                                     Thread.currentThread().interrupt();
                                     break;
                                 } catch (Exception e) {
-                                    LOG.error(
-                                            "[SteamManager] Receive loop error: {}",
-                                            e.getMessage(),
+                                    ProblemLog.error(
+                                            LOG,
+                                            LOG_LIMITER,
+                                            "receive-loop",
+                                            "[SteamManager] Receive loop failed",
                                             e);
                                 }
                             }
-                            LOG.info("[SteamManager] Receive thread stopped.");
+                            LOG.debug("[SteamManager] Receive thread stopped.");
                             if (initialized && !running.get()) scheduleShutdown(runtime);
                         },
                         "SteamBridge-Receive");
@@ -388,7 +401,12 @@ public abstract class SteamRuntime<C extends SteamGameClient, S extends SteamGam
         try {
             thread.join(3000);
             if (thread.isAlive()) {
-                LOG.warn("[SteamManager] {} did not stop within 3s of shutdown.", thread.getName());
+                ProblemLog.warn(
+                        LOG,
+                        LOG_LIMITER,
+                        "SteamRuntime-warn-2",
+                        "[SteamManager] {} did not stop within 3s of shutdown.",
+                        thread.getName());
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -404,7 +422,13 @@ public abstract class SteamRuntime<C extends SteamGameClient, S extends SteamGam
         try {
             return receiveConnection(connection);
         } catch (RuntimeException failure) {
-            LOG.warn("[SteamBridge] Native receive failed for connection {}", connection, failure);
+            ProblemLog.warn(
+                    LOG,
+                    LOG_LIMITER,
+                    "SteamRuntime-warn-3",
+                    "[SteamBridge] Native receive failed for connection {}",
+                    connection,
+                    failure);
             LoopbackBridge bridge = loopbackByConnection.get(connection);
             if (bridge != null)
                 bridge.fail("Native receive failed: " + failure.getClass().getSimpleName());
@@ -621,7 +645,10 @@ public abstract class SteamRuntime<C extends SteamGameClient, S extends SteamGam
                 return friends.getFriendRelationship(SteamID.createFromNativeHandle(remoteSteamID))
                         == SteamFriends.FriendRelationship.Friend;
             } catch (Exception e) {
-                LOG.warn(
+                ProblemLog.warn(
+                        LOG,
+                        LOG_LIMITER,
+                        "SteamRuntime-warn-4",
                         "[SteamManager] Failed to resolve friend relationship for {}: {}",
                         remoteSteamID,
                         e.getMessage());
@@ -738,10 +765,13 @@ public abstract class SteamRuntime<C extends SteamGameClient, S extends SteamGam
             java.nio.file.Path file =
                     DiagnosticReport.write(
                             steambridge.SteamBridgeConfig.gameDirectory(), diagnosticReport());
-            LOG.info("[SteamBridge] Diagnostics saved to {}", file);
+            LOG.debug("[SteamBridge] Diagnostics saved to {}", file);
             return true;
         } catch (java.io.IOException | RuntimeException failure) {
-            LOG.warn(
+            ProblemLog.warn(
+                    LOG,
+                    LOG_LIMITER,
+                    "SteamRuntime-warn-5",
                     "[SteamBridge] Could not save diagnostics: {}",
                     failure.getClass().getSimpleName());
             return false;
@@ -872,7 +902,7 @@ public abstract class SteamRuntime<C extends SteamGameClient, S extends SteamGam
 
     @SuppressWarnings("unchecked")
     public void setActiveServer(SteamGameServer server) {
-        LOG.info("[SteamManager] setActiveServer: {}", server != null ? "SET" : "CLEAR");
+        LOG.debug("[SteamManager] setActiveServer: {}", server != null ? "SET" : "CLEAR");
         activeServer = (S) server;
     }
 
@@ -895,7 +925,7 @@ public abstract class SteamRuntime<C extends SteamGameClient, S extends SteamGam
 
     @SuppressWarnings("unchecked")
     public void setActiveClient(SteamGameClient client) {
-        LOG.info("[SteamManager] setActiveClient: {}", client != null ? "SET" : "CLEAR");
+        LOG.debug("[SteamManager] setActiveClient: {}", client != null ? "SET" : "CLEAR");
         activeClient = (C) client;
     }
 
@@ -948,7 +978,7 @@ public abstract class SteamRuntime<C extends SteamGameClient, S extends SteamGam
     private class SteamUtilsCallbackAdapter implements SteamUtilsCallback {
         @Override
         public void onSteamShutdown() {
-            LOG.warn("[SteamManager] onSteamShutdown callback fired!");
+            LOG.debug("[SteamManager] onSteamShutdown callback fired.");
             SteamRuntime.this.handleSteamShutdown();
         }
     }
@@ -1001,11 +1031,34 @@ public abstract class SteamRuntime<C extends SteamGameClient, S extends SteamGam
             LoopbackBridge bridge, boolean closeSteam, String reason, boolean linger) {
         int handle = bridge.connectionHandle();
         lastBridgeOutcome = CloseReason.classify(reason) + " " + bridge.diagnosticSummary();
-        LOG.info(
-                "[SteamBridge] Bridge closed: conn={} reason={} {}",
-                handle,
-                LogText.safe(reason),
-                bridge.diagnosticSummary());
+        CloseReason category = CloseReason.classify(reason);
+        boolean failure =
+                category == CloseReason.NATIVE_RECEIVE
+                        || category == CloseReason.NATIVE_SEND
+                        || category == CloseReason.QUEUE_LIMIT
+                        || category == CloseReason.DRAIN_TIMEOUT
+                        || (reason != null
+                                && (reason.startsWith("Local TCP error")
+                                        || reason.startsWith("Local TCP write failed")));
+        if (failure) {
+            SteamConnectionStatus status = statusByConnection.get(handle);
+            ProblemLog.warn(
+                    LOG,
+                    LOG_LIMITER,
+                    "bridge-" + category,
+                    "[SteamBridge] Bridge failed conn={} category={} route={} reason={} {}",
+                    handle,
+                    category,
+                    status == null ? "unknown" : status.describeRoute(),
+                    reason,
+                    bridge.diagnosticSummary());
+        } else {
+            LOG.debug(
+                    "[SteamBridge] Bridge closed conn={} reason={} {}",
+                    handle,
+                    LogText.safe(reason),
+                    bridge.diagnosticSummary());
+        }
         if (peerClosing.remove(handle, bridge)) {
             SteamSocketsApi api = socketsApi;
             if (api != null)

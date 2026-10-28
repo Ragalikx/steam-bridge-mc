@@ -21,6 +21,8 @@ import net.minecraft.text.TranslatableText;
 import net.minecraft.util.WorldSavePath;
 
 import steambridge.SteamBridgeMod;
+import steambridge.core.LogLimiter;
+import steambridge.core.ProblemLog;
 import steambridge.gui.GuiSteamConnecting;
 import steambridge.steam.SteamClient;
 import steambridge.steam.SteamManager;
@@ -33,6 +35,7 @@ import java.util.Locale;
 
 /** Client-side gameplay/GUI event handlers (Fabric 1.16.5). */
 public final class SteamClientEvents {
+    private static final LogLimiter LOG_LIMITER = new LogLimiter(32, 30_000);
 
     private static final int TRANSIENT_DISCONNECT_GRACE_TICKS = 160;
     private static final String MOD_MISMATCH_HINT_KEY = "steambridge.disconnect.mod_mismatch_hint";
@@ -90,7 +93,7 @@ public final class SteamClientEvents {
             DisconnectedScreen disconnected = (DisconnectedScreen) next;
             String reasonText = disconnectedReasonText(disconnected);
             if (shouldIgnoreVanillaConnectFailure(client, reasonText)) {
-                SteamBridgeMod.LOG.info(
+                SteamBridgeMod.LOG.debug(
                         "[SteamBridge] Ignoring vanilla ConnectScreen failure while Steam is"
                                 + " active. state={} reason={}",
                         client.getState(),
@@ -101,7 +104,10 @@ public final class SteamClientEvents {
             deferredClientDisconnectTicks = -1;
             Screen result = next;
             if (isGenericDisconnectDuringLogin(client) && looksLikeModRejection(reasonText)) {
-                SteamBridgeMod.LOG.warn(
+                ProblemLog.warn(
+                        SteamBridgeMod.LOG,
+                        LOG_LIMITER,
+                        "SteamClientEvents-warn-1",
                         "[SteamBridge] Replacing login disconnect with mod mismatch hint. state={}"
                                 + " reason={}",
                         client.getState(),
@@ -164,11 +170,11 @@ public final class SteamClientEvents {
             if (mc.world == null
                     && mc.getServer() == null
                     && !(mc.currentScreen instanceof DownloadingTerrainScreen)) {
-                SteamBridgeMod.LOG.info("[SteamBridge] World closed, stopping Steam server...");
+                SteamBridgeMod.LOG.debug("[SteamBridge] World closed, stopping Steam server...");
                 deferredServerStopTicks = -1;
                 server.stop();
             } else if (shouldStopHostForWorldChange(mc, server)) {
-                SteamBridgeMod.LOG.info(
+                SteamBridgeMod.LOG.debug(
                         "[SteamBridge] Integrated world changed (was '{}'), stopping leftover Steam"
                                 + " host.",
                         server.getWorldKey());

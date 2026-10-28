@@ -5,11 +5,16 @@
  */
 package steambridge.proxy;
 
+import steambridge.core.LogLimiter;
+import steambridge.core.ProblemLog;
+
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 
 /** Host-side per-client UDP relay to local voice service. */
 final class UdpHostRelay {
+    private static final LogLimiter LOG_LIMITER = new LogLimiter(32, 30_000);
+
     private static final org.apache.logging.log4j.Logger LOG =
             org.apache.logging.log4j.LogManager.getLogger("steambridge");
 
@@ -56,7 +61,7 @@ final class UdpHostRelay {
         thread = new Thread(this::receiveLoop, "SteamBridge-UdpRelay-" + steamConn);
         thread.setDaemon(true);
         thread.start();
-        LOG.info(
+        LOG.debug(
                 "[UdpRelay] Ready conn={} steamID={} localEphemeral={} voiceTarget={}",
                 steamConn,
                 steamID,
@@ -83,7 +88,7 @@ final class UdpHostRelay {
             if (!loggedFirstForward || port != lastTargetPort) {
                 loggedFirstForward = true;
                 lastTargetPort = port;
-                LOG.info(
+                LOG.debug(
                         "[UdpRelay] Forward steam->svc conn={} steamID={} target={} bytes={}",
                         steamConn,
                         steamID,
@@ -93,7 +98,10 @@ final class UdpHostRelay {
             s.send(new DatagramPacket(data, data.length, target));
         } catch (Exception e) {
             if (running) {
-                LOG.warn(
+                ProblemLog.warn(
+                        LOG,
+                        LOG_LIMITER,
+                        "UdpHostRelay-warn-1",
                         "[UdpRelay] Forward to service failed conn={} target={}: {}",
                         steamConn,
                         proxy.describeVoiceTarget(),
@@ -115,7 +123,7 @@ final class UdpHostRelay {
                 proxy.noteServerVoiceOut();
                 if (!loggedFirstReply) {
                     loggedFirstReply = true;
-                    LOG.info(
+                    LOG.debug(
                             "[UdpRelay] First svc->steam reply conn={} steamID={} bytes={}",
                             steamConn,
                             steamID,
@@ -126,7 +134,13 @@ final class UdpHostRelay {
                 break;
             } catch (Exception e) {
                 if (running)
-                    LOG.warn("[UdpRelay] Recv error conn={}: {}", steamConn, e.getMessage());
+                    ProblemLog.warn(
+                            LOG,
+                            LOG_LIMITER,
+                            "UdpHostRelay-warn-2",
+                            "[UdpRelay] Recv error conn={}: {}",
+                            steamConn,
+                            e.getMessage());
             }
         }
         DatagramSocket s = socket;

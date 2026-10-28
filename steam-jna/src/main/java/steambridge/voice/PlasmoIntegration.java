@@ -2,9 +2,14 @@ package steambridge.voice;
 
 import org.apache.logging.log4j.LogManager;
 
+import steambridge.core.LogLimiter;
+import steambridge.core.ProblemLog;
+
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class PlasmoIntegration {
+    private static final LogLimiter LOG_LIMITER = new LogLimiter(32, 30_000);
+
     private static final AtomicBoolean CLIENT = new AtomicBoolean();
     private static final AtomicBoolean SERVER = new AtomicBoolean();
 
@@ -18,7 +23,12 @@ public final class PlasmoIntegration {
             if (CLIENT.compareAndSet(false, true)) ClientRegistration.load();
         } catch (ClassNotFoundException absent) {
         } catch (LinkageError | RuntimeException failure) {
-            LogManager.getLogger("steambridge").warn("Plasmo client API unavailable", failure);
+            ProblemLog.warn(
+                    LogManager.getLogger("steambridge"),
+                    LOG_LIMITER,
+                    "PlasmoIntegration-warn-1",
+                    "Plasmo client API unavailable",
+                    failure);
         }
         try {
             Class.forName(
@@ -26,7 +36,12 @@ public final class PlasmoIntegration {
             if (SERVER.compareAndSet(false, true)) ServerRegistration.load();
         } catch (ClassNotFoundException absent) {
         } catch (LinkageError | RuntimeException failure) {
-            LogManager.getLogger("steambridge").warn("Plasmo server API unavailable", failure);
+            ProblemLog.warn(
+                    LogManager.getLogger("steambridge"),
+                    LOG_LIMITER,
+                    "PlasmoIntegration-warn-2",
+                    "Plasmo server API unavailable",
+                    failure);
         }
     }
 

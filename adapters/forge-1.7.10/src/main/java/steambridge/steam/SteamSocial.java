@@ -13,6 +13,8 @@ import net.minecraft.util.ResourceLocation;
 import net.minecraft.world.WorldSettings.GameType;
 
 import steambridge.SteamBridgeMod;
+import steambridge.core.LogLimiter;
+import steambridge.core.ProblemLog;
 
 import java.awt.image.BufferedImage;
 import java.io.File;
@@ -29,6 +31,8 @@ import java.io.File;
  * </ul>
  */
 public final class SteamSocial {
+    private static final LogLimiter LOG_LIMITER = new LogLimiter(32, 30_000);
+
     private SteamSocial() {}
 
     // =========================================================================
@@ -114,7 +118,10 @@ public final class SteamSocial {
                     return textureId;
                 } catch (Exception e) {
                     avatarRetryAt.put(steamId, now + AVATAR_RETRY_MS);
-                    SteamBridgeMod.LOG.warn(
+                    ProblemLog.warn(
+                            SteamBridgeMod.LOG,
+                            LOG_LIMITER,
+                            "SteamSocial-warn-1",
                             "[ProfileCache] Avatar load failed for {}: {}",
                             steamId,
                             e.getMessage());

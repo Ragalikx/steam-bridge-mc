@@ -4,12 +4,16 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import steambridge.core.JsonSettings;
+import steambridge.core.LogLimiter;
 import steambridge.core.LogText;
+import steambridge.core.ProblemLog;
 import steambridge.core.SettingsFile;
 
 import java.nio.file.Path;
 
 public final class SteamBridgeConfig {
+    private static final LogLimiter LOG_LIMITER = new LogLimiter(32, 30_000);
+
     private static final Logger LOG = LogManager.getLogger("steambridge");
     private static volatile JsonSettings settings = JsonSettings.defaults();
     private static volatile Path configDirectory;
@@ -29,8 +33,12 @@ public final class SteamBridgeConfig {
         try {
             settings = SettingsFile.load(directory, settings);
         } catch (Exception failure) {
-            LOG.warn(
-                    "Steam Bridge configuration unchanged: {}", LogText.safe(failure.getMessage()));
+            ProblemLog.warn(
+                    LOG,
+                    LOG_LIMITER,
+                    "SteamBridgeConfig-warn-1",
+                    "Steam Bridge configuration unchanged: {}",
+                    LogText.safe(failure.getMessage()));
         }
     }
 

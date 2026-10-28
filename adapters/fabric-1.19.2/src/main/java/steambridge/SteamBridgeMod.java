@@ -8,8 +8,8 @@ package steambridge;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import steambridge.event.SteamClientEvents;
 import steambridge.gui.VanillaGuiIntegration;
@@ -21,11 +21,11 @@ public class SteamBridgeMod implements ClientModInitializer {
     public static final String NAME = "Steam Bridge";
     public static final String VERSION = BuildInfo.VERSION;
 
-    public static final Logger LOG = LoggerFactory.getLogger(NAME);
+    public static final Logger LOG = LogManager.getLogger("steambridge");
 
     @Override
     public void onInitializeClient() {
-        LOG.info("=== Steam Bridge pre-init (Fabric 1.19.2) v{} ===", VERSION);
+        LOG.debug("=== Steam Bridge pre-init (Fabric 1.19.2) v{} ===", VERSION);
 
         SteamBridgeConfig.load(net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir());
         SteamClientEvents.register();
@@ -33,13 +33,13 @@ public class SteamBridgeMod implements ClientModInitializer {
 
         ClientLifecycleEvents.CLIENT_STARTED.register(
                 client -> {
-                    LOG.info("=== SteamBridge client setup: initializing Steam... ===");
+                    LOG.debug("=== SteamBridge client setup: initializing Steam... ===");
                     if (steambridge.voice.VoiceIntegration.needsLegacyFactory()) {
                         steambridge.proxy.UdpInterceptFactory.install();
                     }
                     SteamAppIdHelper.ensureAppId(client.gameDirectory);
                     boolean ok = SteamManager.getInstance().init();
-                    LOG.info("=== Steam init result: {} ===", ok ? "SUCCESS" : "FAILED");
+                    LOG.debug("=== Steam init result: {} ===", ok ? "SUCCESS" : "FAILED");
                 });
     }
 

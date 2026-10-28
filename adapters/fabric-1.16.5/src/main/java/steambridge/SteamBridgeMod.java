@@ -22,7 +22,7 @@ public class SteamBridgeMod implements ClientModInitializer {
     public static final String NAME = "Steam Bridge";
     public static final String VERSION = BuildInfo.VERSION;
 
-    public static final Logger LOG = LogManager.getLogger(NAME);
+    public static final Logger LOG = LogManager.getLogger("steambridge");
 
     static {
         if (System.getProperty("jna.nosys") == null) {
@@ -32,7 +32,7 @@ public class SteamBridgeMod implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
-        LOG.info("=== Steam Bridge pre-init (Fabric 1.16.5) v{} ===", VERSION);
+        LOG.debug("=== Steam Bridge pre-init (Fabric 1.16.5) v{} ===", VERSION);
 
         SteamBridgeConfig.load(net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir());
         SteamClientEvents.register();
@@ -40,13 +40,13 @@ public class SteamBridgeMod implements ClientModInitializer {
 
         ClientLifecycleEvents.CLIENT_STARTED.register(
                 client -> {
-                    LOG.info("=== SteamBridge client setup: initializing Steam... ===");
+                    LOG.debug("=== SteamBridge client setup: initializing Steam... ===");
                     if (steambridge.voice.VoiceIntegration.needsLegacyFactory()) {
                         steambridge.proxy.UdpInterceptFactory.install();
                     }
                     SteamAppIdHelper.ensureAppId(client.runDirectory);
                     boolean ok = SteamManager.getInstance().init();
-                    LOG.info("=== Steam init result: {} ===", ok ? "SUCCESS" : "FAILED");
+                    LOG.debug("=== Steam init result: {} ===", ok ? "SUCCESS" : "FAILED");
                 });
     }
 

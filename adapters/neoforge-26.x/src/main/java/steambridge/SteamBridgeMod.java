@@ -5,8 +5,6 @@
  */
 package steambridge;
 
-import com.mojang.logging.LogUtils;
-
 import net.minecraft.client.Minecraft;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
@@ -14,7 +12,8 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.neoforge.common.NeoForge;
 
-import org.slf4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import steambridge.event.SteamClientEvents;
 import steambridge.steam.SteamManager;
@@ -26,11 +25,11 @@ public class SteamBridgeMod {
     public static final String MODID = "steambridge";
     public static final String VERSION = BuildInfo.VERSION;
 
-    public static final Logger LOG = LogUtils.getLogger();
+    public static final Logger LOG = LogManager.getLogger("steambridge");
 
     public SteamBridgeMod(IEventBus modEventBus, ModContainer modContainer) {
         SteamBridgeConfig.load(net.neoforged.fml.loading.FMLPaths.CONFIGDIR.get());
-        LOG.info("=== Steam Bridge pre-init (NeoForge 26.x) v{} ===", VERSION);
+        LOG.debug("=== Steam Bridge pre-init (NeoForge 26.x) v{} ===", VERSION);
 
         modEventBus.addListener(this::onClientSetup);
 
@@ -40,13 +39,13 @@ public class SteamBridgeMod {
     private void onClientSetup(FMLClientSetupEvent event) {
         event.enqueueWork(
                 () -> {
-                    LOG.info("=== SteamBridge client setup: initializing Steam... ===");
+                    LOG.debug("=== SteamBridge client setup: initializing Steam... ===");
                     if (steambridge.voice.VoiceIntegration.needsLegacyFactory()) {
                         steambridge.proxy.UdpInterceptFactory.install();
                     }
                     SteamAppIdHelper.ensureAppId(Minecraft.getInstance().gameDirectory);
                     boolean ok = SteamManager.getInstance().init();
-                    LOG.info("=== Steam init result: {} ===", ok ? "SUCCESS" : "FAILED");
+                    LOG.debug("=== Steam init result: {} ===", ok ? "SUCCESS" : "FAILED");
                 });
     }
 

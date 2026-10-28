@@ -13,9 +13,12 @@ import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.network.Connection;
 import net.minecraft.world.level.GameType;
 import steambridge.SteamBridgeMod;
+import steambridge.core.LogLimiter;
 import steambridge.core.NamedField;
+import steambridge.core.ProblemLog;
 
 final class GuiFields {
+    private static final LogLimiter LOG_LIMITER = new LogLimiter(32, 30_000);
     static final NamedField<EditBox> EDITOR_IP = new NamedField<>(EditServerScreen.class, EditBox.class, "ipEdit", "f_96010_");
     static final NamedField<EditBox> EDITOR_NAME = new NamedField<>(EditServerScreen.class, EditBox.class, "nameEdit", "f_96011_");
     static final NamedField<ServerData> EDITOR_SERVER = new NamedField<>(EditServerScreen.class, ServerData.class, "serverData", "f_96009_");
@@ -37,7 +40,8 @@ final class GuiFields {
         try {
             return field.get(owner);
         } catch (RuntimeException failure) {
-            SteamBridgeMod.LOG.warn("GUI field access failed: {}", field, failure);
+            ProblemLog.warn(SteamBridgeMod.LOG, LOG_LIMITER, "gui-field-access",
+                    "GUI field access failed: {}", field, failure);
             return null;
         }
     }

@@ -14,6 +14,8 @@ import net.minecraft.util.ResourceLocation;
 import net.minecraft.world.GameType;
 
 import steambridge.SteamBridgeMod;
+import steambridge.core.LogLimiter;
+import steambridge.core.ProblemLog;
 
 import java.io.File;
 import java.util.Base64;
@@ -30,6 +32,8 @@ import java.util.Base64;
  * </ul>
  */
 public final class SteamSocial {
+    private static final LogLimiter LOG_LIMITER = new LogLimiter(32, 30_000);
+
     private SteamSocial() {}
 
     // =========================================================================
@@ -80,7 +84,10 @@ public final class SteamSocial {
             } catch (Exception e) {
                 nativeImage.close();
                 avatarRetryAt.put(steamId, System.currentTimeMillis() + AVATAR_RETRY_MS);
-                SteamBridgeMod.LOG.warn(
+                ProblemLog.warn(
+                        SteamBridgeMod.LOG,
+                        LOG_LIMITER,
+                        "SteamSocial-warn-1",
                         "[ProfileCache] Avatar texture register failed for {}: {}",
                         steamId,
                         e.getMessage());
@@ -149,7 +156,10 @@ public final class SteamSocial {
                     return nativeImage;
                 } catch (Exception e) {
                     avatarRetryAt.put(steamId, now + AVATAR_RETRY_MS);
-                    SteamBridgeMod.LOG.warn(
+                    ProblemLog.warn(
+                            SteamBridgeMod.LOG,
+                            LOG_LIMITER,
+                            "SteamSocial-warn-2",
                             "[ProfileCache] Avatar load failed for {}: {}",
                             steamId,
                             e.getMessage());
@@ -175,7 +185,10 @@ public final class SteamSocial {
                     avatarIconB64BySteamId.put(steamId, Base64.getEncoder().encodeToString(png));
                 }
             } catch (Exception e) {
-                SteamBridgeMod.LOG.warn(
+                ProblemLog.warn(
+                        SteamBridgeMod.LOG,
+                        LOG_LIMITER,
+                        "SteamSocial-warn-3",
                         "[ProfileCache] Avatar iconB64 encode failed for {}: {}",
                         steamId,
                         e.getMessage());

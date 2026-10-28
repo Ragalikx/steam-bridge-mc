@@ -32,17 +32,18 @@ public class ClientConnectionMixin {
         if (reason instanceof TranslatableText) {
             key = ((TranslatableText) reason).getKey();
         }
-        SteamBridgeMod.LOG.warn(
+        SteamBridgeMod.LOG.debug(
                 "[SteamBridge] ClientConnection.disconnect: reason='{}' key='{}' class={} open={}"
-                    + " addr={}",
+                        + " addr={}",
                 SteamBridgeMod.safeLog(msg),
                 key,
                 reason != null ? reason.getClass().getSimpleName() : "null",
                 self.isOpen(),
                 self.getAddress());
-        // Always print a short stack so we can see the caller (login vs channelInactive vs us).
-        SteamBridgeMod.LOG.warn(
-                "[SteamBridge] ClientConnection.disconnect stack",
-                new Throwable("disconnect-trace"));
+        if (SteamBridgeMod.LOG.isDebugEnabled()) {
+            SteamBridgeMod.LOG.debug(
+                    "[SteamBridge] ClientConnection.disconnect stack",
+                    new Throwable("disconnect-trace"));
+        }
     }
 }

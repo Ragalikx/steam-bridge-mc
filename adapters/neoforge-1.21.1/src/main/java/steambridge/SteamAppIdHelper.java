@@ -5,6 +5,9 @@
  */
 package steambridge;
 
+import steambridge.core.LogLimiter;
+import steambridge.core.ProblemLog;
+
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -12,6 +15,7 @@ import java.util.Locale;
 
 /** steam_appid.txt (480 / Spacewar) and optional Steam / Spacewar launch helpers. */
 public final class SteamAppIdHelper {
+    private static final LogLimiter LOG_LIMITER = new LogLimiter(32, 30_000);
 
     /** Spacewar. Fixed; do not point this at a VAC/EAC game. */
     public static final String APP_ID = "480";
@@ -45,7 +49,10 @@ public final class SteamAppIdHelper {
                 if (appId.equals(current)) {
                     return;
                 }
-                SteamBridgeMod.LOG.warn(
+                ProblemLog.warn(
+                        SteamBridgeMod.LOG,
+                        LOG_LIMITER,
+                        "SteamAppIdHelper-warn-1",
                         "[SteamAppId] {} contains '{}', overwriting with '{}'",
                         target.getAbsolutePath(),
                         current,
@@ -54,7 +61,7 @@ public final class SteamAppIdHelper {
             try (FileWriter fw = new FileWriter(target)) {
                 fw.write(appId);
             }
-            SteamBridgeMod.LOG.info(
+            SteamBridgeMod.LOG.debug(
                     "[SteamAppId] Created {} with appid={}", target.getAbsolutePath(), appId);
         } catch (IOException e) {
             SteamBridgeMod.LOG.error(
@@ -79,9 +86,14 @@ public final class SteamAppIdHelper {
                 pb = new ProcessBuilder("xdg-open", uri);
             }
             pb.start();
-            SteamBridgeMod.LOG.info("[SteamAppId] Launching Steam/Spacewar: {}", uri);
+            SteamBridgeMod.LOG.debug("[SteamAppId] Launching Steam/Spacewar: {}", uri);
         } catch (Exception e) {
-            SteamBridgeMod.LOG.warn("[SteamAppId] Could not launch Steam: {}", e.getMessage());
+            ProblemLog.warn(
+                    SteamBridgeMod.LOG,
+                    LOG_LIMITER,
+                    "SteamAppIdHelper-warn-2",
+                    "[SteamAppId] Could not launch Steam: {}",
+                    e.getMessage());
         }
     }
 }

@@ -102,7 +102,7 @@ public final class SteamTransport {
                 java.net.InetSocketAddress local =
                         (java.net.InetSocketAddress) f.channel().localAddress();
                 if (onLocalPort != null) onLocalPort.accept(local.getPort());
-                SteamBridgeMod.LOG.info(
+                SteamBridgeMod.LOG.debug(
                         "[LoopbackBridge][Server] Bridge started: conn={} steamID={} localPort={}",
                         conn,
                         steamID,
@@ -141,7 +141,7 @@ public final class SteamTransport {
             io.netty.channel.ChannelFuture f = b.bind("127.0.0.1", 0).syncUninterruptibly();
             if (f.isSuccess()) {
                 int port = ((java.net.InetSocketAddress) f.channel().localAddress()).getPort();
-                SteamBridgeMod.LOG.info(
+                SteamBridgeMod.LOG.debug(
                         "[LoopbackBridge][Client] Proxy listening on port {}", port);
                 return port;
             }
@@ -238,7 +238,7 @@ public final class SteamTransport {
                     new C00Handshake(5, "SteamRelay\0FML\0", 25565, EnumConnectionState.LOGIN));
             nm.scheduleOutboundPacket(new C00PacketLoginStart(mc.getSession().func_148256_e()));
 
-            SteamBridgeMod.LOG.info(
+            SteamBridgeMod.LOG.debug(
                     "[LoopbackBridge][Client] Connected to loopback proxy. proxyPort={} conn={}"
                             + " steamID={}",
                     proxyPort,

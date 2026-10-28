@@ -1,8 +1,12 @@
 package steambridge.steam;
 
 import steambridge.SteamBridgeMod;
+import steambridge.core.LogLimiter;
+import steambridge.core.ProblemLog;
 
 public class SteamClient extends SteamClientBase<net.minecraft.client.gui.GuiScreen> {
+    private static final LogLimiter LOG_LIMITER = new LogLimiter(32, 30_000);
+
     @Override
     protected SteamRuntime<?, ?> runtime() {
         return SteamManager.getInstance();
@@ -48,7 +52,7 @@ public class SteamClient extends SteamClientBase<net.minecraft.client.gui.GuiScr
                                 return;
                             }
                             markSteamReady();
-                            SteamBridgeMod.LOG.info(
+                            SteamBridgeMod.LOG.debug(
                                     "[SteamClient] Loopback mode active - Steam transport is"
                                             + " ready.");
                         } else {
@@ -68,7 +72,7 @@ public class SteamClient extends SteamClientBase<net.minecraft.client.gui.GuiScr
                     }
                 });
 
-        SteamBridgeMod.LOG.info(
+        SteamBridgeMod.LOG.debug(
                 "[SteamClient] Loopback proxy ready: conn={} steamID={}", conn, remoteSteamID);
     }
 
@@ -123,12 +127,20 @@ public class SteamClient extends SteamClientBase<net.minecraft.client.gui.GuiScr
                 nm.processReceivedPackets();
             } else if (nm.getExitMessage() != null && alive.get()) {
 
-                SteamBridgeMod.LOG.warn(
+                ProblemLog.warn(
+                        SteamBridgeMod.LOG,
+                        LOG_LIMITER,
+                        "SteamClient-warn-1",
                         "[SteamClient] NetworkManager closed: {}",
                         nm.getExitMessage().getUnformattedText());
             }
         } catch (Throwable t) {
-            SteamBridgeMod.LOG.warn("[SteamClient] tickNetwork error: {}", t.toString());
+            ProblemLog.warn(
+                    SteamBridgeMod.LOG,
+                    LOG_LIMITER,
+                    "SteamClient-warn-2",
+                    "[SteamClient] tickNetwork error: {}",
+                    t.toString());
         }
     }
 

@@ -1,8 +1,12 @@
 package steambridge.steam;
 
 import steambridge.SteamBridgeMod;
+import steambridge.core.LogLimiter;
+import steambridge.core.ProblemLog;
 
 public final class SteamManager extends SteamRuntime<SteamClient, SteamServer> {
+    private static final LogLimiter LOG_LIMITER = new LogLimiter(32, 30_000);
+
     private static final SteamManager INSTANCE = new SteamManager();
 
     public static SteamManager getInstance() {
@@ -25,8 +29,16 @@ public final class SteamManager extends SteamRuntime<SteamClient, SteamServer> {
     @Override
     public void handleSteamShutdown() {
         final steambridge.core.NativeCallGate generation = jniGate;
-        SteamBridgeMod.LOG.warn(
-                "[SteamManager] Steam shutdown signal received; scheduling graceful disconnect.");
+        if ((activeClient != null && activeClient.isAlive())
+                || (activeServer != null && activeServer.isRunning())) {
+            ProblemLog.warn(
+                    SteamBridgeMod.LOG,
+                    LOG_LIMITER,
+                    "SteamManager-warn-1",
+                    "[SteamManager] Steam stopped during an active session; disconnecting.");
+        } else {
+            SteamBridgeMod.LOG.debug("[SteamManager] Steam shutdown signal received.");
+        }
 
         running.set(false);
         signalReceiveWake();

@@ -103,7 +103,7 @@ public final class SteamTransport {
             if (f.isSuccess()) {
                 InetSocketAddress local = (InetSocketAddress) f.channel().localAddress();
                 if (onLocalPort != null) onLocalPort.accept(local.getPort());
-                SteamBridgeMod.LOG.info(
+                SteamBridgeMod.LOG.debug(
                         "[LoopbackBridge][Server] Bridge started: conn={} steamID={} localPort={}",
                         conn,
                         steamID,
@@ -139,9 +139,9 @@ public final class SteamTransport {
                         new ChannelInitializer<LocalChannel>() {
                             @Override
                             protected void initChannel(LocalChannel ch) {
-                                SteamBridgeMod.LOG.info(
+                                SteamBridgeMod.LOG.debug(
                                         "[LoopbackBridge][Client] Accepted local MC connection:"
-                                            + " local={} remote={}",
+                                                + " local={} remote={}",
                                         ch.localAddress(),
                                         ch.remoteAddress());
                                 ch.pipeline().addLast("bridge", bridge);
@@ -152,7 +152,7 @@ public final class SteamTransport {
             ChannelFuture f = b.bind(addr).syncUninterruptibly();
             if (f.isSuccess()) {
                 bridge.setServerChannel(f.channel());
-                SteamBridgeMod.LOG.info("[LoopbackBridge][Client] Local proxy bound: {}", addr);
+                SteamBridgeMod.LOG.debug("[LoopbackBridge][Client] Local proxy bound: {}", addr);
                 return addr;
             }
         } catch (Exception e) {
@@ -201,9 +201,9 @@ public final class SteamTransport {
             connection.send(new HandshakeC2SPacket("127.0.0.1", 25565, NetworkState.LOGIN));
             connection.send(new LoginHelloC2SPacket(mc.getSession().getProfile()));
 
-            SteamBridgeMod.LOG.info(
+            SteamBridgeMod.LOG.debug(
                     "[LoopbackBridge][Client] Connected via LocalChannel. addr={} conn={}"
-                        + " steamID={} open={} local={}",
+                            + " steamID={} open={} local={}",
                     proxyAddress,
                     connectionHandle,
                     remoteSteamID,

@@ -47,7 +47,7 @@ public class SteamClient extends SteamClientBase<net.minecraft.client.gui.GuiScr
                                 return;
                             }
                             markSteamReady();
-                            SteamBridgeMod.LOG.info(
+                            SteamBridgeMod.LOG.debug(
                                     "[SteamClient] Loopback mode active - Steam transport is"
                                             + " ready.");
                         } else {
@@ -67,7 +67,7 @@ public class SteamClient extends SteamClientBase<net.minecraft.client.gui.GuiScr
                     }
                 });
 
-        SteamBridgeMod.LOG.info(
+        SteamBridgeMod.LOG.debug(
                 "[SteamClient] Loopback proxy ready: conn={} steamID={}", conn, remoteSteamID);
     }
 

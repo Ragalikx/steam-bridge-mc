@@ -6,7 +6,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def render(target):
-    imports = {'steambridge.core.NamedField', 'steambridge.SteamBridgeMod'}
+    imports = {'steambridge.core.NamedField', 'steambridge.core.LogLimiter', 'steambridge.core.ProblemLog', 'steambridge.SteamBridgeMod'}
 
     def name(value):
         if value in ['boolean', 'int']:
@@ -26,7 +26,7 @@ def render(target):
                       + ' = new NamedField<>(' + owner + '.class, ' + type_name + '.class, '
                       + ', '.join(json.dumps(alias) for alias in aliases) + ');')
     return ('package steambridge.gui;\n\n' + '\n'.join('import ' + value + ';' for value in sorted(imports))
-            + '\n\nfinal class GuiFields {\n' + '\n'.join(fields) + '''
+            + '\n\nfinal class GuiFields {\n    private static final LogLimiter LOG_LIMITER = new LogLimiter(32, 30_000);\n' + '\n'.join(fields) + '''
 
     private GuiFields() {}
 
@@ -34,7 +34,8 @@ def render(target):
         try {
             return field.get(owner);
         } catch (RuntimeException failure) {
-            SteamBridgeMod.LOG.warn("GUI field access failed: {}", field, failure);
+            ProblemLog.warn(SteamBridgeMod.LOG, LOG_LIMITER, "gui-field-access",
+                    "GUI field access failed: {}", field, failure);
             return null;
         }
     }

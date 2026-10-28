@@ -18,6 +18,8 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 
 import steambridge.SteamBridgeMod;
+import steambridge.core.LogLimiter;
+import steambridge.core.ProblemLog;
 import steambridge.gui.GuiSteamConnecting;
 import steambridge.steam.SteamClient;
 import steambridge.steam.SteamManager;
@@ -28,6 +30,7 @@ import java.net.SocketAddress;
 
 /** Client-side gameplay/GUI event handlers (Fabric 1.20.1). */
 public final class SteamClientEvents {
+    private static final LogLimiter LOG_LIMITER = new LogLimiter(32, 30_000);
 
     private static final int TRANSIENT_DISCONNECT_GRACE_TICKS = 160;
     private static final String MOD_MISMATCH_HINT_KEY = "steambridge.disconnect.mod_mismatch_hint";
@@ -78,7 +81,7 @@ public final class SteamClientEvents {
 
         if (client != null && next instanceof DisconnectedScreen) {
             if (client.getState() == SteamClient.State.CONNECTING) {
-                SteamBridgeMod.LOG.info(
+                SteamBridgeMod.LOG.debug(
                         "[SteamBridge] Ignoring secondary DisconnectedScreen from vanilla"
                                 + " background thread while Steam connection is negotiating.");
                 return null;
@@ -106,7 +109,7 @@ public final class SteamClientEvents {
         if (server != null && server.isRunning()) {
             if (shouldDeferSteamServerStop(mc)) {
                 deferredServerStopTicks = TRANSIENT_DISCONNECT_GRACE_TICKS;
-                SteamBridgeMod.LOG.info(
+                SteamBridgeMod.LOG.debug(
                         "[SteamBridge] Deferring Steam host shutdown after client disconnect;"
                                 + " screen={} level={} integratedServer={}",
                         screenName(mc.screen),
@@ -125,7 +128,7 @@ public final class SteamClientEvents {
                 showLoginMismatchHint(mc, client);
             } else if (shouldDeferSteamClientDisconnect(mc, client)) {
                 deferredClientDisconnectTicks = TRANSIENT_DISCONNECT_GRACE_TICKS;
-                SteamBridgeMod.LOG.info(
+                SteamBridgeMod.LOG.debug(
                         "[SteamBridge] Deferring Steam client disconnect; possible dimension"
                                 + " transfer. screen={} level={} player={} channelOpen={}",
                         screenName(mc.screen),
@@ -156,11 +159,11 @@ public final class SteamClientEvents {
             if (mc.level == null
                     && mc.getSingleplayerServer() == null
                     && !(mc.screen instanceof ReceivingLevelScreen)) {
-                SteamBridgeMod.LOG.info("[SteamBridge] World closed, stopping Steam server...");
+                SteamBridgeMod.LOG.debug("[SteamBridge] World closed, stopping Steam server...");
                 deferredServerStopTicks = -1;
                 server.stop();
             } else if (shouldStopHostForWorldChange(mc, server)) {
-                SteamBridgeMod.LOG.info(
+                SteamBridgeMod.LOG.debug(
                         "[SteamBridge] Integrated world changed (was '{}'), stopping leftover Steam"
                                 + " host.",
                         server.getWorldKey());
@@ -192,7 +195,7 @@ public final class SteamClientEvents {
                 deferredClientDisconnectTicks = -1;
             } else if (shouldCloseDeferredClient(mc, client)) {
                 deferredClientDisconnectTicks = -1;
-                SteamBridgeMod.LOG.info(
+                SteamBridgeMod.LOG.debug(
                         "[SteamBridge] Deferred Steam client disconnect resolved as real"
                                 + " disconnect. screen={} channelOpen={}",
                         screenName(mc.screen),
@@ -200,11 +203,11 @@ public final class SteamClientEvents {
                 client.disconnect();
             } else if (mc.level != null && mc.player != null && client.isSteamChannelOpen()) {
                 deferredClientDisconnectTicks = -1;
-                SteamBridgeMod.LOG.info(
+                SteamBridgeMod.LOG.debug(
                         "[SteamBridge] Preserved Steam client across transient world reload.");
             } else if (--deferredClientDisconnectTicks <= 0) {
                 deferredClientDisconnectTicks = -1;
-                SteamBridgeMod.LOG.info(
+                SteamBridgeMod.LOG.debug(
                         "[SteamBridge] Transient disconnect grace window expired; tearing down"
                                 + " Steam client. screen={} channelOpen={}",
                         screenName(mc.screen),
@@ -219,13 +222,13 @@ public final class SteamClientEvents {
                 deferredServerStopTicks = -1;
             } else if (shouldStopHostForWorldChange(mc, server)) {
                 deferredServerStopTicks = -1;
-                SteamBridgeMod.LOG.info(
+                SteamBridgeMod.LOG.debug(
                         "[SteamBridge] Deferred host stop: world changed to a different save,"
                                 + " stopping Steam.");
                 server.stop();
             } else if (shouldCloseDeferredServer(mc)) {
                 deferredServerStopTicks = -1;
-                SteamBridgeMod.LOG.info(
+                SteamBridgeMod.LOG.debug(
                         "[SteamBridge] Deferred Steam host shutdown resolved as real disconnect."
                                 + " screen={}",
                         screenName(mc.screen));
@@ -234,11 +237,11 @@ public final class SteamClientEvents {
                     && mc.level != null
                     && isSameHostedWorld(mc, server)) {
                 deferredServerStopTicks = -1;
-                SteamBridgeMod.LOG.info(
+                SteamBridgeMod.LOG.debug(
                         "[SteamBridge] Preserved Steam host across transient world reload.");
             } else if (--deferredServerStopTicks <= 0) {
                 deferredServerStopTicks = -1;
-                SteamBridgeMod.LOG.info(
+                SteamBridgeMod.LOG.debug(
                         "[SteamBridge] Transient host grace window expired; stopping Steam server."
                                 + " screen={} integratedServer={}",
                         screenName(mc.screen),
@@ -324,7 +327,10 @@ public final class SteamClientEvents {
     }
 
     private static void showLoginMismatchHint(Minecraft mc, SteamClient client) {
-        SteamBridgeMod.LOG.warn(
+        ProblemLog.warn(
+                SteamBridgeMod.LOG,
+                LOG_LIMITER,
+                "SteamClientEvents-warn-1",
                 "[SteamBridge] Minecraft connection closed during Steam login before a detailed"
                         + " disconnect screen appeared. screen={} state={}",
                 screenName(mc.screen),

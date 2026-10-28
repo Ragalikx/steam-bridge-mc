@@ -5,6 +5,9 @@
  */
 package steambridge;
 
+import steambridge.core.LogLimiter;
+import steambridge.core.ProblemLog;
+
 import java.io.File;
 import java.io.InputStream;
 import java.lang.reflect.Method;
@@ -20,6 +23,7 @@ import java.nio.file.StandardCopyOption;
  * SteamOffsets.validateLayout()}.
  */
 public final class JnaBootstrap {
+    private static final LogLimiter LOG_LIMITER = new LogLimiter(32, 30_000);
 
     private static volatile boolean done;
 
@@ -45,7 +49,7 @@ public final class JnaBootstrap {
                 File nativeDir = unpackJnidispatch();
                 if (nativeDir != null) {
                     System.setProperty("jna.boot.library.path", nativeDir.getAbsolutePath());
-                    SteamBridgeMod.LOG.info(
+                    SteamBridgeMod.LOG.debug(
                             "[JNA] jna.boot.library.path={}", nativeDir.getAbsolutePath());
                 }
 
@@ -60,7 +64,7 @@ public final class JnaBootstrap {
                 } finally {
                     Thread.currentThread().setContextClassLoader(prev);
                 }
-                SteamBridgeMod.LOG.info("[JNA] Bootstrap OK.");
+                SteamBridgeMod.LOG.debug("[JNA] Bootstrap OK.");
             } catch (Throwable t) {
                 SteamBridgeMod.LOG.error("[JNA] Bootstrap failed: {}", t.toString());
                 SteamBridgeMod.LOG.error("[JNA] Bootstrap stack", t);
@@ -79,11 +83,16 @@ public final class JnaBootstrap {
             }
             Method add = classLoader.getClass().getMethod("addTransformerExclusion", String.class);
             add.invoke(classLoader, prefix);
-            SteamBridgeMod.LOG.info("[JNA] addTransformerExclusion(\"{}\")", prefix);
+            SteamBridgeMod.LOG.debug("[JNA] addTransformerExclusion(\"{}\")", prefix);
         } catch (ClassNotFoundException ignored) {
             // Not under LaunchWrapper.
         } catch (Throwable t) {
-            SteamBridgeMod.LOG.warn("[JNA] transformer exclusion failed: {}", t.toString());
+            ProblemLog.warn(
+                    SteamBridgeMod.LOG,
+                    LOG_LIMITER,
+                    "JnaBootstrap-warn-1",
+                    "[JNA] transformer exclusion failed: {}",
+                    t.toString());
         }
     }
 
@@ -129,7 +138,7 @@ public final class JnaBootstrap {
             File out = new File(dir, fileName);
             out.deleteOnExit();
             Files.copy(in, out.toPath(), StandardCopyOption.REPLACE_EXISTING);
-            SteamBridgeMod.LOG.info(
+            SteamBridgeMod.LOG.debug(
                     "[JNA] Unpacked {} ({} bytes)", out.getAbsolutePath(), out.length());
             return dir;
         } catch (Throwable t) {

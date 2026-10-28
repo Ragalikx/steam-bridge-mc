@@ -77,7 +77,7 @@ public final class SteamTransport {
             if (f.isSuccess()) {
                 InetSocketAddress local = (InetSocketAddress) f.channel().localAddress();
                 if (onLocalPort != null) onLocalPort.accept(local.getPort());
-                SteamBridgeMod.LOG.info(
+                SteamBridgeMod.LOG.debug(
                         "[LoopbackBridge][Server] Bridge started: conn={} steamID={} localPort={}",
                         conn,
                         steamID,
@@ -116,7 +116,7 @@ public final class SteamTransport {
             if (f.isSuccess()) {
                 bridge.setServerChannel(f.channel());
                 int port = ((InetSocketAddress) f.channel().localAddress()).getPort();
-                SteamBridgeMod.LOG.info(
+                SteamBridgeMod.LOG.debug(
                         "[LoopbackBridge][Client] Proxy listening on port {}", port);
                 return port;
             }
@@ -183,9 +183,9 @@ public final class SteamTransport {
             // Mixin @Accessor is remapped by Loom/Mixin.
             ((steambridge.mixin.MinecraftAccessor) (Object) mc).setPendingConnection(connection);
 
-            SteamBridgeMod.LOG.info(
+            SteamBridgeMod.LOG.debug(
                     "[LoopbackBridge][Client] Connected to loopback proxy. proxyPort={} conn={}"
-                        + " steamID={}",
+                            + " steamID={}",
                     proxyPort,
                     connectionHandle,
                     remoteSteamID);

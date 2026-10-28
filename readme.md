@@ -2,6 +2,8 @@
 
 Batch cleanup, per-peer queue control and diagnostic export are described in [reliability checks](docs/RELIABILITY.md). Minecraft UUID remains unchanged. Real Steam connections and in-game startup still require testing.
 
+Routine events use DEBUG. Recoverable failures include connection context and suppress repeated messages for 30 seconds; startup failures remain ERROR. [Logging behavior](docs/LOGGING.md).
+
 [Русский](readmeru.md) · [Discord](https://discord.gg/2xBnJ7awRC) · [Author](https://github.com/Ragalikx)
 
 Steam Bridge connects Minecraft LAN worlds through Steam Networking Sockets, using direct P2P or Valve relays. Install one mod JAR matching your Minecraft version, loader and OS. Steam and Spacewar (AppID 480) must be running for both players.

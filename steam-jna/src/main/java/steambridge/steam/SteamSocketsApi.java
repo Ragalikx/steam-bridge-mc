@@ -15,14 +15,18 @@ import com.sun.jna.ptr.LongByReference;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import steambridge.core.LogLimiter;
 import steambridge.core.LogText;
 import steambridge.core.NativeCallGate;
+import steambridge.core.ProblemLog;
 import steambridge.core.QueueLimits;
 import steambridge.steam.SteamOffsets.*;
 
 import java.io.File;
 
 public final class SteamSocketsApi {
+    private final LogLimiter LOG_LIMITER = new LogLimiter(32, 30_000);
+
     private static final Logger LOG = LogManager.getLogger("steambridge");
     private final NativeCallGate gate = new NativeCallGate();
     private final java.util.Set<NativeAllocation.Buffer> sendBuffers =
@@ -175,7 +179,7 @@ public final class SteamSocketsApi {
                             0L,
                             CONFIG_TYPE_INT32,
                             val32);
-                    LOG.info(
+                    LOG.debug(
                             "[SteamSocketsApi] Transport mode: P2P_ONLY (ICE=ALL,"
                                     + " SDRpenalty=9999ms)");
                     break;
@@ -196,7 +200,7 @@ public final class SteamSocketsApi {
                             0L,
                             CONFIG_TYPE_INT32,
                             val32);
-                    LOG.info("[SteamSocketsApi] Transport mode: RELAY_ONLY (ICE=disabled)");
+                    LOG.debug("[SteamSocketsApi] Transport mode: RELAY_ONLY (ICE=disabled)");
                     break;
                 case "AUTO":
                 default:
@@ -224,7 +228,7 @@ public final class SteamSocketsApi {
                             0L,
                             CONFIG_TYPE_INT32,
                             val32);
-                    LOG.info(
+                    LOG.debug(
                             "[SteamSocketsApi] Transport mode: AUTO (ICE=ALL, ICEpenalty={}ms,"
                                     + " SDRpenalty={}ms)",
                             P2P_TRANSPORT_ICE_PENALTY_VAL,
@@ -232,7 +236,12 @@ public final class SteamSocketsApi {
                     break;
             }
         } catch (Throwable t) {
-            LOG.warn("[SteamSocketsApi] applyTransportMode error: {}", t.getMessage());
+            ProblemLog.warn(
+                    LOG,
+                    LOG_LIMITER,
+                    "SteamSocketsApi-warn-1",
+                    "[SteamSocketsApi] applyTransportMode error: {}",
+                    t.getMessage());
         }
     }
 
@@ -287,7 +296,7 @@ public final class SteamSocketsApi {
                                             CONFIG_TYPE_STRING,
                                             stunMem)
                                     != 0;
-                    LOG.info(
+                    LOG.debug(
                             "[SteamSocketsApi] STUN server list {}: {}",
                             stunOk ? "set" : "FAILED",
                             LogText.safe(stunServers.trim()));
@@ -375,7 +384,7 @@ public final class SteamSocketsApi {
                     utils, CONFIG_SEND_RATE_MAX, CONFIG_SCOPE_GLOBAL, 0L, CONFIG_TYPE_INT32, val32);
 
             if (ok) {
-                LOG.info(
+                LOG.debug(
                         "[SteamSocketsApi] Steam config applied (TimeoutInitial={}s,"
                                 + " TimeoutConnected={}s, Auth={}, Buffer={}MB, RateMax={}MB/s,"
                                 + " ICE=ALL, ICEPenalty={}ms, SDRPenalty={}ms, DirectPref={},"
@@ -390,12 +399,20 @@ public final class SteamSocketsApi {
                         iceOk && icePenaltyOk && sdrPenaltyOk ? "ENABLED" : "PARTIAL",
                         nagleOk ? "OFF" : "FAILED");
             } else {
-                LOG.warn(
+                ProblemLog.warn(
+                        LOG,
+                        LOG_LIMITER,
+                        "SteamSocketsApi-warn-2",
                         "[SteamSocketsApi] Failed to set Steam SendBufferSize (buffer config"
                                 + " only)");
             }
         } catch (Throwable t) {
-            LOG.warn("[SteamSocketsApi] Error setting Steam configuration: {}", t.getMessage());
+            ProblemLog.warn(
+                    LOG,
+                    LOG_LIMITER,
+                    "SteamSocketsApi-warn-3",
+                    "[SteamSocketsApi] Error setting Steam configuration: {}",
+                    t.getMessage());
         }
     }
 
@@ -440,11 +457,20 @@ public final class SteamSocketsApi {
                                                         utils, null)
                                         != 0;
                     } catch (RuntimeException | LinkageError failure) {
-                        LOG.warn("Steam callback removal failed", failure);
+                        ProblemLog.warn(
+                                LOG,
+                                LOG_LIMITER,
+                                "SteamSocketsApi-warn-4",
+                                "Steam callback removal failed",
+                                failure);
                     }
                     if (!removed && callbackRef != null) {
                         retainedCallbacks.add(callbackRef);
-                        LOG.warn("Retaining connection callback until Steam shutdown");
+                        ProblemLog.warn(
+                                LOG,
+                                LOG_LIMITER,
+                                "SteamSocketsApi-warn-5",
+                                "Retaining connection callback until Steam shutdown");
                     }
                     callbackRef = null;
                     for (NativeAllocation.Buffer memory : sendBuffers) memory.release();
