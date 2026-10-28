@@ -4,12 +4,15 @@ if (nativePlatform != 'windows-x64') {
 }
 def steamNatives = ['steam_api64.dll', 'steamworks4j64.dll']
 def jnaNativeFolder = 'win32-x86-64'
+def usesNamedFields = !(projectDir.name in ['forge-1.7.10', 'forge-1.8.9', 'forge-1.12.2', 'neoforge-26.x'])
 
 tasks.withType(AbstractArchiveTask) {
     def archivePlatform = name == 'linuxRuntimeJar' ? 'linux-x64' : nativePlatform
     preserveFileTimestamps = false
     reproducibleFileOrder = true
     inputs.property('nativePlatform', archivePlatform)
+    inputs.property('usesNamedFields', usesNamedFields)
+    if (!usesNamedFields) exclude 'steambridge/core/NamedField.class'
     inputs.property('jnaBootstrapPlatforms', ['win32-x86-64', 'linux-x86-64'])
     exclude { entry ->
         if (archivePlatform == 'linux-x64') return false

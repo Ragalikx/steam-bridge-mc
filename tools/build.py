@@ -55,6 +55,13 @@ def verify_jar(path, variant, platform):
     natives = {'steam_api64.dll'} if panama else {'steam_api64.dll', 'steamworks4j64.dll'}
     with zipfile.ZipFile(path) as jar:
         names = set(jar.namelist())
+        if variant['id'] in ['forge-1.7.10', 'forge-1.8.9', 'forge-1.12.2', 'neoforge-26.x']:
+            unused = 'steambridge/core/NamedField'
+            if unused + '.class' in names:
+                raise RuntimeError('Unused GUI helper packaged: ' + str(path))
+            for name in names:
+                if name.endswith('.class') and unused.encode() in jar.read(name):
+                    raise RuntimeError('Removed GUI helper is still referenced by ' + name)
         if panama and (any(name.startswith(('com/sun/jna/', 'com/codedisaster/')) for name in names) or 'steamworks4j64.dll' in names):
             raise RuntimeError('JNA/JNI backend packaged in the Panama mod')
         if any(name.endswith(('.so', '.dylib')) and name != 'com/sun/jna/linux-x86-64/libjnidispatch.so' for name in names):
