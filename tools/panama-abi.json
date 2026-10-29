@@ -372,5 +372,35 @@
     "key": "STATE_DEAD",
     "cpp": "k_ESteamNetworkingConnectionState_Dead",
     "java": "SteamSocketsApi.STATE_DEAD"
+  },
+  {
+    "key": "CALLBACK_INVITE",
+    "cpp": "GameRichPresenceJoinRequested_t::k_iCallback",
+    "java": "NativeConstants.CALLBACK_INVITE"
+  },
+  {
+    "key": "CALLBACK_RICH_PRESENCE",
+    "cpp": "FriendRichPresenceUpdate_t::k_iCallback",
+    "java": "NativeConstants.CALLBACK_RICH_PRESENCE"
+  },
+  {
+    "key": "INVITE_TEXT",
+    "cpp": "offsetof(GameRichPresenceJoinRequested_t, m_rgchConnect)",
+    "java": "SteamOffsets.INVITE_TEXT"
+  },
+  {
+    "key": "INVITE_TEXT_BYTES",
+    "cpp": "sizeof(((GameRichPresenceJoinRequested_t*)0)->m_rgchConnect)",
+    "java": "SteamOffsets.INVITE_TEXT_BYTES"
+  },
+  {
+    "key": "INVITE_BYTES",
+    "cpp": "sizeof(GameRichPresenceJoinRequested_t)",
+    "java": "SteamOffsets.INVITE_BYTES"
+  },
+  {
+    "key": "RICH_PRESENCE_MIN_BYTES",
+    "cpp": "offsetof(FriendRichPresenceUpdate_t, m_nAppID) + sizeof(AppId_t)",
+    "java": "SteamOffsets.RICH_PRESENCE_MIN_BYTES"
   }
 ]

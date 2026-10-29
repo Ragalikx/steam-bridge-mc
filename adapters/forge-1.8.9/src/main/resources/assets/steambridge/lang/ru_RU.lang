@@ -62,3 +62,6 @@ steambridge.gui.server_steam_status=Steam
 steambridge.gui.diagnostics=Диагностика
 steambridge.gui.diagnostics_saved=Сохранено
 steambridge.gui.diagnostics_failed=Ошибка
+steambridge.gui.invite=Пригласить друга
+steambridge.gui.invite_sent=Приглашение отправлено
+steambridge.gui.invite_failed=Не удалось пригласить

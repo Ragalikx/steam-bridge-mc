@@ -30,6 +30,41 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class VanillaGuiIntegration {
+    public static void acceptSteamInvite(long host) {
+        net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getMinecraft();
+        SteamManager manager = SteamManager.getInstance();
+        Object generation = manager.inviteGeneration();
+        mc.addScheduledTask(
+                () -> {
+                    if (!manager.isInviteGeneration(generation)) return;
+                    if (!(mc.currentScreen instanceof net.minecraft.client.gui.GuiMainMenu)
+                            && !(mc.currentScreen
+                                    instanceof net.minecraft.client.gui.GuiMultiplayer)) {
+                        steambridge.core.ProblemLog.warn(
+                                SteamBridgeMod.LOG,
+                                LOG_LIMITER,
+                                "invite-menu",
+                                "Return to the main or multiplayer menu before accepting a Steam"
+                                    + " invitation");
+                        return;
+                    }
+                    if (mc.theWorld != null
+                            || (manager.getActiveClient() != null
+                                    && manager.getActiveClient().isAlive())
+                            || (manager.getActiveServer() != null
+                                    && manager.getActiveServer().isRunning())
+                            || mc.currentScreen instanceof GuiSteamConnecting) {
+                        steambridge.core.ProblemLog.warn(
+                                SteamBridgeMod.LOG,
+                                LOG_LIMITER,
+                                "invite-busy",
+                                "Steam invitation ignored while a game or connection is active");
+                        return;
+                    }
+                    beginSteamConnect(mc.currentScreen, Long.toString(host));
+                });
+    }
+
     private static final LogLimiter LOG_LIMITER = new LogLimiter(32, 30_000);
 
     private static final int BTN_FRIENDS = 9002;

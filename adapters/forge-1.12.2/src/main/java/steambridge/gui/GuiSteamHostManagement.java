@@ -18,6 +18,7 @@ import java.util.List;
 public class GuiSteamHostManagement extends GuiScreen {
     private final GuiScreen parent;
     private SteamServer server;
+    private String inviteStatus = "steambridge.gui.invite";
     private int snapshotCount = -1;
     private static final int BUTTON_BACK = 0;
     private static final int BUTTON_BAN_LIST = 1;
@@ -48,6 +49,19 @@ public class GuiSteamHostManagement extends GuiScreen {
         return cachedSnaps;
     }
 
+    private void chooseInviteFriend() {
+        this.mc.displayGuiScreen(
+                new GuiSteamFriends(
+                        this,
+                        null,
+                        id -> {
+                            inviteStatus =
+                                    SteamManager.getInstance().inviteFriend(Long.parseLong(id))
+                                            ? "steambridge.gui.invite_sent"
+                                            : "steambridge.gui.invite_failed";
+                        }));
+    }
+
     public GuiSteamHostManagement(GuiScreen parent) {
         this.parent = parent;
     }
@@ -61,6 +75,15 @@ public class GuiSteamHostManagement extends GuiScreen {
     public void initGui() {
         this.server = SteamManager.getInstance().getActiveServer();
         this.buttonList.clear();
+        this.buttonList.add(
+                GuiButtons.create(
+                        3,
+                        this.fontRenderer,
+                        8,
+                        10,
+                        net.minecraft.client.resources.I18n.format(inviteStatus),
+                        60,
+                        96));
         this.buttonList.add(
                 GuiButtons.create(
                         BUTTON_DIAGNOSTICS,
@@ -134,6 +157,10 @@ public class GuiSteamHostManagement extends GuiScreen {
 
     @Override
     protected void actionPerformed(GuiButton button) throws IOException {
+        if (button.id == 3) {
+            chooseInviteFriend();
+            return;
+        }
         if (button.id == BUTTON_DIAGNOSTICS) {
             boolean saved = SteamManager.getInstance().saveDiagnostics();
             button.displayString =

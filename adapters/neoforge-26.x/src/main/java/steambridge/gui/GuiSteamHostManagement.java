@@ -22,6 +22,7 @@ import java.util.List;
 public class GuiSteamHostManagement extends Screen {
     private final Screen parent;
     private SteamServer server;
+    private String inviteStatus = "steambridge.gui.invite";
     private int snapshotCount = -1;
 
     /** Live status (incl. per-player ping) is a native Steam call; poll it at most this often. */
@@ -49,6 +50,19 @@ public class GuiSteamHostManagement extends Screen {
         return cachedSnaps;
     }
 
+    private void chooseInviteFriend() {
+        this.minecraft.setScreen(
+                new GuiSteamFriends(
+                        this,
+                        null,
+                        id -> {
+                            inviteStatus =
+                                    SteamManager.getInstance().inviteFriend(Long.parseLong(id))
+                                            ? "steambridge.gui.invite_sent"
+                                            : "steambridge.gui.invite_failed";
+                        }));
+    }
+
     public GuiSteamHostManagement(Screen parent) {
         super(Component.translatable("steambridge.gui.management"));
         this.parent = parent;
@@ -65,6 +79,10 @@ public class GuiSteamHostManagement extends Screen {
     @Override
     protected void init() {
         this.server = SteamManager.getInstance().getActiveServer();
+        this.addRenderableWidget(
+                Button.builder(Component.translatable(inviteStatus), b -> chooseInviteFriend())
+                        .bounds(8, 10, 96, 20)
+                        .build());
         this.addRenderableWidget(
                 Button.builder(
                                 Component.translatable("steambridge.gui.diagnostics"),

@@ -58,6 +58,8 @@ For NeoForge 26.x, install one `steambridge-neoforge-26.x-*.jar` for all three t
 
 ## Configuration and voice
 
+Hosts can send Steam invitations from session management. Accepting an invitation while Minecraft with SBM is running opens the usual connection screen from the menu after validating the current host presence. Closed-game launcher startup is unsupported. [Invite behavior and remaining two-account checks](docs/STEAM_INVITES.md).
+
 All adapters use `config/steambridge.json`. The complete configuration is validated before applying an immutable snapshot. A missing JSON file is created atomically. Existing Forge/NeoForge `steambridge-client.toml`, `steambridge-common.toml` or `steambridge.cfg` settings are migrated when JSON is absent; the original file is preserved. Invalid configuration is logged and the previous settings remain active. Restart Minecraft after editing. An [example configuration](docs/steambridge.example.json) lists all settings. Virtual ports are 0..65534 because voice uses the next virtual port.
 
 With `interceptUdp`, Simple Voice Chat uses its socket API when available. Ordinary IP connections keep the default client socket, and sockets already installed by another voice plugin are preserved. Older Simple Voice Chat without the client socket API retains a filtered JVM socket factory fallback. Forge 1.7.10/1.8.9 retain their original lack of a voice tunnel.

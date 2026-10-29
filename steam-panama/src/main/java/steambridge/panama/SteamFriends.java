@@ -2,6 +2,7 @@ package steambridge.panama;
 
 import static java.lang.foreign.ValueLayout.*;
 
+import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 
 public final class SteamFriends {
@@ -96,6 +97,49 @@ public final class SteamFriends {
 
     public int getLargeFriendAvatar(SteamID id) {
         return avatar("Large", id);
+    }
+
+    public boolean setRichPresence(String key, String value) {
+        try (Arena arena = Arena.ofConfined()) {
+            return (byte)
+                            SteamAPI.call(
+                                    "SteamAPI_ISteamFriends_SetRichPresence",
+                                    JAVA_BYTE,
+                                    handle,
+                                    arena.allocateFrom(key),
+                                    arena.allocateFrom(value))
+                    != 0;
+        }
+    }
+
+    public String getFriendRichPresence(SteamID id, String key) {
+        try (Arena arena = Arena.ofConfined()) {
+            return SteamAPI.string(
+                    (MemorySegment)
+                            SteamAPI.call(
+                                    "SteamAPI_ISteamFriends_GetFriendRichPresence",
+                                    ADDRESS,
+                                    handle,
+                                    id.value(),
+                                    arena.allocateFrom(key)));
+        }
+    }
+
+    public void requestFriendRichPresence(SteamID id) {
+        SteamAPI.call("SteamAPI_ISteamFriends_RequestFriendRichPresence", null, handle, id.value());
+    }
+
+    public boolean inviteUserToGame(SteamID id, String connect) {
+        try (Arena arena = Arena.ofConfined()) {
+            return (byte)
+                            SteamAPI.call(
+                                    "SteamAPI_ISteamFriends_InviteUserToGame",
+                                    JAVA_BYTE,
+                                    handle,
+                                    id.value(),
+                                    arena.allocateFrom(connect))
+                    != 0;
+        }
     }
 
     public void dispose() {}

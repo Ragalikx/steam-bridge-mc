@@ -41,6 +41,10 @@ public final class SteamOffsets {
     public static final int DISPATCH_TYPE = 4;
     public static final int DISPATCH_PAYLOAD = 8;
     public static final int DISPATCH_SIZE = 16;
+    public static final int INVITE_TEXT = 8;
+    public static final int INVITE_TEXT_BYTES = 256;
+    public static final int INVITE_BYTES = 264;
+    public static final int RICH_PRESENCE_MIN_BYTES = 12;
     public static final int PERSONA_ID = 0;
     public static final int PERSONA_FLAGS = 8;
     public static final int AVATAR_ID = 0;

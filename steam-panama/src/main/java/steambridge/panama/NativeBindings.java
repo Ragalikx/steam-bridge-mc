@@ -48,6 +48,33 @@ final class NativeBindings {
                 ADDRESS,
                 JAVA_LONG,
                 JAVA_BYTE);
+        bind(
+                bindings,
+                "SteamAPI_ISteamFriends_SetRichPresence",
+                JAVA_BYTE,
+                ADDRESS,
+                ADDRESS,
+                ADDRESS);
+        bind(
+                bindings,
+                "SteamAPI_ISteamFriends_GetFriendRichPresence",
+                ADDRESS,
+                ADDRESS,
+                JAVA_LONG,
+                ADDRESS);
+        bind(
+                bindings,
+                "SteamAPI_ISteamFriends_RequestFriendRichPresence",
+                null,
+                ADDRESS,
+                JAVA_LONG);
+        bind(
+                bindings,
+                "SteamAPI_ISteamFriends_InviteUserToGame",
+                JAVA_BYTE,
+                ADDRESS,
+                JAVA_LONG,
+                ADDRESS);
         for (String size : new String[] {"Small", "Medium", "Large"})
             bind(
                     bindings,

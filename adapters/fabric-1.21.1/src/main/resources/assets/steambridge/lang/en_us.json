@@ -1,4 +1,8 @@
 {
+  "steambridge.gui.invite": "Invite friend",
+  "steambridge.gui.invite_sent": "Invite sent",
+  "steambridge.gui.invite_failed": "Invite failed",
+
   "steambridge.gui.open_steam": "Open via Steam",
   "steambridge.gui.select_friend": "Select a Steam Friend",
   "steambridge.gui.kick": "Kick",

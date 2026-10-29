@@ -62,6 +62,21 @@ public abstract class SteamRuntime<C extends SteamGameClient, S extends SteamGam
 
     private volatile SteamUser steamUser;
     private volatile SteamFriends steamFriends;
+    private volatile String publishedInvite;
+    private volatile SteamGameServer publishedInviteOwner;
+    private final Object inviteLock = new Object();
+    private final java.util.concurrent.atomic.AtomicReference<PendingInvite> pendingInvite =
+            new java.util.concurrent.atomic.AtomicReference<>();
+
+    private static final class PendingInvite {
+        final steambridge.core.SteamInvite target;
+        final long started = System.nanoTime();
+
+        PendingInvite(steambridge.core.SteamInvite target) {
+            this.target = target;
+        }
+    }
+
     private volatile SteamUtils steamUtils;
     private SteamID mySteamID;
     private volatile SteamSocketsApi socketsApi;
@@ -150,6 +165,16 @@ public abstract class SteamRuntime<C extends SteamGameClient, S extends SteamGam
             steamFriends = new SteamFriends(new SteamFriendsCallbackAdapter());
             steamUtils = new SteamUtils(new SteamUtilsCallbackAdapter());
             mySteamID = steamUser.getSteamID();
+            try {
+                steamFriends.setRichPresence("connect", "");
+            } catch (RuntimeException | LinkageError failure) {
+                ProblemLog.warn(
+                        LOG,
+                        LOG_LIMITER,
+                        "invite-reset",
+                        "Could not reset Steam invite presence",
+                        failure);
+            }
             socketsApi = SteamSocketsApi.load();
             socketsApi.installConnectionStatusCallback(this::onConnectionStatusChanged);
 
@@ -223,6 +248,8 @@ public abstract class SteamRuntime<C extends SteamGameClient, S extends SteamGam
                 return;
             }
 
+            clearPublishedInvite();
+            pendingInvite.set(null);
             LOG.debug("[SteamManager] Shutting down...");
             running.set(false);
             signalReceiveWake();
@@ -300,6 +327,7 @@ public abstract class SteamRuntime<C extends SteamGameClient, S extends SteamGam
                             while (running.get()) {
                                 try {
                                     SteamAPI.runCallbacks();
+                                    expirePendingInvite();
                                     SteamSocketsApi api = socketsApi;
                                     if (api != null) {
                                         api.runCallbacks();
@@ -848,6 +876,132 @@ public abstract class SteamRuntime<C extends SteamGameClient, S extends SteamGam
         return api != null && api.closeListenSocket(listenSocket);
     }
 
+    public void publishInvite(SteamGameServer owner) {
+        synchronized (inviteLock) {
+            try (NativeCallGate.Lease lease = acquireNativeCall()) {
+                if (lease == null || activeServer != owner || !owner.isRunning()) return;
+                String value =
+                        steambridge.core.SteamInvite.create(
+                                SteamNativeHandle.getNativeHandle(mySteamID),
+                                steambridge.SteamBridgeConfig.settings().virtualPort);
+                if (steamFriends.setRichPresence("connect", value)) {
+                    publishedInvite = value;
+                    publishedInviteOwner = owner;
+                } else
+                    ProblemLog.warn(
+                            LOG, LOG_LIMITER, "invite-publish", "Steam invite publication failed");
+            } catch (RuntimeException | LinkageError failure) {
+                ProblemLog.warn(
+                        LOG,
+                        LOG_LIMITER,
+                        "invite-publish",
+                        "Steam invite publication failed",
+                        failure);
+            }
+        }
+    }
+
+    private void clearPublishedInvite() {
+        publishedInvite = null;
+        publishedInviteOwner = null;
+        try (NativeCallGate.Lease lease = acquireNativeCall()) {
+            if (lease != null && steamFriends != null) steamFriends.setRichPresence("connect", "");
+        } catch (RuntimeException | LinkageError failure) {
+            ProblemLog.warn(
+                    LOG, LOG_LIMITER, "invite-clear", "Steam invite cleanup failed", failure);
+        }
+    }
+
+    public boolean inviteFriend(long friend) {
+        try (NativeCallGate.Lease lease = acquireNativeCall()) {
+            String value = publishedInvite;
+            if (lease == null
+                    || value == null
+                    || activeServer == null
+                    || activeServer != publishedInviteOwner
+                    || !activeServer.isRunning()
+                    || !isFriend(friend)) return false;
+            return steamFriends.inviteUserToGame(SteamID.createFromNativeHandle(friend), value);
+        } catch (RuntimeException | LinkageError failure) {
+            ProblemLog.warn(LOG, LOG_LIMITER, "invite-send", "Steam invitation failed", failure);
+            return false;
+        }
+    }
+
+    private void expirePendingInvite() {
+        PendingInvite pending = pendingInvite.get();
+        if (pending != null
+                && System.nanoTime() - pending.started > 10_000_000_000L
+                && pendingInvite.compareAndSet(pending, null))
+            ProblemLog.warn(
+                    LOG,
+                    LOG_LIMITER,
+                    "invite-timeout",
+                    "Steam did not return the invited session presence within 10 seconds");
+    }
+
+    private void receiveInvite(long sender, String connect) {
+        steambridge.core.SteamInvite target = steambridge.core.SteamInvite.parse(connect);
+        if (target == null
+                || target.host != sender
+                || sender == SteamNativeHandle.getNativeHandle(mySteamID)) return;
+        try (NativeCallGate.Lease lease = acquireNativeCall()) {
+            if (lease == null || !isFriend(sender)) return;
+            pendingInvite.set(new PendingInvite(target));
+            steamFriends.requestFriendRichPresence(SteamID.createFromNativeHandle(sender));
+        } catch (RuntimeException | LinkageError failure) {
+            pendingInvite.set(null);
+            ProblemLog.warn(
+                    LOG,
+                    LOG_LIMITER,
+                    "invite-receive",
+                    "Cannot validate Steam invitation",
+                    failure);
+        }
+    }
+
+    private void validateInvite(long sender, int appId) {
+        PendingInvite pending = pendingInvite.get();
+        if (pending == null || appId != 480 || sender != pending.target.host) return;
+        if (!pendingInvite.compareAndSet(pending, null)) return;
+        try (NativeCallGate.Lease lease = acquireNativeCall()) {
+            if (lease == null) return;
+            String current =
+                    steamFriends.getFriendRichPresence(
+                            SteamID.createFromNativeHandle(sender), "connect");
+            if (System.nanoTime() - pending.started > 10_000_000_000L
+                    || !pending.target.matches(
+                            sender,
+                            steambridge.SteamBridgeConfig.settings().virtualPort,
+                            current)) {
+                ProblemLog.warn(
+                        LOG,
+                        LOG_LIMITER,
+                        "invite-expired",
+                        "Steam invite expired, host closed the session, or virtual ports differ");
+                return;
+            }
+            handleGameInvite(sender);
+        } catch (RuntimeException | LinkageError failure) {
+            ProblemLog.warn(
+                    LOG,
+                    LOG_LIMITER,
+                    "invite-receive",
+                    "Cannot validate Steam invitation",
+                    failure);
+        }
+    }
+
+    public Object inviteGeneration() {
+        return jniGate;
+    }
+
+    public boolean isInviteGeneration(Object generation) {
+        return running.get() && generation == jniGate;
+    }
+
+    protected void handleGameInvite(long host) {}
+
     public int connectP2P(SteamID remote, int virtualPort) {
         long remoteSteamID = SteamNativeHandle.getNativeHandle(remote);
         return connectP2P(remoteSteamID, virtualPort);
@@ -919,8 +1073,11 @@ public abstract class SteamRuntime<C extends SteamGameClient, S extends SteamGam
         synchronized (connectionLock) {
             if (activeServer != server) return false;
             activeServer = null;
-            return true;
         }
+        synchronized (inviteLock) {
+            if (activeServer == null) clearPublishedInvite();
+        }
+        return true;
     }
 
     @SuppressWarnings("unchecked")
@@ -964,10 +1121,14 @@ public abstract class SteamRuntime<C extends SteamGameClient, S extends SteamGam
         }
 
         @Override
-        public void onFriendRichPresenceUpdate(SteamID steamIDFriend, int appID) {}
+        public void onFriendRichPresenceUpdate(SteamID steamIDFriend, int appID) {
+            validateInvite(SteamNativeHandle.getNativeHandle(steamIDFriend), appID);
+        }
 
         @Override
-        public void onGameRichPresenceJoinRequested(SteamID steamIDFriend, String connect) {}
+        public void onGameRichPresenceJoinRequested(SteamID steamIDFriend, String connect) {
+            receiveInvite(SteamNativeHandle.getNativeHandle(steamIDFriend), connect);
+        }
 
         @Override
         public void onGameServerChangeRequested(String server, String password) {}

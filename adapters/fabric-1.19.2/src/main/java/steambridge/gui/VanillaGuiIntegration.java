@@ -48,6 +48,43 @@ import java.util.List;
 
 /** Injects Steam Bridge controls into vanilla multiplayer/LAN screens. */
 public final class VanillaGuiIntegration {
+    public static void acceptSteamInvite(long host) {
+        net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+        SteamManager manager = SteamManager.getInstance();
+        Object generation = manager.inviteGeneration();
+        mc.execute(
+                () -> {
+                    if (!manager.isInviteGeneration(generation)) return;
+                    if (!(mc.screen instanceof net.minecraft.client.gui.screens.TitleScreen)
+                            && !(mc.screen
+                                    instanceof
+                                    net.minecraft.client.gui.screens.multiplayer
+                                            .JoinMultiplayerScreen)) {
+                        steambridge.core.ProblemLog.warn(
+                                SteamBridgeMod.LOG,
+                                LOG_LIMITER,
+                                "invite-menu",
+                                "Return to the main or multiplayer menu before accepting a Steam"
+                                    + " invitation");
+                        return;
+                    }
+                    if (mc.level != null
+                            || (manager.getActiveClient() != null
+                                    && manager.getActiveClient().isAlive())
+                            || (manager.getActiveServer() != null
+                                    && manager.getActiveServer().isRunning())
+                            || mc.screen instanceof GuiSteamConnecting) {
+                        steambridge.core.ProblemLog.warn(
+                                SteamBridgeMod.LOG,
+                                LOG_LIMITER,
+                                "invite-busy",
+                                "Steam invitation ignored while a game or connection is active");
+                        return;
+                    }
+                    mc.setScreen(beginSteamConnect(mc.screen, Long.toString(host)));
+                });
+    }
+
     private static final LogLimiter LOG_LIMITER = new LogLimiter(32, 30_000);
 
     private VanillaGuiIntegration() {}

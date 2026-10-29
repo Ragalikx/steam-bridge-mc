@@ -1,6 +1,8 @@
 package steambridge.panama;
 
 public final class NativeConstants {
+    public static final int CALLBACK_RICH_PRESENCE = 336;
+    public static final int CALLBACK_INVITE = 337;
     public static final int CALLBACK_PERSONA = 304;
     public static final int CALLBACK_AVATAR = 334;
     public static final int CALLBACK_SHUTDOWN = 704;

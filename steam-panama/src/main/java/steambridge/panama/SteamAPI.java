@@ -14,6 +14,15 @@ public final class SteamAPI {
     private static volatile BiConsumer<Long, Boolean> personaListener = (id, avatar) -> {};
     private static volatile Runnable shutdownListener = () -> {};
 
+    private static volatile BiConsumer<Long, String> inviteListener = (id, connect) -> {};
+    private static volatile BiConsumer<Long, Integer> presenceListener = (id, appId) -> {};
+
+    public static void setInviteListeners(
+            BiConsumer<Long, String> invite, BiConsumer<Long, Integer> presence) {
+        inviteListener = invite;
+        presenceListener = presence;
+    }
+
     private SteamAPI() {}
 
     public static synchronized boolean loadLibraries() {
@@ -90,7 +99,21 @@ public final class SteamAPI {
         }
         if (pointer.address() == 0) return;
         MemorySegment payload = pointer.reinterpret(size);
-        if (type == NativeConstants.CALLBACK_PERSONA && size >= SteamOffsets.PERSONA_MIN_BYTES)
+        if (type == NativeConstants.CALLBACK_INVITE && size >= SteamOffsets.INVITE_BYTES) {
+            MemorySegment text =
+                    payload.asSlice(SteamOffsets.INVITE_TEXT, SteamOffsets.INVITE_TEXT_BYTES);
+            for (int i = 0; i < SteamOffsets.INVITE_TEXT_BYTES; i++) {
+                if (text.get(JAVA_BYTE, i) == 0) {
+                    inviteListener.accept(
+                            payload.get(JAVA_LONG, 0), text.asSlice(0, i + 1).getString(0));
+                    break;
+                }
+            }
+        } else if (type == NativeConstants.CALLBACK_RICH_PRESENCE
+                && size >= SteamOffsets.RICH_PRESENCE_MIN_BYTES) {
+            presenceListener.accept(payload.get(JAVA_LONG, 0), payload.get(JAVA_INT, 8));
+        } else if (type == NativeConstants.CALLBACK_PERSONA
+                && size >= SteamOffsets.PERSONA_MIN_BYTES)
             personaListener.accept(
                     payload.get(JAVA_LONG, SteamOffsets.PERSONA_ID),
                     (payload.get(JAVA_INT, SteamOffsets.PERSONA_FLAGS)
@@ -110,6 +133,7 @@ public final class SteamAPI {
             pipe = 0;
             personaListener = (id, avatar) -> {};
             shutdownListener = () -> {};
+            setInviteListeners((id, connect) -> {}, (id, appId) -> {});
             current.close();
             library = null;
         }

@@ -196,6 +196,7 @@ public abstract class SteamServerBase implements SteamGameServer {
                 listenSocket,
                 worldKey,
                 accessPolicy);
+        runtime().publishInvite(this);
         LOG.debug("Server started. World=" + worldKey + " access=" + accessPolicy);
         return true;
     }

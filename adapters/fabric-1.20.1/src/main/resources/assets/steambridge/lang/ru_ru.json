@@ -1,4 +1,8 @@
 {
+  "steambridge.gui.invite": "Пригласить друга",
+  "steambridge.gui.invite_sent": "Приглашение отправлено",
+  "steambridge.gui.invite_failed": "Не удалось пригласить",
+
   "steambridge.gui.open_steam": "Открыть для Steam",
   "steambridge.gui.select_friend": "Выберите друга из Steam",
   "steambridge.gui.kick": "Кик",

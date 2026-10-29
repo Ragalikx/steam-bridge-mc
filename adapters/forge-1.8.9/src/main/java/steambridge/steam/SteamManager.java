@@ -16,6 +16,11 @@ public final class SteamManager extends SteamRuntime<SteamClient, SteamServer> {
     private SteamManager() {}
 
     @Override
+    protected void handleGameInvite(long host) {
+        steambridge.gui.VanillaGuiIntegration.acceptSteamInvite(host);
+    }
+
+    @Override
     protected void clearProfiles() {
         SteamSocial.ProfileCache.get().clear();
     }

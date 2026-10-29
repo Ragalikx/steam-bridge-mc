@@ -32,7 +32,7 @@ def generate(destination):
             for name in ['SteamUser', 'SteamFriends', 'SteamUtils']:
                 text = text.replace('new ' + name + '(new ' + name + 'CallbackAdapter())', 'new ' + name + '()')
             text = text.replace('mySteamID = steamUser.getSteamID();',
-                                'mySteamID = steamUser.getSteamID();\n            SteamAPI.setListeners(this::invalidateProfile, this::handleSteamShutdown);')
+                                'mySteamID = steamUser.getSteamID();\n            SteamAPI.setListeners(this::invalidateProfile, this::handleSteamShutdown);\n            SteamAPI.setInviteListeners(this::receiveInvite, this::validateInvite);')
             pattern = r'                SteamNetConnectionStatusChangedCallback copy =.*?earlyStatuses.addLast\(copy\);'
             text, count = re.subn(pattern, '                earlyStatuses.addLast(event);', text, flags=re.S)
             if count != 1:
