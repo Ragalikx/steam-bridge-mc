@@ -6,10 +6,19 @@ public final class GenerateRuntimeLoader implements Opcodes {
     private static final String ID = "steambridge_linux_runtime";
 
     private static void annotation(
-            ClassWriter writer, String type, String version, boolean legacy) {
+            ClassWriter writer, String type, String version, boolean legacy, boolean neoforge) {
         AnnotationVisitor value = writer.visitAnnotation("L" + type + ";", true);
         value.visit("value", ID);
+        if (neoforge) {
+            // Client only: on a dedicated server without SBM the bootstrap class would not link.
+            AnnotationVisitor dist = value.visitArray("dist");
+            dist.visitEnum(null, "Lnet/neoforged/api/distmarker/Dist;", "CLIENT");
+            dist.visitEnd();
+        }
         if (legacy) {
+            // FML 1.7.10-1.12.2 registers a network holder for every @Mod, clientSideOnly included.
+            // Without "*" a Linux LAN host with this addon rejects guests that do not need it.
+            value.visit("acceptableRemoteVersions", "*");
             value.visit("modid", ID);
             value.visit("name", "SBM Linux Runtime");
             value.visit("version", version);
@@ -30,12 +39,13 @@ public final class GenerateRuntimeLoader implements Opcodes {
                 null,
                 "java/lang/Object",
                 null);
-        if (java == 8) annotation(writer, "cpw/mods/fml/common/Mod", args[1], true);
+        if (java == 8) annotation(writer, "cpw/mods/fml/common/Mod", args[1], true, false);
         annotation(
                 writer,
                 java == 21 ? "net/neoforged/fml/common/Mod" : "net/minecraftforge/fml/common/Mod",
                 args[1],
-                java == 8);
+                java == 8,
+                java == 21);
         MethodVisitor init = writer.visitMethod(ACC_PUBLIC, "<init>", "()V", null, null);
         init.visitCode();
         init.visitVarInsn(ALOAD, 0);

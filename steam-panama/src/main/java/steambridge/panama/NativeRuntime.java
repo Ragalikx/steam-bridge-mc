@@ -78,7 +78,8 @@ public final class NativeRuntime {
         }
         try (InputStream cached = Files.newInputStream(target)) {
             if (!digest(cached.readNBytes(bytes.length + 1)).equals(expected))
-                throw new SecurityException("Steam native cache checksum mismatch: " + target);
+                throw new SecurityException("Steam native cache checksum mismatch: " + target
+                        + "; delete this file to let SBM extract it again");
         }
         return target;
     }

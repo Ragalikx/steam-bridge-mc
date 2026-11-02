@@ -87,7 +87,8 @@ public final class LinuxNativeRuntime {
             }
             try (InputStream cached = Files.newInputStream(target)) {
                 if (!hash(read(cached)).equals(HASHES[i]))
-                    throw new SecurityException("Steam Linux cache checksum mismatch: " + target);
+                    throw new SecurityException("Steam Linux cache checksum mismatch: " + target
+                            + "; delete this file to let SBM extract it again");
             }
         }
         return directory.resolve(NAMES[selected]);
