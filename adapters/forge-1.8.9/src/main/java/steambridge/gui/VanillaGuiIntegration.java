@@ -313,16 +313,16 @@ public class VanillaGuiIntegration {
 
         /*
          * Vanilla updateScreen() resets the button enabled-state every tick.
-         * Re-enable Connect (id=1) every frame when the IP field is non-empty.
+         * Re-enable Join Server (id=0) every frame when the IP field is non-empty.
          */
-        if (pendingConnectEnable || isDirectConnectWithAddress(gui)) {
+        if (gui instanceof GuiScreenServerList && (pendingConnectEnable || isDirectConnectWithAddress(gui))) {
             try {
                 List<GuiButton> buttons =
                         ReflectionHelper.getPrivateValue(
                                 GuiScreen.class, gui, "buttonList", "field_146292_n");
                 if (buttons != null) {
                     for (GuiButton b : buttons) {
-                        if (b.id == 1) {
+                        if (b.id == 0) {
                             b.enabled = true;
                             break;
                         }
@@ -471,10 +471,10 @@ public class VanillaGuiIntegration {
                 // GuiScreenDirectConnect or similar -> just fill the IP field
                 GuiTextField tf = findIpTextField(gui);
                 if (tf != null) tf.setText(sid);
-                // Signal the draw hook to keep Connect (id=1) enabled every frame.
+                // Signal the draw hook to keep Join Server (id=0) enabled every frame; id 1 is Cancel.
                 pendingConnectEnable = true;
                 for (GuiButton b : event.buttonList) {
-                    if (b.id == 1) {
+                    if (b.id == 0) {
                         b.enabled = true;
                         break;
                     }

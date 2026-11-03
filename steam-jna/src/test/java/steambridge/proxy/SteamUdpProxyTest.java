@@ -43,6 +43,17 @@ public class SteamUdpProxyTest {
         assertEquals(1, socket.closed.get());
     }
 
+    @Test
+    public void clientWithoutVoiceDriverIsIgnored() throws Exception {
+        Constructor<SteamUdpProxy> constructor = SteamUdpProxy.class.getDeclaredConstructor();
+        constructor.setAccessible(true);
+        SteamUdpProxy proxy = constructor.newInstance();
+        GameAttemptOwner owner = () -> true;
+        proxy.startClient(null, owner);
+        assertFalse(proxy.isClientActive());
+        proxy.stopClient(owner);
+    }
+
     private SteamUdpProxy proxy(FakeDriver driver) throws Exception {
         Constructor<SteamUdpProxy> constructor = SteamUdpProxy.class.getDeclaredConstructor();
         constructor.setAccessible(true);

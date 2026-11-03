@@ -377,6 +377,8 @@ public final class SteamUdpProxy implements steambridge.core.VoiceTransport {
     }
 
     public synchronized void startClient(SteamID hostId, steambridge.core.GameAttemptOwner owner) {
+        // No driver is installed where the adapter has no voice tunnel (Forge 1.7.10/1.8.9).
+        if (driver == null) return;
         if (driver.getActiveClient() != owner || !owner.isAlive()) return;
         if (udpClientConn != 0) return;
         gameOwner = owner;
