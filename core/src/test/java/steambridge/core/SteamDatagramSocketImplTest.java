@@ -95,6 +95,40 @@ public class SteamDatagramSocketImplTest {
         }
     }
 
+    /**
+     * Simple Voice Chat starts its reader before the first send. The send switches the socket to
+     * Steam mode; a reader caught between opening the UDP channel and creating its selector must
+     * still see packets queued from Steam (once every few reconnects it slept forever).
+     */
+    @Test
+    public void readerStartedBeforeFirstSendReceivesSteamPackets() throws Exception {
+        ExecutorService readers = Executors.newCachedThreadPool();
+        try {
+            for (int attempt = 0; attempt < 300; attempt++) {
+                Endpoint endpoint = new Endpoint();
+                endpoint.active = true;
+                SteamDatagramSocketImpl impl = new SteamDatagramSocketImpl(endpoint);
+                try (final Socket socket = new Socket(impl)) {
+                    Future<Integer> read =
+                            readers.submit(
+                                    () -> {
+                                        DatagramPacket incoming = new DatagramPacket(new byte[8], 8);
+                                        socket.receive(incoming);
+                                        return incoming.getLength();
+                                    });
+                    for (int spin = attempt % 50; spin > 0; spin--) Thread.yield();
+                    socket.send(
+                            new DatagramPacket(
+                                    new byte[] {1}, 1, InetAddress.getLoopbackAddress(), 24454));
+                    assertTrue(impl.enqueueFromSteam(new byte[] {7, 7}, null, 24454));
+                    assertEquals("attempt " + attempt, 2, (int) read.get(2, TimeUnit.SECONDS));
+                }
+            }
+        } finally {
+            readers.shutdownNow();
+        }
+    }
+
     @Test
     public void steamSendReceiveAndPeekKeepPacketBoundaries() throws Exception {
         Endpoint endpoint = new Endpoint();

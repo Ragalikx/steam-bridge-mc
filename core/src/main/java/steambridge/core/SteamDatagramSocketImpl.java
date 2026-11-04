@@ -227,6 +227,9 @@ public class SteamDatagramSocketImpl extends DatagramSocketImpl implements Voice
                     return;
                 }
                 Selector selected = selectorFor(ch);
+                // A send may switch to Steam between open() and selectorFor(): it closed this
+                // channel while no selector existed to wake, so never sleep on it.
+                if (steam || !ch.isOpen()) continue;
                 if (deadline == 0) selected.select();
                 else
                     selected.select(
