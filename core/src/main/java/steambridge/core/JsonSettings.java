@@ -28,12 +28,15 @@ public final class JsonSettings {
         json.addProperty("timeoutInitialSec", timeoutInitialSec);
         json.addProperty("timeoutConnectedSec", timeoutConnectedSec);
         json.addProperty("stunServers", stunServers);
+        json.addProperty("iceEnabled", iceEnabled);
         return json;
     }
 
     public final boolean allowWithoutAuth, interceptUdp, disableOnlineModeOnPublish;
     public final int virtualPort, timeoutInitialSec, timeoutConnectedSec;
     public final String sameNameAsHost, stunServers;
+    /** false forces Valve relay for hosting and joining; direct ICE routes are never attempted. */
+    public final boolean iceEnabled;
 
     public JsonSettings(
             boolean auth,
@@ -44,6 +47,20 @@ public final class JsonSettings {
             int initial,
             int connected,
             String stun) {
+        this(auth, port, udp, offline, sameName, initial, connected, stun, true);
+    }
+
+    public JsonSettings(
+            boolean auth,
+            int port,
+            boolean udp,
+            boolean offline,
+            String sameName,
+            int initial,
+            int connected,
+            String stun,
+            boolean ice) {
+        iceEnabled = ice;
         allowWithoutAuth = auth;
         virtualPort = port;
         interceptUdp = udp;
@@ -82,7 +99,8 @@ public final class JsonSettings {
                 sameName,
                 initial,
                 connected,
-                stun);
+                stun,
+                bool(json, "iceEnabled", current.iceEnabled));
     }
 
     private static int timeout(JsonObject json, String key, int fallback) {

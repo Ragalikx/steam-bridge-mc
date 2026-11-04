@@ -6,5 +6,6 @@
   "sameNameAsHost": "allow",
   "timeoutInitialSec": 30,
   "timeoutConnectedSec": 60,
-  "stunServers": "stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302"
+  "stunServers": "stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302",
+  "iceEnabled": true
 }

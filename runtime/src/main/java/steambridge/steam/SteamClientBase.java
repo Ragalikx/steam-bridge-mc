@@ -113,8 +113,9 @@ public abstract class SteamClientBase<T> implements SteamGameClient {
 
         if (connectionHandle != 0) {
             runtime().unregisterLoopback(connectionHandle);
+            // Cancel runs on the game thread; a stalled Steam service must not freeze the window.
             runtime()
-                    .closeConnection(
+                    .closeConnectionAsync(
                             connectionHandle,
                             SteamSocketsApi.APP_CLOSE_NORMAL,
                             safeText(steamCloseReason, "Client disconnected"));

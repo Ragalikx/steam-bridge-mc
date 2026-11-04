@@ -33,11 +33,30 @@ import steambridge.steam.SteamOffsets.SteamNetConnectionStatusChangedCallback;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public abstract class SteamRuntime<C extends SteamGameClient, S extends SteamGameServer>
         implements LoopbackBridge.Driver, steambridge.voice.VoiceNativeDriver {
     private final LogLimiter LOG_LIMITER = new LogLimiter(32, 30_000);
+
+    static final long NATIVE_UI_TIMEOUT_MS = 5_000L;
+
+    /**
+     * Single thread for Steam networking calls made on behalf of the game thread (host start,
+     * cancel, world close), so a stalled Steam service never freezes the game window.
+     */
+    private final ExecutorService nativeWorker =
+            Executors.newSingleThreadExecutor(
+                    task -> {
+                        Thread thread = new Thread(task, "SteamBridge-Native");
+                        thread.setDaemon(true);
+                        return thread;
+                    });
 
     protected static final org.apache.logging.log4j.Logger LOG =
             org.apache.logging.log4j.LogManager.getLogger("steambridge");
@@ -183,6 +202,11 @@ public abstract class SteamRuntime<C extends SteamGameClient, S extends SteamGam
                     steambridge.SteamBridgeConfig.settings().stunServers,
                     steambridge.SteamBridgeConfig.settings().timeoutInitialSec,
                     steambridge.SteamBridgeConfig.settings().timeoutConnectedSec);
+            if (!steambridge.SteamBridgeConfig.settings().iceEnabled) {
+                // Guests never apply a transport mode, so the global relay-only switch goes here.
+                socketsApi.applyTransportMode(SteamServerBase.TransportMode.RELAY_ONLY);
+                LOG.debug("[SteamManager] iceEnabled=false: Steam traffic uses Valve relay only.");
+            }
             socketsApi.initRelayNetworkAccess();
         } catch (Throwable t) {
             LOG.error(
@@ -862,8 +886,15 @@ public abstract class SteamRuntime<C extends SteamGameClient, S extends SteamGam
     public void applyTransportMode(Enum<?> mode) {
         SteamSocketsApi api = socketsApi;
         if (api != null) {
-            api.applyTransportMode(mode);
+            api.applyTransportMode(effectiveTransportMode(mode));
         }
+    }
+
+    /** iceEnabled=false keeps every host and guest on the Valve relay, whatever the world asks. */
+    static Enum<?> effectiveTransportMode(Enum<?> mode) {
+        return steambridge.SteamBridgeConfig.settings().iceEnabled
+                ? mode
+                : SteamServerBase.TransportMode.RELAY_ONLY;
     }
 
     public int createListenSocketP2P(int virtualPort) {
@@ -874,6 +905,57 @@ public abstract class SteamRuntime<C extends SteamGameClient, S extends SteamGam
     public boolean closeListenSocket(int listenSocket) {
         SteamSocketsApi api = socketsApi;
         return api != null && api.closeListenSocket(listenSocket);
+    }
+
+    /**
+     * Applies the transport mode and opens the listen socket off the caller's thread. Steam can
+     * hold its networking lock indefinitely when its internal service loop stalls; the game then
+     * gets 0 after {@link #NATIVE_UI_TIMEOUT_MS} instead of freezing. A socket created after the
+     * timeout is closed again.
+     */
+    public int startListening(final Enum<?> mode, final int virtualPort) {
+        final Future<Integer> created =
+                nativeWorker.submit(
+                        () -> {
+                            applyTransportMode(mode);
+                            return createListenSocketP2P(virtualPort);
+                        });
+        try {
+            return created.get(nativeUiTimeoutMs(), TimeUnit.MILLISECONDS);
+        } catch (TimeoutException stalled) {
+            LOG.error(
+                    "[SteamManager] Steam networking did not respond within {} ms; host not"
+                            + " started. Restart Steam if this repeats.",
+                    nativeUiTimeoutMs());
+            nativeWorker.execute(
+                    () -> {
+                        try {
+                            int late = created.get();
+                            if (late != 0) closeListenSocket(late);
+                        } catch (Exception ignored) {
+                        }
+                    });
+            return 0;
+        } catch (Exception failure) {
+            LOG.error("[SteamManager] Could not open Steam listen socket", failure);
+            return 0;
+        }
+    }
+
+    protected long nativeUiTimeoutMs() {
+        return NATIVE_UI_TIMEOUT_MS;
+    }
+
+    /** Closes without blocking the caller; see {@link #startListening}. */
+    public void closeConnectionAsync(final int connection, final int reason, final String debug) {
+        if (connection == 0) return;
+        nativeWorker.execute(() -> closeConnection(connection, reason, debug));
+    }
+
+    /** Closes without blocking the caller; see {@link #startListening}. */
+    public void closeListenSocketAsync(final int listenSocket) {
+        if (listenSocket == 0) return;
+        nativeWorker.execute(() -> closeListenSocket(listenSocket));
     }
 
     public void publishInvite(SteamGameServer owner) {

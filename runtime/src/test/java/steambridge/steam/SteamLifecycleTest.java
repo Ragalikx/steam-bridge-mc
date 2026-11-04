@@ -171,6 +171,68 @@ public class SteamLifecycleTest {
         }
     }
 
+    @Test
+    public void stalledSteamFailsHostStartWithoutBlockingAndClosesLateSocket() throws Exception {
+        final java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
+        final java.util.concurrent.CountDownLatch lateClosed = new java.util.concurrent.CountDownLatch(1);
+        FakeRuntime runtime =
+                new FakeRuntime() {
+                    @Override
+                    protected long nativeUiTimeoutMs() {
+                        return 100;
+                    }
+
+                    @Override
+                    public int createListenSocketP2P(int port) {
+                        try {
+                            release.await();
+                        } catch (InterruptedException interrupted) {
+                            Thread.currentThread().interrupt();
+                        }
+                        return 77;
+                    }
+
+                    @Override
+                    public boolean closeListenSocket(int handle) {
+                        boolean closed = super.closeListenSocket(handle);
+                        if (handle == 77) lateClosed.countDown();
+                        return closed;
+                    }
+                };
+        FakeServer server = new FakeServer(runtime, files.newFile());
+        long started = System.nanoTime();
+        assertFalse(server.startHost());
+        assertTrue(System.nanoTime() - started < 3_000_000_000L);
+        assertFalse(server.isRunning());
+        assertNull(runtime.getActiveServer());
+        release.countDown();
+        assertTrue(lateClosed.await(5, java.util.concurrent.TimeUnit.SECONDS));
+    }
+
+    @Test
+    public void stoppingHostDoesNotWaitForSteam() throws Exception {
+        final java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
+        FakeRuntime runtime =
+                new FakeRuntime() {
+                    @Override
+                    public boolean closeListenSocket(int handle) {
+                        try {
+                            release.await();
+                        } catch (InterruptedException interrupted) {
+                            Thread.currentThread().interrupt();
+                        }
+                        return super.closeListenSocket(handle);
+                    }
+                };
+        FakeServer server = new FakeServer(runtime, files.newFile());
+        assertTrue(server.startHost());
+        long started = System.nanoTime();
+        server.stop();
+        assertTrue(System.nanoTime() - started < 3_000_000_000L);
+        assertFalse(server.isRunning());
+        release.countDown();
+    }
+
     private static class FakeRuntime extends SteamRuntime<SteamGameClient, SteamGameServer> {
         int listen;
         final List<Integer> listenersClosed = new ArrayList<>();

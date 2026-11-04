@@ -10,6 +10,18 @@ public class JsonSettingsTest {
     private final JsonSettings current = new JsonSettings(true, 0, true, true, "allow", 30, 60, "");
 
     @Test
+    public void iceStaysEnabledUnlessTurnedOff() {
+        assertTrue(current.iceEnabled);
+        assertTrue(JsonSettings.defaults().toJson().get("iceEnabled").getAsBoolean());
+        JsonSettings relayOnly =
+                JsonSettings.parse(
+                        new JsonParser().parse("{\"iceEnabled\":false}").getAsJsonObject(), current);
+        assertFalse(relayOnly.iceEnabled);
+        assertFalse(relayOnly.toJson().get("iceEnabled").getAsBoolean());
+        assertEquals(current.virtualPort, relayOnly.virtualPort);
+    }
+
+    @Test
     public void readsOldMillisecondSettings() {
         JsonSettings settings =
                 JsonSettings.parse(

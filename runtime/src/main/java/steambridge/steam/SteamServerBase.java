@@ -175,11 +175,10 @@ public abstract class SteamServerBase implements SteamGameServer {
         kickBlockedUntilBySteamId.clear();
         acceptedConnections.clear();
 
-        runtime().applyTransportMode(transportMode);
         listenSocket =
                 runtime()
-                        .createListenSocketP2P(
-                                steambridge.SteamBridgeConfig.settings().virtualPort);
+                        .startListening(
+                                transportMode, steambridge.SteamBridgeConfig.settings().virtualPort);
         if (listenSocket == 0) {
             running = false;
             runtime().clearActiveServer(this);
@@ -211,16 +210,15 @@ public abstract class SteamServerBase implements SteamGameServer {
         if (voiceSupported()) steambridge.proxy.SteamUdpProxy.getInstance().stopServer();
         runtime().clearActiveServer(this);
 
+        // Runs while the world closes on the game thread; Steam calls must not block it.
         for (Map.Entry<Integer, Long> entry : steamIdByConnection.entrySet()) {
             runtime()
-                    .closeConnection(
+                    .closeConnectionAsync(
                             entry.getKey(), SteamSocketsApi.APP_CLOSE_NORMAL, "Host stopped");
         }
 
-        if (listenSocket != 0) {
-            runtime().closeListenSocket(listenSocket);
-            listenSocket = 0;
-        }
+        runtime().closeListenSocketAsync(listenSocket);
+        listenSocket = 0;
 
         steamIdByConnection.clear();
         connectionBySteamId.clear();
