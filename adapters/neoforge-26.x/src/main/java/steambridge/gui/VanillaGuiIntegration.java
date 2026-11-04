@@ -7,6 +7,7 @@ package steambridge.gui;
 
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.events.GuiEventListener;
@@ -567,23 +568,60 @@ public final class VanillaGuiIntegration {
         // 26.2+ replaced "Start LAN World" with "Apply Changes" in the same footer slot.
         if (startLan == null) startLan = findButtonByMessage(event, "menu.multiplayerOptions.applyChanges");
         Button cancel = findButtonByMessage(event, "gui.cancel");
-        int bottomY = gui.height - 28;
-        if (startLan != null) {
-            startLan.setWidth(96);
-            startLan.setX(gui.width / 2 - 152);
-            startLan.setY(bottomY);
-        }
-        if (cancel != null) {
-            cancel.setWidth(96);
-            cancel.setX(gui.width / 2 + 56);
-            cancel.setY(bottomY);
-        }
-        event.addListener(
+        Button steam =
                 Button.builder(
                                 Component.translatable("steambridge.gui.open_steam"),
                                 b -> startSteamHost(gui))
-                        .bounds(gui.width / 2 - 48, bottomY, 96, 20)
-                        .build());
+                        .bounds(gui.width / 2 - 48, gui.height - 28, 96, 20)
+                        .build();
+        event.addListener(steam);
+
+        lanScreen = gui;
+        lanApply = startLan;
+        lanCancel = cancel;
+        lanSteam = steam;
+        lanAccess = access;
+        lanTransport = transport;
+        layoutShareToLan(gui);
+    }
+
+    private static Screen lanScreen;
+    private static Button lanApply, lanCancel, lanSteam, lanAccess, lanTransport;
+
+    /**
+     * 26.2+ lays this screen out with LinearLayouts that re-arrange after Init.Post and whenever
+     * LAN is toggled, undoing absolute positions. Re-applied before every frame: the SBM row goes
+     * under the lowest vanilla widget, the footer shares the vanilla footer row.
+     */
+    @SubscribeEvent
+    public static void onScreenRenderPre(ScreenEvent.Render.Pre event) {
+        if (event.getScreen() == lanScreen) layoutShareToLan(lanScreen);
+    }
+
+    private static void layoutShareToLan(Screen gui) {
+        Button footer = lanApply != null ? lanApply : lanCancel;
+        int bottomY = footer != null ? footer.getY() : gui.height - 28;
+        if (lanApply != null) {
+            lanApply.setWidth(96);
+            lanApply.setPosition(gui.width / 2 - 152, bottomY);
+        }
+        if (lanCancel != null) {
+            lanCancel.setWidth(96);
+            lanCancel.setPosition(gui.width / 2 + 56, bottomY);
+        }
+        lanSteam.setPosition(gui.width / 2 - 48, bottomY);
+
+        int contentBottom = gui.height / 4 + 42;
+        for (GuiEventListener child : gui.children()) {
+            if (!(child instanceof AbstractWidget widget) || !widget.visible) continue;
+            if (widget == lanApply || widget == lanCancel || widget == lanSteam
+                    || widget == lanAccess || widget == lanTransport) continue;
+            int bottom = widget.getY() + widget.getHeight();
+            if (bottom < bottomY - 4) contentBottom = Math.max(contentBottom, bottom);
+        }
+        int rowY = contentBottom + 8;
+        lanAccess.setPosition(gui.width / 2 - 155, rowY);
+        lanTransport.setPosition(gui.width / 2 + 5, rowY);
     }
 
     private static void injectFriendsButton(ScreenEvent.Init.Post event, Screen gui) {
