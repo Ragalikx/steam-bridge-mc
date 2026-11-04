@@ -1,0 +1,11 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "steambridge.mc.v263.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "client": [],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "plugin": "steambridge.bootstrap.VersionMixinPlugin"
+}

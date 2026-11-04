@@ -89,6 +89,16 @@ def verify_jar(path, variant, platform):
                 raise RuntimeError('Missing Plasmo API integration: ' + str(path))
         if 'steambridge.voice.mixins.json' in names:
             raise RuntimeError('Obsolete Plasmo mixins packaged: ' + str(path))
+        # Mixin refuses to load any ordinary class inside a declared mixin package.
+        for config in [name for name in names if name.endswith('.mixins.json')]:
+            package = json.loads(jar.read(config)).get('package', '').replace('.', '/') + '/'
+            if package == '/':
+                raise RuntimeError(config + ' declares no mixin package: ' + str(path))
+            for name in names:
+                if name.startswith(package) and name.endswith('.class'):
+                    simple = name.rsplit('/', 1)[1]
+                    if not any(part in simple for part in ('Mixin', 'Accessor', 'Invoker')):
+                        raise RuntimeError(config + ' package also contains ' + name + ' in ' + str(path))
         if variant['id'].startswith('fabric-'):
             metadata = json.loads(jar.read('fabric.mod.json'))
             if 'steambridge.voice.SimpleVoicePlugin' not in metadata.get('entrypoints', {}).get('voicechat', []):
