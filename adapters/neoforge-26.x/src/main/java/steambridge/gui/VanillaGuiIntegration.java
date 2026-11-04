@@ -564,6 +564,8 @@ public final class VanillaGuiIntegration {
         event.addListener(transport);
 
         Button startLan = findButtonByMessage(event, "lanServer.start");
+        // 26.2+ replaced "Start LAN World" with "Apply Changes" in the same footer slot.
+        if (startLan == null) startLan = findButtonByMessage(event, "menu.multiplayerOptions.applyChanges");
         Button cancel = findButtonByMessage(event, "gui.cancel");
         int bottomY = gui.height - 28;
         if (startLan != null) {
