@@ -34,6 +34,9 @@ def metadata(group, version):
     if group['java'] == 8:
         files['mcmod.info'] = json.dumps([dict(modid=runtime_id, name='SBM Linux Runtime', version=version,
                                              mcversion='', authorList=['Ragalikx'], description='Linux x64 Steam natives for SBM')], indent=2).encode()
+    if group.get('forge'):
+        # Forge 1.16.5+ loads every mod JAR as a resource pack and logs an error without pack.mcmeta.
+        files['pack.mcmeta'] = (json.dumps(dict(pack=dict(description='SBM Linux Runtime', pack_format=6 if group['java'] == 8 else 9)), indent=2) + '\n').encode()
     files['META-INF/MANIFEST.MF'] = ('Manifest-Version: 1.0\r\nAutomatic-Module-Name: steambridge.linuxruntime\r\nImplementation-Vendor: Ragalikx\r\n\r\n').encode()
     return files
 
