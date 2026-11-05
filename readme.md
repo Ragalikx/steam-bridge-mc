@@ -73,7 +73,7 @@ Linux x64 uses the same main jar plus one **SBM Linux Runtime** jar. The runtime
 - **Linux as guest:** if joining stalls, set `"iceEnabled": false` in `config/steambridge.json`. Traffic then goes through Valve relays.
 - ARM, 32-bit Java and macOS are not supported.
 
-Tested on Fedora 44 with the Prism Launcher AppImage and the native Steam client, against Windows 11 in both host and guest roles. Details: [docs/LINUX_RUNTIME.md](docs/LINUX_RUNTIME.md).
+Tested on Fedora 44 with the Prism Launcher AppImage and the native Steam client, against Windows 11 in both host and guest roles.
 
 ---
 
@@ -81,10 +81,9 @@ Tested on Fedora 44 with the Prism Launcher AppImage and the native Steam client
 
 All targets live in one branch. Shared code is in `core/`, `runtime/`, `transport-netty/`, `steam-jna/` (Java 8 to 21) and `steam-panama/` (Java 25), each Minecraft target in `adapters/<target>/` with its own Gradle wrapper.
 
-Install JDK 8, 17, 21 and 25 and set `JAVA_HOME_8`, `JAVA_HOME_17`, `JAVA_HOME_21`, `JAVA_HOME_25` (or run `tools/fetch_jdks.py` on Windows). Python 3 is needed.
+Install JDK 8, 17, 21 and 25 and set `JAVA_HOME_8`, `JAVA_HOME_17`, `JAVA_HOME_21`, `JAVA_HOME_25`. Python 3 is needed.
 
 ```text
-python tools/test.py                            # tests
 python tools/build.py                           # all targets, version 0.0.0-dev
 python tools/build.py --variant forge-1.12.2    # one target
 python tools/build.py --version 1.3             # release
@@ -116,8 +115,6 @@ All versions use `config/steambridge.json`.
 - **allowWithoutAuth:** `true` (default) skips Steam Session Ticket checks (easier with bad NAT, weaker security). `false` = strict checks.
 - **interceptUdp:** `true` (default) routes voice mods (Simple Voice Chat, Plasmo Voice) through Steam next to game traffic. Not on 1.7.10 / 1.8.9.
 - **iceEnabled:** `false` forces Valve relays (see [Linux](#linux)).
-
-[Example configuration](docs/steambridge.example.json).
 
 ---
 

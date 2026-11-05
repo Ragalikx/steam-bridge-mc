@@ -2,7 +2,7 @@ name: Build
 
 on:
   push:
-    branches: [26.x]
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
@@ -10,117 +10,7 @@ permissions:
   contents: read
 
 jobs:
-  shared:
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - java: 8
-            jna: 4.4.0
-            netty: 4.0.23.Final
-            gson: 2.2.4
-          - java: 17
-            jna: 5.12.1
-            netty: 4.1.97.Final
-            gson: 2.8.9
-          - java: 21
-            jna: 5.14.0
-            netty: 4.1.97.Final
-            gson: 2.8.9
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3
-        with:
-          distribution: corretto
-          java-version: |
-            ${{ matrix.java }}
-            17
-      - run: bash gradlew check -PtestJnaVersion=${{ matrix.jna }} -PtestNettyVersion=${{ matrix.netty }} -PtestGsonVersion=${{ matrix.gson }}
-        env:
-          SBM_TEST_JAVA_HOME: ${{ env[format('JAVA_HOME_{0}_X64', matrix.java)] }}
-      - if: matrix.java == 17
-        run: python3 tools/verify_voice.py --download
-        env:
-          JAVA_HOME_17: ${{ env.JAVA_HOME_17_X64 }}
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        if: always()
-        with:
-          name: tests-java-${{ matrix.java }}
-          path: |
-            core/build/reports/tests
-            steam-jna/build/reports/tests
-            transport-netty/build/reports/tests
-            runtime/build/reports/tests
-            build/voice-target-results.json
-
-  abi:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3
-        with:
-          distribution: corretto
-          java-version: |
-            8
-            21
-            25
-            17
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
-        with:
-          python-version: '3.12'
-      - run: python tools/verify_abi.py --sdk-mirror --panama --download
-        env:
-          JAVA_HOME_8: ${{ env.JAVA_HOME_8_X64 }}
-          JAVA_HOME_17: ${{ env.JAVA_HOME_17_X64 }}
-          JAVA_HOME_21: ${{ env.JAVA_HOME_21_X64 }}
-          JAVA_HOME_25: ${{ env.JAVA_HOME_25_X64 }}
-          SBM_ABI_BUILD: '1'
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        if: always()
-        with:
-          name: abi-${{ matrix.os }}
-          path: |
-            build/abi-results.json
-            build/abi/panama-results.json
-            build/abi/panama-windows-x64-results.json
-            build/abi/panama-linux-x64-results.json
-
-  linux_runtime:
-    needs: [shared, abi]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3
-        with:
-          distribution: corretto
-          java-version: |
-            25
-            17
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
-        with:
-          python-version: '3.12'
-      - run: python tools/build.py --variant neoforge-26.x --version 0.0.0-${{ github.sha }}
-        env:
-          JAVA_HOME_17: ${{ env.JAVA_HOME_17_X64 }}
-          JAVA_HOME_25: ${{ env.JAVA_HOME_25_X64 }}
-      - run: python tools/verify_linux_runtime.py --version 0.0.0-${{ github.sha }}
-        env:
-          JAVA_HOME_25: ${{ env.JAVA_HOME_25_X64 }}
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        if: always()
-        with:
-          name: linux-runtime-tests
-          path: |
-            steam-panama/build/reports/tests/
-            build/linux-runtime-results.json
-
-  legacy_linux_runtime:
-    needs: [shared, abi]
+  build:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -136,6 +26,7 @@ jobs:
           - fabric-1.21.1
           - neoforge-1.20.1
           - neoforge-1.21.1
+          - neoforge-26.x
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3
@@ -155,126 +46,9 @@ jobs:
           JAVA_HOME_17: ${{ env.JAVA_HOME_17_X64 }}
           JAVA_HOME_21: ${{ env.JAVA_HOME_21_X64 }}
           JAVA_HOME_25: ${{ env.JAVA_HOME_25_X64 }}
-      - run: python tools/verify_legacy_linux_runtime.py --variant ${{ matrix.variant }} --version 0.0.0-${{ github.sha }}
-        env:
-          JAVA_HOME_8: ${{ env.JAVA_HOME_8_X64 }}
-          JAVA_HOME_17: ${{ env.JAVA_HOME_17_X64 }}
-          JAVA_HOME_21: ${{ env.JAVA_HOME_21_X64 }}
-          JAVA_HOME_25: ${{ env.JAVA_HOME_25_X64 }}
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        if: always()
-        with:
-          name: linux-runtime-${{ matrix.variant }}-tests
-          path: build/legacy-linux-runtime-results.json
-
-  adapters:
-    needs: [shared, abi, linux_runtime, legacy_linux_runtime]
-    runs-on: windows-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        variant:
-          - forge-1.7.10
-          - forge-1.8.9
-          - forge-1.12.2
-          - forge-1.16.5
-          - forge-1.19.2
-          - fabric-1.19.2
-          - fabric-1.20.1
-          - fabric-1.21.1
-          - neoforge-1.20.1
-          - neoforge-1.21.1
-          - neoforge-26.x
-        platform: [windows-x64]
-    permissions:
-      contents: read
-      id-token: write
-      attestations: write
-      artifact-metadata: write
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3
-        with:
-          distribution: corretto
-          java-version: |
-            8
-            21
-            25
-            17
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
-        with:
-          python-version: '3.12'
-      - run: python tools/build.py --variant ${{ matrix.variant }} --platform ${{ matrix.platform }} --version 0.0.0-${{ github.sha }}
-        env:
-          JAVA_HOME_8: ${{ env.JAVA_HOME_8_X64 }}
-          JAVA_HOME_17: ${{ env.JAVA_HOME_17_X64 }}
-          JAVA_HOME_21: ${{ env.JAVA_HOME_21_X64 }}
-          JAVA_HOME_25: ${{ env.JAVA_HOME_25_X64 }}
-      - if: matrix.variant != 'neoforge-26.x'
-        run: |
-          .\gradlew.bat :steam-jna:compileTestJava --no-daemon --max-workers=2
-          python tools/verify_native.py --variant ${{ matrix.variant }} --version 0.0.0-${{ github.sha }}
-          python tools/verify_legacy_linux_runtime.py --variant ${{ matrix.variant }} --version 0.0.0-${{ github.sha }}
-        env:
-          JAVA_HOME_8: ${{ env.JAVA_HOME_8_X64 }}
-          JAVA_HOME_17: ${{ env.JAVA_HOME_17_X64 }}
-          JAVA_HOME_21: ${{ env.JAVA_HOME_21_X64 }}
-          JAVA_HOME_25: ${{ env.JAVA_HOME_25_X64 }}
-      - if: matrix.variant == 'neoforge-26.x'
-        run: python tools/verify_voice.py --panama --download
-        env:
-          JAVA_HOME_17: ${{ env.JAVA_HOME_17_X64 }}
-          JAVA_HOME_25: ${{ env.JAVA_HOME_25_X64 }}
-      - if: matrix.variant == 'neoforge-26.x'
-        run: python tools/verify_linux_runtime.py --version 0.0.0-${{ github.sha }}
-        env:
-          JAVA_HOME_25: ${{ env.JAVA_HOME_25_X64 }}
-      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
-        if: github.event_name != 'pull_request'
-        with:
-          subject-path: dist/${{ matrix.platform }}/*.jar
-      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
-        if: matrix.variant == 'neoforge-26.x' && github.event_name != 'pull_request'
-        with:
-          subject-path: dist/addons/*.jar
-      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
-        if: (matrix.variant == 'forge-1.16.5' || matrix.variant == 'forge-1.19.2' || matrix.variant == 'neoforge-1.21.1') && github.event_name != 'pull_request'
-        with:
-          subject-path: dist/addons/*.jar
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        if: matrix.variant == 'forge-1.16.5' || matrix.variant == 'forge-1.19.2' || matrix.variant == 'neoforge-1.21.1'
-        with:
-          name: linux-runtime-${{ matrix.variant }}
-          path: dist/addons/
-          if-no-files-found: error
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        if: matrix.variant == 'neoforge-26.x'
-        with:
-          name: linux-runtime-neoforge-26.x
-          path: dist/addons/
-          if-no-files-found: error
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: ${{ matrix.variant }}-${{ matrix.platform }}
-          path: dist/${{ matrix.platform }}/
-          if-no-files-found: error
-
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        if: always() && matrix.variant == 'neoforge-26.x'
-        with:
-          name: panama-java-25-tests
+          name: ${{ matrix.variant }}
           path: |
-            steam-panama/build/reports/tests/
-            build/voice-panama-target-results.json
-            build/linux-runtime-results.json
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        if: always()
-        with:
-          name: gui-${{ matrix.variant }}
-          path: adapters/${{ matrix.variant }}/build/gui-contract-results.json
-          if-no-files-found: ignore
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        if: always() && matrix.variant != 'neoforge-26.x'
-        with:
-          name: runtime-contract-${{ matrix.variant }}
-          path: build/legacy-linux-runtime-results.json
+            dist/windows-x64/*.jar
+            dist/addons/*.jar

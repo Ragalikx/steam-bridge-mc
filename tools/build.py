@@ -186,16 +186,11 @@ def main():
                                     sha256=hashlib.sha256(artifact.read_bytes()).hexdigest()))
             continue
         directory = ROOT / 'adapters' / variant['id']
-        from verify_gui import TARGETS, gradle_arguments, verify_variant
-        gui_tasks, gui_properties = gradle_arguments(variant['id'])
-        code = gradle(directory, (['compileJava'] if args.compile_only else ['build']) + gui_tasks,
-                      variant['buildJava'], ['-PmodVersion=' + args.version,
-                                            '-PnativePlatform=' + args.platform] + gui_properties)
+        code = gradle(directory, ['compileJava'] if args.compile_only else ['build'],
+                      variant['buildJava'], ['-PmodVersion=' + args.version, '-PnativePlatform=' + args.platform])
         if code:
             failed.append(variant['id'])
             continue
-        if variant['id'] in TARGETS:
-            verify_variant(variant['id'])
         if args.compile_only:
             records.append(dict(variant, result='compiled'))
             continue

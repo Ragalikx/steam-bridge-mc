@@ -73,7 +73,7 @@ NeoForge 26.1, 26.2 и 26.3 используют один jar, `steambridge-neof
 - **Linux как гость:** если подключение зависает, укажите `"iceEnabled": false` в `config/steambridge.json`. Трафик пойдёт через релеи Valve.
 - ARM, 32-битная Java и macOS не поддерживаются.
 
-Проверено на Fedora 44 с AppImage Prism Launcher и нативным Steam, в паре с Windows 11 в роли хоста и гостя. Подробности: [docs/LINUX_RUNTIME.md](docs/LINUX_RUNTIME.md).
+Проверено на Fedora 44 с AppImage Prism Launcher и нативным Steam, в паре с Windows 11 в роли хоста и гостя.
 
 ---
 
@@ -81,10 +81,9 @@ NeoForge 26.1, 26.2 и 26.3 используют один jar, `steambridge-neof
 
 Все версии лежат в одной ветке. Общий код в `core/`, `runtime/`, `transport-netty/`, `steam-jna/` (Java 8-21) и `steam-panama/` (Java 25), каждая версия Minecraft в `adapters/<target>/` со своим Gradle wrapper.
 
-Нужны JDK 8, 17, 21 и 25 и переменные `JAVA_HOME_8`, `JAVA_HOME_17`, `JAVA_HOME_21`, `JAVA_HOME_25` (или `tools/fetch_jdks.py` на Windows), а также Python 3.
+Нужны JDK 8, 17, 21 и 25 и переменные `JAVA_HOME_8`, `JAVA_HOME_17`, `JAVA_HOME_21`, `JAVA_HOME_25`, а также Python 3.
 
 ```text
-python tools/test.py                            # тесты
 python tools/build.py                           # все версии, 0.0.0-dev
 python tools/build.py --variant forge-1.12.2    # одна версия
 python tools/build.py --version 1.3             # релиз
@@ -115,8 +114,6 @@ python tools/build.py --version 1.3             # релиз
 - **allowWithoutAuth:** `true` (по умолчанию) - без проверки Steam Session Ticket (проще при проблемах с NAT, слабее безопасность). `false` - строгая проверка.
 - **interceptUdp:** `true` (по умолчанию) пускает войс-моды (Simple Voice Chat, Plasmo Voice) через Steam рядом с игровым трафиком. На 1.7.10 / 1.8.9 нет.
 - **iceEnabled:** `false` - только релеи Valve (см. [Linux](#linux)).
-
-[Пример конфигурации](docs/steambridge.example.json).
 
 ---
 

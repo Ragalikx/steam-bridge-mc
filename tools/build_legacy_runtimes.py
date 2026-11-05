@@ -7,7 +7,14 @@ import zipfile
 
 from build import ROOT, gradle, java_home
 from build_26x import write_jar
-from verify_native import dependency
+
+
+def dependency(group, artifact, version):
+    directory = Path.home() / '.gradle/caches/modules-2/files-2.1' / group / artifact / version
+    candidates = [p for p in directory.glob('**/*.jar') if p.name == artifact + '-' + version + '.jar']
+    if not candidates:
+        raise RuntimeError('Missing cached dependency: ' + str(directory))
+    return candidates[0]
 
 GROUPS = json.loads((ROOT / 'tools/linux-runtime-groups.json').read_text(encoding='utf-8'))
 
