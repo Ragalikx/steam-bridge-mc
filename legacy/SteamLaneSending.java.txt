@@ -1,4 +1,4 @@
-LEGACY / REFERENCE ONLY — NOT COMPILED, NOT ON THE CLASSPATH
+LEGACY / REFERENCE ONLY - NOT COMPILED, NOT ON THE CLASSPATH
 ============================================================
 
 Priority-lane sending, extracted from SteamSocketsApi when it was cut from the
@@ -8,7 +8,7 @@ WHY IT WAS REMOVED
 ------------------
 The data path always sent on lane 0, so the `lane > 0` branch never executed and
 none of this ran. Worse, it *looked* like priority channels existed when they did
-not — misleading for anyone reading the code.
+not - misleading for anyone reading the code.
 
 WHAT IS USEFUL HERE (keep as a reference)
 -----------------------------------------
@@ -17,14 +17,14 @@ AllocateMessage(len) -> write payload into m_pData -> set m_cbSize / m_conn /
 m_nFlags / m_idxLane by offset -> SendMessages(1, ...). Getting the offset writes
 and the ThreadLocal reuse right is fiddly; this is a correct, GC-free version.
 
-WHAT IS MISSING (why this is NOT a foundation — expect to redesign)
+WHAT IS MISSING (why this is NOT a foundation - expect to redesign)
 -------------------------------------------------------------------
 1. No ConfigureConnectionLanes() call. Steam needs
    ISteamNetworkingSockets_ConfigureConnectionLanes(conn, numLanes, priorities,
    weights) ONCE per connection to define what a lane index means. Setting
    m_idxLane = 1 on a connection that only has lane 0 configured does nothing.
 2. No packet classification. LoopbackBridge forwards an opaque TCP byte stream
-   from Minecraft's pipeline — it cannot tell a chunk packet from a movement
+   from Minecraft's pipeline - it cannot tell a chunk packet from a movement
    packet without re-parsing the MC protocol (framing + packet IDs + connection
    state) inside the bridge. Routing chunks onto a "bulk" lane requires that
    parsing, which is the bulk of the real work and is not here.
@@ -38,7 +38,7 @@ a lightweight MC-protocol classifier in the bridge, then map packet class -> lan
     /** Whether lane-aware sending has been confirmed available on this process. */
     private volatile boolean lanesAvailable = true;
 
-    // Pre-allocated ThreadLocal Memory for sendOnLane — eliminates per-call allocations
+    // Pre-allocated ThreadLocal Memory for sendOnLane - eliminates per-call allocations
     private static final ThreadLocal<Memory> TL_LANE_MSG_ARRAY  = ThreadLocal.withInitial(() -> new Memory(Native.POINTER_SIZE));
     private static final ThreadLocal<Memory> TL_LANE_OUT_RESULT = ThreadLocal.withInitial(() -> new Memory(8));
 
@@ -71,7 +71,7 @@ a lightweight MC-protocol classifier in the bridge, then map packet class -> lan
             msgPtr.setInt(SteamOffsets.MSG_OFF_FLAGS,  flags);
             msgPtr.setShort(SteamOffsets.MSG_OFF_LANE, lane);
 
-            // Reuse pre-allocated ThreadLocal Memory — eliminates per-call allocations
+            // Reuse pre-allocated ThreadLocal Memory - eliminates per-call allocations
             Memory msgArray  = TL_LANE_MSG_ARRAY.get();
             Memory outResult = TL_LANE_OUT_RESULT.get();
             msgArray.setPointer(0, msgPtr);
