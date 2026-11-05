@@ -11,6 +11,7 @@ import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.events.GuiEventListener;
+import net.minecraft.client.gui.layouts.HeaderAndFooterLayout;
 import net.minecraft.client.gui.screens.ConnectScreen;
 import net.minecraft.client.gui.screens.DirectJoinServerScreen;
 import net.minecraft.client.gui.screens.ManageServerScreen;
@@ -582,34 +583,72 @@ public final class VanillaGuiIntegration {
         lanSteam = steam;
         lanAccess = access;
         lanTransport = transport;
+        lanLayout = findFooterLayout(gui);
+        if (lanLayout != null) {
+            // Init.Post runs again on every resize while the layout object survives: grow from the
+            // footer height first seen, never cumulatively.
+            Integer base = LAN_BASE_FOOTER.computeIfAbsent(lanLayout, l -> l.getFooterHeight());
+            lanLayout.setFooterHeight(base + LAN_ROW);
+            repositionElements(gui);
+        }
         layoutShareToLan(gui);
     }
 
+    private static final int LAN_ROW = 24;
+    private static final java.util.Map<HeaderAndFooterLayout, Integer> LAN_BASE_FOOTER =
+            new java.util.WeakHashMap<>();
     private static Screen lanScreen;
+    private static HeaderAndFooterLayout lanLayout;
     private static Button lanApply, lanCancel, lanSteam, lanAccess, lanTransport;
 
     /**
-     * 26.2+ lays this screen out with LinearLayouts that re-arrange after Init.Post and whenever
-     * LAN is toggled, undoing absolute positions. Re-applied before every frame: the SBM row goes
-     * under the lowest vanilla widget, the footer shares the vanilla footer row.
+     * 26.2+ builds this screen from a HeaderAndFooterLayout that re-arranges after Init.Post and
+     * whenever LAN is toggled, undoing absolute positions; 26.3 also scrolls its content down to
+     * the footer. The footer is therefore one row taller: Access/Route on top, then Apply, Open via
+     * Steam and Cancel. Positions are re-applied before every frame.
      */
     @SubscribeEvent
     public static void onScreenRenderPre(ScreenEvent.Render.Pre event) {
         if (event.getScreen() == lanScreen) layoutShareToLan(lanScreen);
     }
 
+    /** 26.2+ screens keep a HeaderAndFooterLayout; 26.1 has none, which is expected. */
+    private static HeaderAndFooterLayout findFooterLayout(Screen gui) {
+        for (Class<?> type = gui.getClass(); type != null && type != Screen.class; type = type.getSuperclass()) {
+            for (Field field : type.getDeclaredFields()) {
+                if (field.getType() != HeaderAndFooterLayout.class) continue;
+                try {
+                    field.setAccessible(true);
+                    return (HeaderAndFooterLayout) field.get(gui);
+                } catch (ReflectiveOperationException | RuntimeException failure) {
+                    return null;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static void repositionElements(Screen gui) {
+        try {
+            java.lang.reflect.Method method = Screen.class.getDeclaredMethod("repositionElements");
+            method.setAccessible(true);
+            method.invoke(gui);
+        } catch (ReflectiveOperationException | RuntimeException failure) {
+            SteamBridgeMod.LOG.debug("[SteamBridge] Could not re-arrange the LAN screen: {}", failure.toString());
+        }
+    }
+
     private static void layoutShareToLan(Screen gui) {
+        if (lanLayout != null) {
+            int top = gui.height - lanLayout.getFooterHeight() + 4;
+            lanAccess.setPosition(gui.width / 2 - 155, top);
+            lanTransport.setPosition(gui.width / 2 + 5, top);
+            placeLanFooter(gui, top + LAN_ROW);
+            return;
+        }
         Button footer = lanApply != null ? lanApply : lanCancel;
         int bottomY = footer != null ? footer.getY() : gui.height - 28;
-        if (lanApply != null) {
-            lanApply.setWidth(96);
-            lanApply.setPosition(gui.width / 2 - 152, bottomY);
-        }
-        if (lanCancel != null) {
-            lanCancel.setWidth(96);
-            lanCancel.setPosition(gui.width / 2 + 56, bottomY);
-        }
-        lanSteam.setPosition(gui.width / 2 - 48, bottomY);
+        placeLanFooter(gui, bottomY);
 
         int contentBottom = gui.height / 4 + 42;
         for (GuiEventListener child : gui.children()) {
@@ -622,6 +661,18 @@ public final class VanillaGuiIntegration {
         int rowY = contentBottom + 8;
         lanAccess.setPosition(gui.width / 2 - 155, rowY);
         lanTransport.setPosition(gui.width / 2 + 5, rowY);
+    }
+
+    private static void placeLanFooter(Screen gui, int bottomY) {
+        if (lanApply != null) {
+            lanApply.setWidth(96);
+            lanApply.setPosition(gui.width / 2 - 152, bottomY);
+        }
+        if (lanCancel != null) {
+            lanCancel.setWidth(96);
+            lanCancel.setPosition(gui.width / 2 + 56, bottomY);
+        }
+        lanSteam.setPosition(gui.width / 2 - 48, bottomY);
     }
 
     private static void injectFriendsButton(ScreenEvent.Init.Post event, Screen gui) {
