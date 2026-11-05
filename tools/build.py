@@ -112,6 +112,31 @@ def verify_jar(path, variant, platform):
             raise RuntimeError('Missing license notices: ' + str(path))
 
 
+FIXED_ZIP_TIME = (1980, 2, 1, 0, 0, 0)
+
+
+def normalize_jar(source, target):
+    """Repack with fixed timestamps and a stable entry order.
+
+    ForgeGradle reobfuscation rewrites the jar after Gradle's reproducible jar task and stamps the
+    build time, so the same sources gave a new hash on every build. Entry bytes are unchanged.
+    """
+    with zipfile.ZipFile(source) as jar:
+        infos = jar.infolist()
+        first = [name for name in ('META-INF/', 'META-INF/MANIFEST.MF') if name in jar.namelist()]
+        rest = sorted(info.filename for info in infos if info.filename not in first)
+        temporary = target.with_suffix('.jar.tmp')
+        with zipfile.ZipFile(temporary, 'w') as out:
+            for name in first + rest:
+                info = jar.getinfo(name)
+                fixed = zipfile.ZipInfo(name, FIXED_ZIP_TIME)
+                fixed.compress_type = zipfile.ZIP_STORED if name.endswith('/') else zipfile.ZIP_DEFLATED
+                fixed.external_attr = info.external_attr
+                fixed.create_system = 0
+                out.writestr(fixed, jar.read(name))
+    os.replace(temporary, target)
+
+
 def code_fingerprint():
     paths = set()
     for root in ['core', 'steam-jna', 'steam-panama', 'transport-netty', 'runtime', 'integrations', 'adapters', 'build-logic', 'tools', '.github', 'gradle']:
@@ -181,7 +206,8 @@ def main():
         source = candidates[0]
         verify_jar(source, variant, args.platform)
         target = destination / ('steambridge-' + variant['id'] + '-' + args.version.lstrip('v') + '.jar')
-        shutil.copy2(source, target)
+        normalize_jar(source, target)
+        verify_jar(target, variant, args.platform)
         digest = hashlib.sha256(target.read_bytes()).hexdigest()
         target.with_suffix('.jar.sha256').write_text(digest + '  ' + target.name + '\n', encoding='utf-8')
         records.append(dict(variant, file=target.name, bytes=target.stat().st_size, sha256=digest))
