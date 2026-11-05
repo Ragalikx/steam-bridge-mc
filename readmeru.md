@@ -63,10 +63,10 @@ NeoForge 26.1, 26.2 и 26.3 используют один jar, `steambridge-neof
 
 | Runtime | Для |
 |---|---|
-| `steambridge-linux-runtime-java8` | Forge 1.7.10, 1.8.9, 1.12.2, 1.16.5 |
-| `steambridge-linux-runtime-java17` | Forge 1.19.2, Fabric 1.19.2 / 1.20.1, NeoForge 1.20.1 |
-| `steambridge-linux-runtime-java21` | Fabric / NeoForge 1.21.1 |
-| `steambridge-linux-runtime-neoforge-26.x` | NeoForge 26.1 / 26.2 / 26.3 |
+| `steambridge-linux-runtime-1.7.10-1.16.5` | Forge 1.7.10, 1.8.9, 1.12.2, 1.16.5 |
+| `steambridge-linux-runtime-1.19.2-1.20.1` | Forge 1.19.2, Fabric 1.19.2 / 1.20.1, NeoForge 1.20.1 |
+| `steambridge-linux-runtime-1.21.1` | Fabric / NeoForge 1.21.1 |
+| `steambridge-linux-runtime-26.1-26.3` | NeoForge 26.1 / 26.2 / 26.3 |
 
 - **Лаунчер не должен быть в песочнице.** Flatpak-лаунчер (например Prism Launcher из Flathub) скрывает от игры процесс Steam, и Steam закрывает игру. Используйте AppImage Prism Launcher, пакет дистрибутива или другой нативный лаунчер.
 - Нужен обычный десктопный клиент Steam того же пользователя.

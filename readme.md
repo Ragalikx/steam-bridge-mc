@@ -63,10 +63,10 @@ Linux x64 uses the same main jar plus one **SBM Linux Runtime** jar. The runtime
 
 | Runtime | For |
 |---|---|
-| `steambridge-linux-runtime-java8` | Forge 1.7.10, 1.8.9, 1.12.2, 1.16.5 |
-| `steambridge-linux-runtime-java17` | Forge 1.19.2, Fabric 1.19.2 / 1.20.1, NeoForge 1.20.1 |
-| `steambridge-linux-runtime-java21` | Fabric / NeoForge 1.21.1 |
-| `steambridge-linux-runtime-neoforge-26.x` | NeoForge 26.1 / 26.2 / 26.3 |
+| `steambridge-linux-runtime-1.7.10-1.16.5` | Forge 1.7.10, 1.8.9, 1.12.2, 1.16.5 |
+| `steambridge-linux-runtime-1.19.2-1.20.1` | Forge 1.19.2, Fabric 1.19.2 / 1.20.1, NeoForge 1.20.1 |
+| `steambridge-linux-runtime-1.21.1` | Fabric / NeoForge 1.21.1 |
+| `steambridge-linux-runtime-26.1-26.3` | NeoForge 26.1 / 26.2 / 26.3 |
 
 - **Use a launcher that is not sandboxed.** A Flatpak launcher (for example Prism Launcher from Flathub) hides the Steam process from the game and Steam exits it. Use the Prism Launcher AppImage, a distribution package or another native launcher.
 - Use the regular desktop Steam client of the same user.

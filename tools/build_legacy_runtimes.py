@@ -84,7 +84,7 @@ def build_runtimes(version, selected, compile_only=False):
         for path in (ROOT / 'adapters/neoforge-26.x/third_party_licenses').glob('*'):
             if path.is_file():
                 entries['META-INF/licenses/' + path.name] = path.read_bytes()
-        output = ROOT / 'dist/addons' / ('steambridge-linux-runtime-java' + str(target) + '-' + version.lstrip('v') + '.jar')
+        output = ROOT / 'dist/addons' / ('steambridge-linux-runtime-' + {8: '1.7.10-1.16.5', 17: '1.19.2-1.20.1', 21: '1.21.1'}[target] + '-' + version.lstrip('v') + '.jar')
         digest = write_jar(output, entries)
         results.append(dict(file=output.name, path=output.relative_to(ROOT).as_posix(), java=target,
                             bytes=output.stat().st_size, sha256=digest, variants=group['variants'], backend='jna', api=1))

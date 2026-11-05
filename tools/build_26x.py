@@ -79,7 +79,7 @@ def build_bundle(version='0.0.0-dev', compile_only=False):
     if 'steam_api64.dll' not in entries or 'steambridge/panama/SteamLibrary.class' not in entries:
         raise RuntimeError('Missing Panama backend')
     digest = write_jar(output, entries)
-    linux_output = ROOT / 'dist/addons' / ('steambridge-linux-runtime-neoforge-26.x-' + version.lstrip('v') + '.jar')
+    linux_output = ROOT / 'dist/addons' / ('steambridge-linux-runtime-26.1-26.3-' + version.lstrip('v') + '.jar')
     write_jar(linux_output, linux_entries)
     linux = dict(file=linux_output.name, sha256=hashlib.sha256(linux_output.read_bytes()).hexdigest(), java=25, variants=['neoforge-26.x'])
     manifest = dict(file=output.name, bytes=output.stat().st_size, sha256=digest, targets=targets,
