@@ -7,6 +7,7 @@ __pycache__/
 
 # IDE
 .idea/
+.vscode/
 *.iml
 out/
 bin/
@@ -14,6 +15,7 @@ bin/
 # Forge decompiled workspace
 src/generated/
 run/
+runs/
 
 # Logs and debug artifacts
 *.log
