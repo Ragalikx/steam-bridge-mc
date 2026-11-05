@@ -139,7 +139,8 @@ public class GuiSteamFriends extends Screen {
         if (super.mouseClicked(event, doubleClick)) {
             return true;
         }
-        if (mouseButton != 0) return false;
+        // 26.3 renumbered mouse buttons (left 0 -> 1); compile against the target's constant.
+        if (mouseButton != com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT) return false;
 
         int maxVisible = maxVisibleRows();
         for (int i = 0; i < maxVisible; i++) {
