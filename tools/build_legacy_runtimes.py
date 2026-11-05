@@ -15,11 +15,12 @@ GROUPS = json.loads((ROOT / 'tools/linux-runtime-groups.json').read_text(encodin
 def metadata(group, version):
     runtime_id = 'steambridge_linux_runtime'
     files = {}
-    fabric = dict(schemaVersion=1, id=runtime_id, version=version,
-                  name='SBM Linux Runtime', environment='client', authors=['Ragalikx'], license='MIT',
-                  entrypoints=dict(preLaunch=['steambridge.linuxruntime.RuntimeBootstrap::initialize']),
-                  depends=dict(fabricloader='>=0.14.9', steambridge='*', minecraft=group['fabric'], java='>=' + str(group['java'])))
-    files['fabric.mod.json'] = (json.dumps(fabric, indent=2) + '\n').encode()
+    if group.get('fabric'):
+        fabric = dict(schemaVersion=1, id=runtime_id, version=version,
+                      name='SBM Linux Runtime', environment='client', authors=['Ragalikx'], license='MIT',
+                      entrypoints=dict(preLaunch=['steambridge.linuxruntime.RuntimeBootstrap::initialize']),
+                      depends=dict(fabricloader='>=0.14.9', steambridge='*', minecraft=group['fabric'], java='>=' + str(group['java'])))
+        files['fabric.mod.json'] = (json.dumps(fabric, indent=2) + '\n').encode()
     neo = 'neoforge' in group
     loader = 'neoforge' if neo else 'forge'
     minecraft = group.get('neoforge', group.get('forge'))

@@ -4,7 +4,7 @@
 
 | Runtime | Совместимые версии и загрузчики |
 | --- | --- |
-| Java 8 | Forge 1.7.10, 1.8.9, 1.12.2, 1.16.5; Fabric 1.16.5 |
+| Java 8 | Forge 1.7.10, 1.8.9, 1.12.2, 1.16.5 |
 | Java 17 | Forge 1.19.2; Fabric 1.19.2, 1.20.1; NeoForge 1.20.1 |
 | Java 21 | Fabric и NeoForge 1.21.1 |
 | Java 25 | NeoForge 26.1, 26.2, 26.3 |

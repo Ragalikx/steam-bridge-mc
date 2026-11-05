@@ -29,9 +29,12 @@ def verify_artifact(path, group):
                 raise RuntimeError('Incorrect grouped runtime native: ' + item['file'])
         if {name for name in jar.namelist() if name.endswith(('.so', '.dll', '.dylib'))} != {item['resource'].lstrip('/') for item in lock['files']}:
             raise RuntimeError('Unexpected grouped runtime natives')
-        fabric = json.loads(jar.read('fabric.mod.json'))
-        if fabric['depends']['minecraft'] != group['fabric'] or list(fabric['entrypoints']) != ['preLaunch']:
-            raise RuntimeError('Incorrect Fabric preLaunch registration')
+        if group.get('fabric'):
+            fabric = json.loads(jar.read('fabric.mod.json'))
+            if fabric['depends']['minecraft'] != group['fabric'] or list(fabric['entrypoints']) != ['preLaunch']:
+                raise RuntimeError('Incorrect Fabric preLaunch registration')
+        elif 'fabric.mod.json' in jar.namelist():
+            raise RuntimeError('Fabric metadata in a runtime group without Fabric targets')
         name = 'META-INF/' + ('neoforge.mods.toml' if group['java'] == 21 else 'mods.toml')
         metadata = tomllib.loads(jar.read(name).decode('utf-8'))
         if metadata['mods'][0]['modId'] != 'steambridge_linux_runtime':

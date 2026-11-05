@@ -35,13 +35,6 @@
     "buildJava": 17
   },
   {
-    "id": "fabric-1.16.5",
-    "sourceBranch": "Fabric-1.16.5",
-    "sourceCommit": "45e2f37dc59f90054a2b68e46dfdfd453f14d534",
-    "runtimeJava": 8,
-    "buildJava": 17
-  },
-  {
     "id": "fabric-1.19.2",
     "sourceBranch": "Fabric-1.19.2",
     "sourceCommit": "5abb95c420cbeb0aa468e240a47bb69e02798061",
