@@ -21,6 +21,7 @@ runs/
 *.log
 log.txt
 build_output.txt
+hs_err_pid*.log
 
 # OS
 Thumbs.db
