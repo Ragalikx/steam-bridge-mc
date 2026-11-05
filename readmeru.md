@@ -1,107 +1,150 @@
-# Steam Bridge
+# Steam Bridge - Minecraft Mod
 
-В управлении сессией добавлена отправка приглашений через Steam. Принятие при запущенном Minecraft с SBM открывает обычное подключение из меню после проверки актуальности сессии. [Приглашения и границы проверки](docs/STEAM_INVITES.md).
+[![Author](https://img.shields.io/badge/author-Ragalikx-blue)](https://github.com/Ragalikx)
+[![Discord](https://img.shields.io/badge/Discord-%D0%9F%D1%80%D0%B8%D1%81%D0%BE%D0%B5%D0%B4%D0%B8%D0%BD%D0%B8%D1%82%D1%8C%D1%81%D1%8F-5865F2?logo=discord&logoColor=white)](https://discord.gg/2xBnJ7awRC)
 
-Исправления batch, управление очередью отдельного игрока и экспорт диагностики описаны в [проверках надёжности](docs/RELIABILITY.md). Minecraft UUID сохраняется. Реальные Steam-соединения и игровой запуск ещё требуют проверки.
+🇬🇧 [Read in English](readme.md)
 
-Штатные события пишутся на DEBUG. Ошибки содержат контекст соединения, повторяющиеся сообщения подавляются на 30 секунд; ошибки запуска остаются ERROR. [Поведение логгера](docs/LOGGING.md).
+**Steam Bridge** - мод, с которым можно открыть мир друзьям без VPN, proxy и туннелей.
+Трафик игры идёт через Steam Networking Sockets (SDR / P2P). Благодаря сети релеев Valve задержка обычно остаётся настолько низкой, насколько это возможно, а подключение работает даже через большинство сложных NAT.
 
-[English](readme.md) · [Discord](https://discord.gg/2xBnJ7awRC) · [Автор](https://github.com/Ragalikx)
+> **Discord - основная площадка проекта.** Вопросы, планы, релизы и баги: **[discord.gg/2xBnJ7awRC](https://discord.gg/2xBnJ7awRC)**
 
-Мод соединяет LAN-миры Minecraft через Steam Networking Sockets: напрямую P2P или через ретрансляторы Valve. Игрок скачивает один JAR под свою версию Minecraft, загрузчик и ОС. На обеих машинах должны работать Steam и Spacewar, AppID 480.
+---
 
-## Текущая структура 26.x
+## Поддерживаемые версии
 
-Для старых версий общий сетевой код компилируется для Java 8. NeoForge 26.x использует отдельный backend Project Panama на Java 25. Общий lifecycle компилируется из тех же исходников через генератор привязок. Отдельное приложение и дополнительный core-мод игрокам не нужны. Это рабочая разработка, игровой запуск и настоящее соединение Steam ещё требуют проверки.
+Все версии собираются из этой ветки.
+
+<table>
+<thead>
+<tr>
+<th rowspan="2">Minecraft</th>
+<th rowspan="2">Платформа</th>
+<th rowspan="2">Версия загрузчика</th>
+<th rowspan="2">UDP Tunnel*</th>
+<th colspan="3">ОС</th>
+<th rowspan="2">Статус</th>
+</tr>
+<tr>
+<th>Win</th>
+<th>Linux**</th>
+<th>macOS</th>
+</tr>
+</thead>
+<tbody>
+<tr><td>26.3</td><td>NeoForge</td><td>26.3.0.85</td><td>✅</td><td>✅</td><td>✅</td><td>❌</td><td>Доступно</td></tr>
+<tr><td>26.2</td><td>NeoForge</td><td>26.2.0.93</td><td>✅</td><td>✅</td><td>✅</td><td>❌</td><td>Доступно</td></tr>
+<tr><td>26.1</td><td>NeoForge</td><td>26.1.0.19-beta</td><td>✅</td><td>✅</td><td>✅</td><td>❌</td><td>Доступно</td></tr>
+<tr><td>1.21.1</td><td>NeoForge</td><td>21.1.234</td><td>✅</td><td>✅</td><td>✅</td><td>❌</td><td>Доступно</td></tr>
+<tr><td>1.21.1</td><td>Fabric</td><td>0.16.14 + API 0.116.13</td><td>✅</td><td>✅</td><td>✅</td><td>❌</td><td>Доступно</td></tr>
+<tr><td>1.20.1</td><td>NeoForge/Forge</td><td>47.1.106</td><td>✅</td><td>✅</td><td>✅</td><td>❌</td><td>Доступно</td></tr>
+<tr><td>1.20.1</td><td>Fabric</td><td>0.16.14 + API 0.92.2</td><td>✅</td><td>✅</td><td>✅</td><td>❌</td><td>Доступно</td></tr>
+<tr><td>1.19.2</td><td>Forge</td><td>43.5.0</td><td>✅</td><td>✅</td><td>✅</td><td>❌</td><td>Доступно</td></tr>
+<tr><td>1.19.2</td><td>Fabric</td><td>0.16.14 + API 0.76.1</td><td>✅</td><td>✅</td><td>✅</td><td>❌</td><td>Доступно</td></tr>
+<tr><td>1.16.5</td><td>Forge</td><td>36.2.42</td><td>✅</td><td>✅</td><td>✅</td><td>❌</td><td>Доступно</td></tr>
+<tr><td>1.12.2</td><td>Forge</td><td>14.23.5.2860</td><td>✅</td><td>✅</td><td>✅</td><td>❌</td><td>Доступно</td></tr>
+<tr><td>1.8.9</td><td>Forge</td><td>11.15.1.2318</td><td>❌</td><td>✅</td><td>✅</td><td>❌</td><td>Доступно</td></tr>
+<tr><td>1.7.10</td><td>Forge</td><td>10.13.4.1614</td><td>❌</td><td>✅</td><td>✅</td><td>❌</td><td>Доступно</td></tr>
+</tbody>
+</table>
+
+NeoForge 26.1, 26.2 и 26.3 используют один jar, `steambridge-neoforge-26.x`. Для Fabric нужен Fabric API. У хоста и гостя должны совпадать версия Minecraft, загрузчик и версия Steam Bridge.
+
+\*UDP Tunnel: пускает **UDP войсов** (Simple Voice Chat, Plasmo Voice) через Steam рядом с игровым трафиком (`interceptUdp`). На 1.7.10 / 1.8.9 нет.
+
+\*\*Для Linux рядом с основным модом нужен [Linux Runtime](#linux).
+
+---
+
+## Linux
+
+На Linux x64 ставится тот же основной jar и один jar **SBM Linux Runtime**. В нём только Linux-библиотеки Steam. Выбирайте его по версии Minecraft и загрузчику, ставьте только один:
+
+| Runtime | Для |
+|---|---|
+| `steambridge-linux-runtime-java8` | Forge 1.7.10, 1.8.9, 1.12.2, 1.16.5 |
+| `steambridge-linux-runtime-java17` | Forge 1.19.2, Fabric 1.19.2 / 1.20.1, NeoForge 1.20.1 |
+| `steambridge-linux-runtime-java21` | Fabric / NeoForge 1.21.1 |
+| `steambridge-linux-runtime-neoforge-26.x` | NeoForge 26.1 / 26.2 / 26.3 |
+
+- **Лаунчер не должен быть в песочнице.** Flatpak-лаунчер (например Prism Launcher из Flathub) скрывает от игры процесс Steam, и Steam закрывает игру. Используйте AppImage Prism Launcher, пакет дистрибутива или другой нативный лаунчер.
+- Нужен обычный десктопный клиент Steam того же пользователя.
+- **Linux как гость:** если подключение зависает, укажите `"iceEnabled": false` в `config/steambridge.json`. Трафик пойдёт через релеи Valve.
+- ARM, 32-битная Java и macOS не поддерживаются.
+
+Проверено на Fedora 44 с AppImage Prism Launcher и нативным Steam, в паре с Windows 11 в роли хоста и гостя. Подробности: [docs/LINUX_RUNTIME.md](docs/LINUX_RUNTIME.md).
+
+---
+
+## Информация для разработчиков
+
+Все версии лежат в одной ветке. Общий код в `core/`, `runtime/`, `transport-netty/`, `steam-jna/` (Java 8-21) и `steam-panama/` (Java 25), каждая версия Minecraft в `adapters/<target>/` со своим Gradle wrapper.
+
+Нужны JDK 8, 17, 21 и 25 и переменные `JAVA_HOME_8`, `JAVA_HOME_17`, `JAVA_HOME_21`, `JAVA_HOME_25` (или `tools/fetch_jdks.py` на Windows), а также Python 3.
 
 ```text
-core/             попытки подключения, handles, JSON, ограниченные cache, UDP
-steam-jna/        прежний JNA backend и исходники общих voice adapters
-steam-panama/     Java 25 FFM bindings и общий runtime для 26.x
-transport-netty/  TCP-мост, ограниченные очереди, backpressure
-runtime/          общий lifecycle manager/client/server и социальные хранилища
-integrations/     проверка voice API по релизным JAR
-adapters/         интеграция с Minecraft, загрузчиками и GUI
-build-logic/      общие исходники и упаковка natives для выбранной ОС
-tools/            сборка, тесты и проверка native linkage
+python tools/test.py                            # тесты
+python tools/build.py                           # все версии, 0.0.0-dev
+python tools/build.py --variant forge-1.12.2    # одна версия
+python tools/build.py --version 1.3             # релиз
 ```
 
-Коннектор, TCP/UDP-транспорт, lifecycle manager/client/server, состояния входа, баны, настройки миров и cache профилей общие. В адаптерах остаются Minecraft-экраны, login pipeline, вызовы игрового потока и загрузка текстур. Исходные ветки и commits перечислены в [variants.json](variants.json).
+Основные jar попадают в `dist/windows-x64/` (они же для Linux), Linux Runtime в `dist/addons/`.
 
-## Варианты
+Заметки:
 
-| Вариант | Java игры | Java сборки |
-| --- | --- | --- |
-| forge-1.7.10 | 8 | 8 |
-| forge-1.8.9 | 8 | 8 |
-| forge-1.12.2 | 8 | 8 |
-| forge-1.16.5 | 8 | 17 |
-| forge-1.19.2 | 17 | 17 |
-| fabric-1.19.2 | 17 | 17 |
-| fabric-1.20.1 | 17 | 17 |
-| fabric-1.21.1 | 21 | 21 |
-| neoforge-1.20.1 | 17 | 17 |
-| neoforge-1.21.1 | 21 | 21 |
-| neoforge-26.x (26.1 / 26.2 / 26.3) | 25 | 25 |
+- AppID Steam: **480 (Spacewar)**. Клиент Steam должен быть запущен.
+- Релиз: `--version 1.3` -> `1.3+mc<mc_version>`. Без него: `0.0.0-dev+mc<mc_version>`.
+- **Forge 1.19.2:** собирается NeoForged ModDevGradle legacyforge против **MinecraftForge** 1.19.2-43.5.0.
+- **NeoForge 1.20.1:** coordinate `net.neoforged:forge` 1.20.1-47.1.106.
+- Старые ветки по версиям оставлены для истории и больше не обновляются.
 
-Для старых вариантов это конкретные версии Minecraft. Для NeoForge 26.1/26.2/26.3 выпускается один JAR с внутренними адаптерами. Точные версии компиляции и оставшиеся runtime-проверки перечислены в [статусе порта 26.x](docs/NEOFORGE_26X.md). Один репозиторий выпускает несколько совместимых JAR. У хоста и гостя должны совпадать совместимые версии игры и модпака. NeoForge 1.20.1 использует исходную зависимость `net.neoforged:forge` 47.1.106, а не NeoForge 20.x.
+---
+## Важные замечания
 
-## Использование
+Не используйте AppID реальных игр. Это может привести к проблемам с VAC/EAC, при этом, в такой ситуации, работоспособность мода - не гарантирована.
 
-1. Установить подходящий JAR в `mods` на обеих машинах. Fabric также требует Fabric API.
-2. Запустить Steam, Spacewar и Minecraft.
-3. Хост открывает одиночный мир для LAN через Steam Bridge.
-4. Гость выбирает хоста в списке Steam-друзей или вводит SteamID64 в прямом подключении.
+---
 
-Windows использует основной JAR. На Linux x64 устанавливается тот же основной JAR и один SBM Linux Runtime. Четыре runtime покрывают поддерживаемые версии по группам Java 8, 17, 21 и 25. Выбирается группа целевого Minecraft/загрузчика, даже при запуске на более новой JVM. [Таблица установки и границы проверки](docs/LINUX_RUNTIME.md). Настоящая Linux JVM и игровой запуск Minecraft/Steam ещё требуют проверки. Пакетов ARM, 32-bit и macOS нет.
+## Настройка
 
-## Что изменилось
+Все версии используют `config/steambridge.json`.
 
-- Старые callbacks и отменённые задачи проверяются по владельцу и handle, чтобы не закрывать новое подключение.
-- Listener и ByteBuf освобождаются при отмене и закрытии. Полученные native messages освобождаются и при ошибке внутри batch.
-- Очереди ограничены по payload: 8 MiB на направление одного TCP-моста и 128 MiB на все мосты вместе. Это не лимит общего потребления памяти Minecraft.
-- При заполнении Steam send queue применяется backpressure; обработка receive ограничена по peer. Принудительная минимальная скорость и автоматический безлимит по низкому ping удалены.
-- Native shutdown ждёт завершения использующих API потоков; просроченная очистка не должна затрагивать новый SDK runtime.
-- ESC отменяет подключение; сохранён экран Minecraft с исходной причиной разрыва. Исправлено освобождение аватаров.
-- Основной JAR сохраняет Windows Steam natives. Упакованная JNA также содержит Linux bootstrap своей версии; Steam Linux natives поставляются отдельным runtime. При предоставлении JNA загрузчиком повторная копия не включается.
+- **Порт 25565:** при запуске мира через Steam Bridge порт должен быть свободен. Если он уже используется другим процессом, выберите другой порт в конфигурации мода.
+- **allowWithoutAuth:** `true` (по умолчанию) - без проверки Steam Session Ticket (проще при проблемах с NAT, слабее безопасность). `false` - строгая проверка.
+- **interceptUdp:** `true` (по умолчанию) пускает войс-моды (Simple Voice Chat, Plasmo Voice) через Steam рядом с игровым трафиком. На 1.7.10 / 1.8.9 нет.
+- **iceEnabled:** `false` - только релеи Valve (см. [Linux](#linux)).
 
-Для NeoForge 26.x нужен один `steambridge-neoforge-26.x-*.jar` под все три целевые версии. Внутри Steam SDK DLL и прямые вызовы Project Panama, без JNA и JNI bridge steamworks4j. [Статус разработки 26.x](docs/NEOFORGE_26X.md).
+[Пример конфигурации](docs/steambridge.example.json).
 
-## Настройки и голос
+---
 
-Все адаптеры используют `config/steambridge.json`. Настройки полностью проверяются перед применением неизменяемого snapshot. Отсутствующий JSON создаётся атомарно; значения из старого `steambridge-client.toml`, `steambridge-common.toml` или `steambridge.cfg` переносятся, оригинал сохраняется. Ошибка конфигурации попадает в лог, предыдущие настройки остаются активными. После изменения файла нужно перезапустить Minecraft. [Пример JSON](docs/steambridge.example.json) содержит все параметры. Virtual port: 0..65534; голос использует следующий виртуальный порт. Если ICE-согласование зависает в сетевой службе Steam (так было с Linux-гостем), поставьте `iceEnabled: false`: весь трафик пойдёт через relay Valve.
+## Лицензии
 
-При `interceptUdp` Simple Voice Chat подключается через API сокетов, если он доступен. Обычное подключение по IP сохраняет стандартный клиентский сокет; сокет, установленный другим голосовым плагином, не подменяется. Для старого Simple Voice Chat без клиентского socket API оставлен фильтр глобальной JVM factory. Forge 1.7.10/1.8.9 сохраняют исходное отсутствие голосового туннеля.
+- **Steam Bridge** : [MIT License](LICENSE). Copyright (c) 2026 [Ragalikx](https://github.com/Ragalikx).
+- **steamworks4j** : [MIT License](third_party_licenses/steamworks4j_LICENSE.txt) (Daniel Ludwig / code-disaster).
+- **Java Native Access (JNA)** : [Apache License 2.0](third_party_licenses/JNA_AL2.0.txt).
 
-Plasmo подключается через опубликованный addon/UDP API и маленький локальный relay. Прежние voice mixins удалены. Оборачивается стандартный Netty UDP client; сокет другого аддона сохраняется. События запуска/остановки сервера передают настоящий адрес и порт привязки, включая IPv6. У каждого допущенного игрового peer может быть одно голосовое соединение. Старая игровая сессия не закрывает заменившую её. API обеих реализаций SBM проверен по 13 закреплённым JAR Plasmo/Simple Voice Chat, включая девять сборок NeoForge 26.x; настоящая голосовая сессия ещё требует проверки в Minecraft/Steam. Выбранный голосовой мод устанавливается отдельно. Voice API, Plasmo, Kotlin и ASM не упаковываются в SBM. [Границы интеграции и источники](docs/VOICE_COMPATIBILITY.md). Одновременная работа Simple Voice Chat и Plasmo через один клиентский туннель не поддерживается.
+> **Steam Bridge не связан с Valve. "Steam" является торговой маркой Valve. Мод использует официальные библиотеки Steamworks SDK для работы сети. Все права на них принадлежат Valve.**
 
-При обычном закрытии TCP мост получает до двух секунд на передачу очереди. Успешная отправка запрашивает Steam linger; при закрытии peer уже полученные данные сначала передаются Minecraft. Отмена и ошибки транспорта закрывают соединение сразу. Каждый cache профилей ограничен 256 записями, вытеснение аватара освобождает его texture.
+---
 
-## Сборка
+## Поддержать автора
 
-Нужны JDK 8/17/21/25 и Python 3. Пути задаются через `JAVA_HOME_8`, `JAVA_HOME_17`, `JAVA_HOME_21`, `JAVA_HOME_25`. Windows-скрипт `tools/fetch_jdks.py` скачивает JDK в пользовательский cache и проверяет SHA-256.
+Поддержка проекта полностью добровольная. Если есть желание поддержать разработку, можно воспользоваться любым из способов ниже:
 
-```text
-python tools/test.py
-python tools/verify_voice.py --download
-python tools/verify_abi.py --download
-python tools/build.py --variant fabric-1.21.1 --platform windows-x64
-python tools/build.py --variant neoforge-26.x
-python tools/verify_native.py --variant fabric-1.21.1
+**Bitcoin (BTC)**
+```
+bc1q2e7hxvv90qm5menfc9m9nd8q43g4w6hmdfuhk3
 ```
 
-Результаты: `dist/<platform>/`, рядом с каждым JAR лежит `.sha256`, общая информация находится в `build-results.json`. Версия по умолчанию `0.0.0-dev`, для своей версии используйте `--version 1.3.0`. Отчёты тестов сохраняются в `build/test-reports/java-<runtime>/`.
+**Litecoin (LTC)**
+```
+ltc1q075u480ug7c7wne9tv34yf8suskvtr68rd4q9y
+```
 
-[Проверки и критерии выпуска](docs/TESTING.md). Проверка native linkage загружает библиотеки и проверяет exports, но не запускает Steam и не проверяет SDR. C/JNA/Panama сверяются с закреплённым снимком Steamworks SDK 1.62, включая сигнатуры функций и callback layouts. Источник является публичным зеркалом с нормализованными окончаниями строк; оригинальный ZIP Valve не проверен. [Объём и происхождение проверки](docs/STEAMWORKS_ABI.md).
-
-## GitHub CI
-
-Workflow проверяет Java 8/17/21, C/JNA layouts на Windows/Linux и контракты voice API, собирает основные пакеты. Для 26.x отдельно проверяются Panama на Java 25 и три внутренних адаптера. Ubuntu jobs проверяют native runtime для всех 11 старых интеграций и Java 25. Наружу сохраняются четыре общих Linux runtime JAR с SHA-256 и шагами attestation вне PR. Публикации GitHub Release нет; сам workflow в GitHub пока не запускался.
-
-SHA-256 подтверждает совпадение байтов. [Attestation](https://docs.github.com/en/actions/concepts/security/artifact-attestations) позволяет проверить происхождение сборки, но не гарантирует отсутствие ошибок. Изменяемый ForgeGradle 2.1 snapshot заменён конкретным timestamp-артефактом с SHA-256. Для десяти критичных native/API зависимостей добавлены checksum locks. Это не проверка всей транзитивной цепочки Minecraft и не доказательство воспроизводимости сборки.
-
-## Лицензия
-
-[MIT](LICENSE), автор Ragalikx. Обязательные уведомления о лицензиях зависимостей включаются в JAR. Steam принадлежит Valve; проект не связан с Valve.
-
-[Предыдущая документация веток](docs/legacy/readmeru.md) сохранена как история; её инструкции сборки и статусы не описывают `26.x`.
+**USDT (сеть TRC-20, Tron)**
+```
+TVzTdidAdYnQyTth1RoY8duyHQnxcuHDrC
+```
